@@ -348,7 +348,7 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
                   )}
                   {rol.value === 'vendedor' && (
                     <>
-                      <li>• Crear cotizaciones</li>
+                      <li>• Crear cotizacionesporjoan</li>
                       <li>• Ver proyectos</li>
                       <li>• Facturar proyectos</li>
                       <li>• Dashboard de ventas</li>
