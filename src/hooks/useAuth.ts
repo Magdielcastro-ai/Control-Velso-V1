@@ -55,7 +55,12 @@ export function useAuth() {
         // SIEMPRE marcar como inicializado al final
         setLoading(false);
         setInitialized(true);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setLoading(false);
+        setInitialized(true);
       }
+    });
 
     // Forzar verificación de sesión existente
     const checkSession = async () => {
