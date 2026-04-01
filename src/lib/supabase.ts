@@ -4,7 +4,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,        // ← Guarda sesión en localStorage
+    autoRefreshToken: true,      // ← Refresca token automáticamente
+    detectSessionInUrl: true,    // ← Detecta sesión en URL
+    storage: localStorage,       // ← Usa localStorage
+  },
+});
 
 // Tipos para los datos
 type UserRole = 'admin' | 'vendedor' | 'produccion';
@@ -152,27 +159,23 @@ export async function getCurrentUser() {
   try {
     console.log('[getCurrentUser] Iniciando...');
     
-    // Timeout de 10 segundos
-    const getUserPromise = supabase.auth.getUser();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 10000)
-    );
+    // Primero obtener la sesión (recupera de localStorage)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    const result = await Promise.race([getUserPromise, timeoutPromise]) as any;
-    const { data: { user }, error } = result;
-    
-    console.log('[getCurrentUser] User:', user?.id);
-    
-    if (error) {
-      console.error('[getCurrentUser] Error:', error);
+    if (sessionError) {
+      console.error('[getCurrentUser] Error de sesión:', sessionError);
       return null;
     }
-    if (!user) {
-      console.log('[getCurrentUser] No hay sesión');
+    
+    if (!session) {
+      console.log('[getCurrentUser] No hay sesión activa');
       return null;
     }
-
-    console.log('[getCurrentUser] Buscando perfil...');
+    
+    console.log('[getCurrentUser] Sesión encontrada:', session.user.id);
+    
+    // Usar el usuario de la sesión
+    const user = session.user;
     const perfil = await getPerfilUsuario(user.id);
     console.log('[getCurrentUser] Perfil:', perfil);
     
@@ -182,6 +185,7 @@ export async function getCurrentUser() {
     return null;
   }
 }
+
 // Funciones para cotizaciones
 export async function getCotizaciones(): Promise<CotizacionDB[]> {
   const { data, error } = await supabase
