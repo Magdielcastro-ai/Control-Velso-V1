@@ -137,13 +137,21 @@ export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | 
 }
 
 export async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('[getCurrentUser] Error getting user:', error);
+      return null;
+    }
+    if (!user) return null;
 
-  const perfil = await getPerfilUsuario(user.id);
-  return { ...user, perfil };
+    const perfil = await getPerfilUsuario(user.id);
+    return { ...user, perfil };
+  } catch (error) {
+    console.error('[getCurrentUser] Unexpected error:', error);
+    return null;
+  }
 }
-
 // Funciones para cotizaciones
 export async function getCotizaciones(): Promise<CotizacionDB[]> {
   const { data, error } = await supabase
