@@ -33,7 +33,7 @@ export function useAuth() {
             setLoading(false);
             setInitialized(true);
           }
-        }, 3000);
+        }, 10000);
 
         const currentUser = await getCurrentUser();
         console.log('[useAuth] Usuario obtenido:', currentUser);
