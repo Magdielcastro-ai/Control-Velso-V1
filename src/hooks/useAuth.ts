@@ -26,7 +26,7 @@ export function useAuth() {
       try {
         console.log('[useAuth] Iniciando carga de usuario...');
         
-            // Timeout de seguridad - si tarda más de 3 segundos, forzar fin de carga
+        // Timeout de seguridad - si tarda más de 3 segundos, forzar fin de carga
         timeoutId = setTimeout(() => {
           if (isMounted && !initialized) {
             console.warn('[useAuth] Timeout - forzando fin de carga');
@@ -118,7 +118,7 @@ export function useAuth() {
       }
       throw new Error('No se pudo iniciar sesión');
     } catch (error: any) {
-      console.error('[useAuth] Error en signIn:', error);
+      console.error('Error en signIn:', error);
       throw error;
     } finally {
       setLoading(false);
