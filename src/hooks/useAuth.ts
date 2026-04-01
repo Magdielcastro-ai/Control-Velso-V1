@@ -28,8 +28,10 @@ export function useAuth() {
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session?.user) {
+          console.log('[useAuth] Cargando perfil para:', session.user.id);
           try {
             const perfil = await getPerfilUsuario(session.user.id);
+            console.log('[useAuth] Perfil obtenido:', perfil);
             if (perfil) {
               setUser({
                 id: session.user.id,
@@ -46,19 +48,14 @@ export function useAuth() {
             console.error('[useAuth] Error cargando perfil:', error);
             setUser(null);
           }
-          setLoading(false);
-          setInitialized(true);
         } else {
+          console.log('[useAuth] No hay usuario en sesión');
           setUser(null);
-          setLoading(false);
-          setInitialized(true);
         }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
+        // SIEMPRE marcar como inicializado al final
         setLoading(false);
         setInitialized(true);
       }
-    });
 
     // Forzar verificación de sesión existente
     const checkSession = async () => {
