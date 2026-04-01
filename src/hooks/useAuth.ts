@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getPerfilUsuario, signIn as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
 
-export type UserRole = 'admin' | 'vendedor' | 'produccion';
+export type UserRole = 'superadmin' | 'admin' | 'vendedor' | 'produccion';
 
 export interface AuthUser {
   id: string;
@@ -148,14 +148,19 @@ export function useAuth() {
   }, []);
 
   // Permisos basados en roles
+  // SUPERADMIN: Todo el acceso
+  // ADMIN: Ver y modificar todo, pero NO crear usuarios ni cambiar roles
+  // VENDEDOR: Cotizar y facturar
+  // PRODUCCION: Actualizar estados de producción
+
   const canCreateCotizacion = useCallback(() => {
     if (!user) return false;
-    return user.rol === 'admin' || user.rol === 'vendedor';
+    return ['superadmin', 'admin', 'vendedor'].includes(user.rol);
   }, [user]);
 
   const canEditCotizacion = useCallback(() => {
     if (!user) return false;
-    return user.rol === 'admin' || user.rol === 'vendedor';
+    return ['superadmin', 'admin', 'vendedor'].includes(user.rol);
   }, [user]);
 
   const canViewProyectos = useCallback(() => {
@@ -165,30 +170,36 @@ export function useAuth() {
 
   const canUpdateProyectoEstado = useCallback((nuevoEstado?: string) => {
     if (!user) return false;
-    if (user.rol === 'admin') return true;
+    if (['superadmin', 'admin'].includes(user.rol)) return true;
     if (user.rol === 'produccion') {
-      // Producción puede marcar como fabricado y entregado
       return nuevoEstado === 'fabricado' || nuevoEstado === 'entregado';
     }
     if (user.rol === 'vendedor') {
-      // Vendedor puede facturar
       return nuevoEstado === 'facturado';
     }
     return false;
   }, [user]);
 
+  // SOLO SUPERADMIN puede crear usuarios y cambiar roles
   const canManageUsers = useCallback(() => {
-    return user?.rol === 'admin';
+    return user?.rol === 'superadmin';
   }, [user]);
 
+  // SUPERADMIN y ADMIN pueden ver dashboard
   const canViewDashboard = useCallback(() => {
     if (!user) return false;
-    return user.rol === 'admin' || user.rol === 'vendedor';
+    return ['superadmin', 'admin', 'vendedor'].includes(user.rol);
   }, [user]);
 
   const canViewControlCodigos = useCallback(() => {
     if (!user) return false;
-    return user.rol === 'admin' || user.rol === 'produccion';
+    return ['superadmin', 'admin', 'produccion'].includes(user.rol);
+  }, [user]);
+
+  // SUPERADMIN y ADMIN pueden modificar catálogos
+  const canManageCatalogos = useCallback(() => {
+    if (!user) return false;
+    return ['superadmin', 'admin'].includes(user.rol);
   }, [user]);
 
   return {
@@ -206,5 +217,6 @@ export function useAuth() {
     canManageUsers,
     canViewDashboard,
     canViewControlCodigos,
+    canManageCatalogos,
   };
 }
