@@ -133,6 +133,7 @@ function App() {
     user, 
     loading: authLoading, 
     initialized, 
+    error: authError,
     signIn, 
     signOut,
     canCreateCotizacion,
@@ -381,13 +382,24 @@ function App() {
   const indicePasoActual = pasos.findIndex(p => p.id === pasoActual);
   const progreso = ((indicePasoActual + 1) / pasos.length) * 100;
 
-  // Mostrar loading mientras inicializa auth
+   // Mostrar loading mientras inicializa auth
   if (!initialized || authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <Factory className="w-12 h-12 animate-pulse mx-auto text-blue-600 mb-4" />
           <p className="text-slate-500">Cargando...</p>
+          {authError && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg max-w-md">
+              <p className="text-red-600 text-sm">{authError}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+              >
+                Reintentar
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
