@@ -126,43 +126,62 @@ export async function signOut() {
 }
 
 export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | null> {
-  const { data, error } = await supabase
-    .from('perfiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  console.log('[getPerfilUsuario] ID:', userId);
+  
+  try {
+    const { data, error } = await supabase
+      .from('perfiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-  if (error) return null;
-  return data;
+    if (error) {
+      console.error('[getPerfilUsuario] Error:', error);
+      return null;
+    }
+    
+    console.log('[getPerfilUsuario] Encontrado:', data);
+    return data;
+  } catch (err) {
+    console.error('[getPerfilUsuario] Excepción:', err);
+    return null;
+  }
 }
 
 export async function getCurrentUser() {
   try {
-    // Timeout de 3 segundos para getUser
+    console.log('[getCurrentUser] Iniciando...');
+    
+    // Timeout de 10 segundos
     const getUserPromise = supabase.auth.getUser();
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 3000)
+      setTimeout(() => reject(new Error('Timeout')), 10000)
     );
     
-    const { data: { user }, error } = await Promise.race([getUserPromise, timeoutPromise]) as any;
+    const result = await Promise.race([getUserPromise, timeoutPromise]) as any;
+    const { data: { user }, error } = result;
+    
+    console.log('[getCurrentUser] User:', user?.id);
     
     if (error) {
-      console.error('[getCurrentUser] Error getting user:', error);
+      console.error('[getCurrentUser] Error:', error);
       return null;
     }
     if (!user) {
-      console.log('[getCurrentUser] No user session');
+      console.log('[getCurrentUser] No hay sesión');
       return null;
     }
 
+    console.log('[getCurrentUser] Buscando perfil...');
     const perfil = await getPerfilUsuario(user.id);
+    console.log('[getCurrentUser] Perfil:', perfil);
+    
     return { ...user, perfil };
   } catch (error: any) {
     console.error('[getCurrentUser] Error:', error.message);
     return null;
   }
 }
-
 // Funciones para cotizaciones
 export async function getCotizaciones(): Promise<CotizacionDB[]> {
   const { data, error } = await supabase
