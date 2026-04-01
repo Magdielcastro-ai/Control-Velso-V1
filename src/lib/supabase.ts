@@ -14,7 +14,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 // Tipos para los datos
-type UserRole = 'admin' | 'vendedor' | 'produccion';
+type UserRole = 'superadmin' | 'admin' | 'vendedor' | 'produccion';
 
 export interface PerfilUsuario {
   id: string;
