@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, getCurrentUser, signIn as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
+import { supabase, getPerfilUsuario, signIn as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
 
 export type UserRole = 'admin' | 'vendedor' | 'produccion';
 
@@ -15,83 +15,77 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Cargar usuario al iniciar
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
 
-    const loadUser = async () => {
-      try {
-        console.log('[useAuth] Iniciando carga de usuario...');
-        
-        // Timeout de seguridad - si tarda más de 3 segundos, forzar fin de carga
-        timeoutId = setTimeout(() => {
-          if (isMounted && !initialized) {
-            console.warn('[useAuth] Timeout - forzando fin de carga');
-            setLoading(false);
-            setInitialized(true);
+    // Configurar listener de auth PRIMERO (antes de cargar la sesión)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] Auth state changed:', event, session?.user?.id);
+      
+      if (!isMounted) return;
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session?.user) {
+          try {
+            const perfil = await getPerfilUsuario(session.user.id);
+            if (perfil) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                nombre: perfil.nombre,
+                rol: perfil.rol,
+                activo: perfil.activo,
+              });
+            } else {
+              console.warn('[useAuth] Usuario sin perfil');
+              setUser(null);
+            }
+          } catch (error) {
+            console.error('[useAuth] Error cargando perfil:', error);
+            setUser(null);
           }
-        }, 10000);
+          setLoading(false);
+          setInitialized(true);
+        } else {
+          setUser(null);
+          setLoading(false);
+          setInitialized(true);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setLoading(false);
+        setInitialized(true);
+      }
+    });
 
-        const currentUser = await getCurrentUser();
-        console.log('[useAuth] Usuario obtenido:', currentUser);
+    // Forzar verificación de sesión existente
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[useAuth] Sesión inicial:', session?.user?.id);
         
-        if (!isMounted) return;
-
-        if (currentUser && currentUser.perfil) {
-          setUser({
-            id: currentUser.id,
-            email: currentUser.email || '',
-            nombre: currentUser.perfil.nombre,
-            rol: currentUser.perfil.rol,
-            activo: currentUser.perfil.activo,
-          });
+        // Si no hay sesión, marcar como inicializado
+        if (!session && isMounted) {
+          setUser(null);
+          setLoading(false);
+          setInitialized(true);
         }
-      } catch (err: any) {
-        console.error('[useAuth] Error cargando usuario:', err);
+        // Si hay sesión, onAuthStateChange ya se habrá disparado
+      } catch (err) {
+        console.error('[useAuth] Error verificando sesión:', err);
         if (isMounted) {
-          setError(err.message || 'Error al cargar usuario');
-        }
-      } finally {
-        clearTimeout(timeoutId);
-        if (isMounted) {
-          console.log('[useAuth] Carga completada');
           setLoading(false);
           setInitialized(true);
         }
       }
     };
 
-    loadUser();
-
-    // Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[useAuth] Auth state changed:', event);
-      if (event === 'SIGNED_IN' && session?.user) {
-        try {
-          const perfil = await getCurrentUser();
-          if (perfil && perfil.perfil) {
-            setUser({
-              id: perfil.id,
-              email: perfil.email || '',
-              nombre: perfil.perfil.nombre,
-              rol: perfil.perfil.rol,
-              activo: perfil.perfil.activo,
-            });
-          }
-        } catch (error) {
-          console.error('[useAuth] Error en auth state change:', error);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-      }
-    });
+    checkSession();
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
@@ -101,14 +95,14 @@ export function useAuth() {
     try {
       const data = await supabaseSignIn(email, password);
       if (data.user) {
-        const perfil = await getCurrentUser();
-        if (perfil && perfil.perfil) {
+        const perfil = await getPerfilUsuario(data.user.id);
+        if (perfil) {
           const authUser: AuthUser = {
-            id: perfil.id,
-            email: perfil.email || '',
-            nombre: perfil.perfil.nombre,
-            rol: perfil.perfil.rol,
-            activo: perfil.perfil.activo,
+            id: data.user.id,
+            email: data.user.email || '',
+            nombre: perfil.nombre,
+            rol: perfil.rol,
+            activo: perfil.activo,
           };
           setUser(authUser);
           return authUser;
@@ -183,7 +177,6 @@ export function useAuth() {
     user,
     loading,
     initialized,
-    error,
     signIn,
     signOut,
     isAuthenticated: !!user,
