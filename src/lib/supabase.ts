@@ -6,10 +6,10 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,        // ← Guarda sesión en localStorage
-    autoRefreshToken: true,      // ← Refresca token automáticamente
-    detectSessionInUrl: true,    // ← Detecta sesión en URL
-    storage: localStorage,       // ← Usa localStorage
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: localStorage,
   },
 });
 
@@ -136,11 +136,18 @@ export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | 
   console.log('[getPerfilUsuario] Buscando ID:', userId);
   
   try {
-    const { data, error } = await supabase
+    // Crear promesa con timeout de 5 segundos
+    const queryPromise = supabase
       .from('perfiles')
       .select('*')
       .eq('id', userId)
-      .maybeSingle(); // ← Cambiado de .single() a .maybeSingle()
+      .maybeSingle();
+    
+    const timeoutPromise = new Promise<{data: null, error: Error}>((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout consultando perfiles')), 5000)
+    );
+    
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
     if (error) {
       console.error('[getPerfilUsuario] Error:', error);
@@ -149,8 +156,8 @@ export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | 
     
     console.log('[getPerfilUsuario] Resultado:', data);
     return data;
-  } catch (err) {
-    console.error('[getPerfilUsuario] Excepción:', err);
+  } catch (err: any) {
+    console.error('[getPerfilUsuario] Excepción/Timeout:', err.message);
     return null;
   }
 }
