@@ -17,32 +17,38 @@ import {
   Factory,
   Loader2,
   CheckCircle,
-  XCircle
+  XCircle,
+  Crown
 } from 'lucide-react';
 import { supabase, type PerfilUsuario } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface AdminUsuariosViewProps {
   onVolver: () => void;
+  userRol?: string; // Rol del usuario actual
 }
 
 const ROLES = [
-  { value: 'admin', label: 'Administrador', icon: Shield, color: 'bg-purple-600' },
-  { value: 'vendedor', label: 'Vendedor', icon: User, color: 'bg-blue-600' },
-  { value: 'produccion', label: 'Producción', icon: Factory, color: 'bg-green-600' },
+  { value: 'superadmin', label: 'Super Admin', icon: Crown, color: 'bg-yellow-600', description: 'Acceso total al sistema' },
+  { value: 'admin', label: 'Administrador', icon: Shield, color: 'bg-purple-600', description: 'Ver y modificar todo, excepto usuarios' },
+  { value: 'vendedor', label: 'Vendedor', icon: User, color: 'bg-blue-600', description: 'Crear cotizaciones y facturar' },
+  { value: 'produccion', label: 'Producción', icon: Factory, color: 'bg-green-600', description: 'Actualizar estados de producción' },
 ];
 
-export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
+export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuariosViewProps) {
   const [usuarios, setUsuarios] = useState<PerfilUsuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
   
+  // Verificar si es superadmin
+  const isSuperAdmin = userRol === 'superadmin';
+  
   // Formulario nuevo usuario
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rol, setRol] = useState<'admin' | 'vendedor' | 'produccion'>('vendedor');
+  const [rol, setRol] = useState<'superadmin' | 'admin' | 'vendedor' | 'produccion'>('vendedor');
 
   useEffect(() => {
     cargarUsuarios();
@@ -72,6 +78,12 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
       return;
     }
 
+    // Solo superadmin puede crear usuarios
+    if (!isSuperAdmin) {
+      toast.error('Solo el Super Admin puede crear usuarios');
+      return;
+    }
+
     setGuardando(true);
     try {
       // 1. Crear usuario en auth
@@ -83,7 +95,7 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
       if (authError) throw authError;
       if (!authData.user) throw new Error('No se pudo crear el usuario');
 
-      // 2. Crear perfil
+      // 2. Crear perfil del usuario
       const { error: perfilError } = await supabase
         .from('perfiles')
         .insert([{ 
@@ -111,6 +123,12 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
   };
 
   const handleCambiarRol = async (userId: string, nuevoRol: string) => {
+    // Solo superadmin puede cambiar roles
+    if (!isSuperAdmin) {
+      toast.error('Solo el Super Admin puede cambiar roles');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('perfiles')
@@ -126,6 +144,12 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
   };
 
   const handleActivarDesactivar = async (userId: string, activo: boolean) => {
+    // Solo superadmin puede activar/desactivar
+    if (!isSuperAdmin) {
+      toast.error('Solo el Super Admin puede activar/desactivar usuarios');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('perfiles')
@@ -141,8 +165,11 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
   };
 
   const getRolConfig = (rolValue: string) => {
-    return ROLES.find(r => r.value === rolValue) || ROLES[1];
+    return ROLES.find(r => r.value === rolValue) || ROLES[2];
   };
+
+  // Filtrar roles disponibles para crear (superadmin puede crear cualquiera, pero no se muestra la opción de superadmin por seguridad)
+  const rolesDisponibles = isSuperAdmin ? ROLES.filter(r => r.value !== 'superadmin') : [];
 
   return (
     <div className="space-y-6">
@@ -161,90 +188,104 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
             {usuarios.length} usuarios registrados
           </p>
         </div>
-        <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
-          <DialogTrigger asChild>
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Usuario
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Nombre completo *</Label>
-                <Input
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Juan Pérez"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Correo electrónico *</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="juan@velso.mx"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Contraseña *</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Rol *</Label>
-                <Select value={rol} onValueChange={(v) => setRol(v as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>
-                        <div className="flex items-center gap-2">
-                          <r.icon className="w-4 h-4" />
-                          {r.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertDescription className="text-blue-700 text-sm">
-                  El usuario recibirá un correo de confirmación para activar su cuenta.
-                </AlertDescription>
-              </Alert>
-
-              <Button
-                onClick={handleCrearUsuario}
-                disabled={guardando || !nombre || !email || !password}
-                className="w-full bg-purple-600 hover:bg-purple-700"
-              >
-                {guardando ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  'Crear Usuario'
-                )}
+        
+        {/* Solo Super Admin puede crear usuarios */}
+        {isSuperAdmin && (
+          <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
+            <DialogTrigger asChild>
+              <Button className="bg-purple-600 hover:bg-purple-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Usuario
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Nombre completo *</Label>
+                  <Input
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    placeholder="Ej: Juan Pérez"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Correo electrónico *</Label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="juan@velso.mx"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contraseña *</Label>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Rol *</Label>
+                  <Select value={rol} onValueChange={(v) => setRol(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rolesDisponibles.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          <div className="flex items-center gap-2">
+                            <r.icon className="w-4 h-4" />
+                            {r.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Alert className="bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-blue-700 text-sm">
+                    El usuario recibirá un correo de confirmación para activar su cuenta.
+                  </AlertDescription>
+                </Alert>
+
+                <Button
+                  onClick={handleCrearUsuario}
+                  disabled={guardando || !nombre || !email || !password}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  {guardando ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    'Crear Usuario'
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
+
+      {/* Mensaje para Admin (no superadmin) */}
+      {!isSuperAdmin && (
+        <Alert className="bg-amber-50 border-amber-200">
+          <AlertDescription className="text-amber-700 text-sm">
+            Como Administrador, puedes ver todos los usuarios pero no puedes crear nuevos usuarios ni cambiar roles. 
+            Contacta al Super Admin para estas acciones.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Lista de usuarios */}
       {loading ? (
@@ -289,30 +330,40 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Select
-                        value={usuario.rol}
-                        onValueChange={(v) => handleCambiarRol(usuario.id, v)}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLES.map((r) => (
-                            <SelectItem key={r.value} value={r.value}>
-                              {r.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* Solo Super Admin puede cambiar roles */}
+                      {isSuperAdmin ? (
+                        <Select
+                          value={usuario.rol}
+                          onValueChange={(v) => handleCambiarRol(usuario.id, v)}
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ROLES.map((r) => (
+                              <SelectItem key={r.value} value={r.value}>
+                                {r.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge className={`${rolConfig.color} text-white`}>
+                          {rolConfig.label}
+                        </Badge>
+                      )}
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleActivarDesactivar(usuario.id, usuario.activo)}
-                        className={usuario.activo ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
-                      >
-                        {usuario.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                      </Button>
+                      {/* Solo Super Admin puede activar/desactivar */}
+                      {isSuperAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleActivarDesactivar(usuario.id, usuario.activo)}
+                          className={usuario.activo ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
+                        >
+                          {usuario.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -328,7 +379,7 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
           <CardTitle className="text-lg">Permisos por Rol</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {ROLES.map((rol) => (
               <div key={rol.value} className="bg-white p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
@@ -337,18 +388,27 @@ export function AdminUsuariosView({ onVolver }: AdminUsuariosViewProps) {
                   </div>
                   <span className="font-medium">{rol.label}</span>
                 </div>
+                <p className="text-xs text-slate-500 mb-2">{rol.description}</p>
                 <ul className="text-xs text-slate-500 space-y-1">
-                  {rol.value === 'admin' && (
+                  {rol.value === 'superadmin' && (
                     <>
                       <li>• Todo el acceso</li>
                       <li>• Crear/editar usuarios</li>
+                      <li>• Cambiar roles</li>
+                      <li>• Dashboard completo</li>
+                    </>
+                  )}
+                  {rol.value === 'admin' && (
+                    <>
+                      <li>• Ver y modificar todo</li>
                       <li>• Dashboard completo</li>
                       <li>• Control de códigos</li>
+                      <li>• ❌ No gestiona usuarios</li>
                     </>
                   )}
                   {rol.value === 'vendedor' && (
                     <>
-                      <li>• Crear cotizacionesporjoan</li>
+                      <li>• Crear cotizaciones</li>
                       <li>• Ver proyectos</li>
                       <li>• Facturar proyectos</li>
                       <li>• Dashboard de ventas</li>
