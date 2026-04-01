@@ -138,20 +138,31 @@ export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | 
 
 export async function getCurrentUser() {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    // Timeout de 3 segundos para getUser
+    const getUserPromise = supabase.auth.getUser();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 3000)
+    );
+    
+    const { data: { user }, error } = await Promise.race([getUserPromise, timeoutPromise]) as any;
+    
     if (error) {
       console.error('[getCurrentUser] Error getting user:', error);
       return null;
     }
-    if (!user) return null;
+    if (!user) {
+      console.log('[getCurrentUser] No user session');
+      return null;
+    }
 
     const perfil = await getPerfilUsuario(user.id);
     return { ...user, perfil };
-  } catch (error) {
-    console.error('[getCurrentUser] Unexpected error:', error);
+  } catch (error: any) {
+    console.error('[getCurrentUser] Error:', error.message);
     return null;
   }
 }
+
 // Funciones para cotizaciones
 export async function getCotizaciones(): Promise<CotizacionDB[]> {
   const { data, error } = await supabase
