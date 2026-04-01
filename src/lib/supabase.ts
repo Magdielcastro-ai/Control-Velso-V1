@@ -133,21 +133,21 @@ export async function signOut() {
 }
 
 export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | null> {
-  console.log('[getPerfilUsuario] ID:', userId);
+  console.log('[getPerfilUsuario] Buscando ID:', userId);
   
   try {
     const { data, error } = await supabase
       .from('perfiles')
       .select('*')
       .eq('id', userId)
-      .maybeSingle();
+      .maybeSingle(); // ← Cambiado de .single() a .maybeSingle()
 
     if (error) {
       console.error('[getPerfilUsuario] Error:', error);
       return null;
     }
     
-    console.log('[getPerfilUsuario] Encontrado:', data);
+    console.log('[getPerfilUsuario] Resultado:', data);
     return data;
   } catch (err) {
     console.error('[getPerfilUsuario] Excepción:', err);
