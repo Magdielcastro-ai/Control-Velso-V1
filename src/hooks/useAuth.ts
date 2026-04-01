@@ -19,6 +19,17 @@ export function useAuth() {
   // Cargar usuario al iniciar
   useEffect(() => {
     let isMounted = true;
+    let safetyTimeout: ReturnType<typeof setTimeout>;
+
+    // Timeout de seguridad - si todo falla, mostrar login después de 8 segundos
+    safetyTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('[useAuth] Safety timeout - forzando fin de carga');
+        setUser(null);
+        setLoading(false);
+        setInitialized(true);
+      }
+    }, 8000);
 
     // Configurar listener de auth PRIMERO (antes de cargar la sesión)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -55,10 +66,12 @@ export function useAuth() {
         // SIEMPRE marcar como inicializado al final
         setLoading(false);
         setInitialized(true);
+        clearTimeout(safetyTimeout);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setLoading(false);
         setInitialized(true);
+        clearTimeout(safetyTimeout);
       }
     });
 
@@ -73,6 +86,7 @@ export function useAuth() {
           setUser(null);
           setLoading(false);
           setInitialized(true);
+          clearTimeout(safetyTimeout);
         }
         // Si hay sesión, onAuthStateChange ya se habrá disparado
       } catch (err) {
@@ -80,6 +94,7 @@ export function useAuth() {
         if (isMounted) {
           setLoading(false);
           setInitialized(true);
+          clearTimeout(safetyTimeout);
         }
       }
     };
@@ -88,6 +103,7 @@ export function useAuth() {
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
