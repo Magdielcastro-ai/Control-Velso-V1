@@ -15,12 +15,32 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Cargar usuario al iniciar
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const loadUser = async () => {
       try {
+        console.log('[useAuth] Iniciando carga de usuario...');
+        
+        // Timeout de seguridad - si tarda más de 5 segundos, forzar fin de carga
+        timeoutId = setTimeout(() => {
+          if (isMounted && !initialized) {
+            console.warn('[useAuth] Timeout - forzando fin de carga');
+            setLoading(false);
+            setInitialized(true);
+            setError('Tiempo de espera agotado');
+          }
+        }, 5000);
+
         const currentUser = await getCurrentUser();
+        console.log('[useAuth] Usuario obtenido:', currentUser);
+        
+        if (!isMounted) return;
+
         if (currentUser && currentUser.perfil) {
           setUser({
             id: currentUser.id,
@@ -30,11 +50,18 @@ export function useAuth() {
             activo: currentUser.perfil.activo,
           });
         }
-      } catch (error) {
-        console.error('Error cargando usuario:', error);
+      } catch (err: any) {
+        console.error('[useAuth] Error cargando usuario:', err);
+        if (isMounted) {
+          setError(err.message || 'Error al cargar usuario');
+        }
       } finally {
-        setLoading(false);
-        setInitialized(true);
+        clearTimeout(timeoutId);
+        if (isMounted) {
+          console.log('[useAuth] Carga completada');
+          setLoading(false);
+          setInitialized(true);
+        }
       }
     };
 
@@ -42,6 +69,7 @@ export function useAuth() {
 
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] Auth state changed:', event);
       if (event === 'SIGNED_IN' && session?.user) {
         try {
           const perfil = await getCurrentUser();
@@ -55,7 +83,7 @@ export function useAuth() {
             });
           }
         } catch (error) {
-          console.error('Error en auth state change:', error);
+          console.error('[useAuth] Error en auth state change:', error);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -63,6 +91,8 @@ export function useAuth() {
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
@@ -89,7 +119,7 @@ export function useAuth() {
       }
       throw new Error('No se pudo iniciar sesión');
     } catch (error: any) {
-      console.error('Error en signIn:', error);
+      console.error('[useAuth] Error en signIn:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -154,6 +184,7 @@ export function useAuth() {
     user,
     loading,
     initialized,
+    error,
     signIn,
     signOut,
     isAuthenticated: !!user,
