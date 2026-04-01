@@ -199,15 +199,16 @@ function App() {
     guardarDatosReales
   } = useProyectosStore();
 
-  // Login handler
+   // Login handler
   const handleLogin = async (email: string, password: string) => {
     setLoginError(null);
     try {
       await signIn(email, password);
       toast.success('Bienvenido al sistema');
     } catch (error: any) {
+      console.error('Login error:', error);
       setLoginError(error.message || 'Error al iniciar sesión');
-      toast.error('Error al iniciar sesión');
+      toast.error(error.message || 'Error al iniciar sesión');
     }
   };
 
