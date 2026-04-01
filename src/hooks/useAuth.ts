@@ -43,15 +43,19 @@ export function useAuth() {
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        const perfil = await getCurrentUser();
-        if (perfil && perfil.perfil) {
-          setUser({
-            id: perfil.id,
-            email: perfil.email || '',
-            nombre: perfil.perfil.nombre,
-            rol: perfil.perfil.rol,
-            activo: perfil.perfil.activo,
-          });
+        try {
+          const perfil = await getCurrentUser();
+          if (perfil && perfil.perfil) {
+            setUser({
+              id: perfil.id,
+              email: perfil.email || '',
+              nombre: perfil.perfil.nombre,
+              rol: perfil.perfil.rol,
+              activo: perfil.perfil.activo,
+            });
+          }
+        } catch (error) {
+          console.error('Error en auth state change:', error);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -63,7 +67,7 @@ export function useAuth() {
     };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string): Promise<AuthUser> => {
     setLoading(true);
     try {
       const data = await supabaseSignIn(email, password);
@@ -79,9 +83,14 @@ export function useAuth() {
           };
           setUser(authUser);
           return authUser;
+        } else {
+          throw new Error('Usuario no tiene perfil asignado');
         }
       }
       throw new Error('No se pudo iniciar sesión');
+    } catch (error: any) {
+      console.error('Error en signIn:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
