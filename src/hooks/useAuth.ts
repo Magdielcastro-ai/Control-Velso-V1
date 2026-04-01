@@ -26,9 +26,13 @@ export function useAuth() {
       try {
         console.log('[useAuth] Iniciando carga de usuario...');
         
-              // Timeout de seguridad - si tarda más de 3 segundos...
+            // Timeout de seguridad - si tarda más de 3 segundos, forzar fin de carga
         timeoutId = setTimeout(() => {
-          ...
+          if (isMounted && !initialized) {
+            console.warn('[useAuth] Timeout - forzando fin de carga');
+            setLoading(false);
+            setInitialized(true);
+          }
         }, 3000);
 
         const currentUser = await getCurrentUser();
