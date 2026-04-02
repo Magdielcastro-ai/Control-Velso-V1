@@ -25,7 +25,7 @@ import { useCotizacionStore } from '@/hooks/useCotizacionStore';
 import { useCatalogoMateriales } from '@/hooks/useCatalogoMateriales';
 import { useClientesStore } from '@/hooks/useClientesStore';
 import { useProyectosStore } from '@/hooks/useProyectosStore';
-import { useTalleresStore } from '@/hooks/useTalleresStore';
+import { useTalleresStore } from '@/hooks/useTalleresStore';  // ← AGREGAR ESTA LÍNEA
 import { useAuth, type AuthUser } from '@/hooks/useAuth';
 
 // Componentes de pasos
@@ -344,11 +344,37 @@ function App() {
     toast.success('Cotización guardada correctamente');
   };
 
-  const handleGenerarCotizacion = async () => {
+   const handleGenerarCotizacion = async () => {
     // Guardar el taller si no existe
     if (cotizacion.datosTaller.nombre) {
       guardarTallerDesdeCotizacion(cotizacion.datosTaller);
     }
+    
+    // Guardar el cliente si no existe
+    if (cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa) {
+      const clienteData = {
+        nombreEmpresa: cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre,
+        direccion: cotizacion.datosCliente.direccion,
+        telefono: cotizacion.datosCliente.telefono,
+        rfc: cotizacion.datosCliente.rfc || '',
+        terminosPago: '50% anticipo, 50% contra entrega',
+      };
+      
+      // Verificar si el cliente ya existe
+      const existe = clientes.some(c => 
+        c.nombreEmpresa.toLowerCase() === clienteData.nombreEmpresa.toLowerCase()
+      );
+      
+      if (!existe && clienteData.nombreEmpresa) {
+        agregarCliente(clienteData);
+      }
+    }
+    
+    // Guardar la cotización
+    await guardarCotizacion('enviada');
+    setVistaActual('cotizacion-final');
+    toast.success('¡Cotización generada exitosamente!');
+  };
     
     // Guardar el cliente si no existe
     if (cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa) {
@@ -652,7 +678,7 @@ function App() {
                     onGuardarTaller={guardarTallerDesdeCotizacion}
                   />
                 )}
-                {pasoActual === 'cliente' && (
+                                {pasoActual === 'cliente' && (
                   <ClienteStep 
                     datos={cotizacion.datosCliente} 
                     onChange={actualizarDatosCliente}
@@ -686,7 +712,7 @@ function App() {
                     onEliminar={eliminarProceso}
                   />
                 )}
-                {pasoActual === 'costos' && (
+                                {pasoActual === 'costos' && (
                   <CostosStep 
                     costos={cotizacion.costosAdicionales}
                     margenUtilidad={cotizacion.margenUtilidad}
