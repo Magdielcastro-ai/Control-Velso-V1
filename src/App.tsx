@@ -353,11 +353,6 @@ function App() {
     }
   };
 
-  const handleEliminarCotizacion = (id: string) => {
-    eliminarCotizacionGuardada(id);
-    toast.success('Cotización eliminada');
-  };
-
   const handleNuevaCotizacion = () => {
     nuevaCotizacion();
     setVistaActual('home');
