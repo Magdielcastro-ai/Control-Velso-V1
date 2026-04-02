@@ -136,12 +136,31 @@ function App() {
     initialized, 
     signIn, 
     signOut,
+    refreshSession,
     canCreateCotizacion,
     canViewDashboard,
     canManageUsers,
     canViewControlCodigos,
     canUpdateProyectoEstado
   } = useAuth();
+
+  // Verificar sesión periódicamente para evitar cierres inesperados
+  useEffect(() => {
+    if (!initialized || authLoading) return;
+
+    // Verificar sesión cada 5 minutos
+    const intervalId = setInterval(async () => {
+      if (user) {
+        const isValid = await refreshSession();
+        if (!isValid) {
+          console.warn('[App] Sesión inválida detectada');
+          toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        }
+      }
+    }, 5 * 60 * 1000); // 5 minutos
+
+    return () => clearInterval(intervalId);
+  }, [initialized, authLoading, user, refreshSession]);
   
   // Cargar horas disponibles del localStorage
   useEffect(() => {
