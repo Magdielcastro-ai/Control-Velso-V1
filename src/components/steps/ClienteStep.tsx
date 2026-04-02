@@ -1,15 +1,75 @@
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Building2, MapPin, Phone, Mail, Briefcase } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { User, Building2, MapPin, Phone, Mail, Briefcase, Save, Plus, Check } from 'lucide-react';
 import type { DatosCliente } from '@/types/cotizacion';
+import type { Cliente } from '@/types/ventas';
 
 interface ClienteStepProps {
   datos: DatosCliente;
   onChange: (datos: Partial<DatosCliente>) => void;
+  clientesGuardados: Cliente[];
+  onGuardarCliente: (datos: DatosCliente) => Cliente | null;
 }
 
-export function ClienteStep({ datos, onChange }: ClienteStepProps) {
+export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente }: ClienteStepProps) {
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
+  const [mostrarGuardar, setMostrarGuardar] = useState(false);
+  const [clienteGuardado, setClienteGuardado] = useState(false);
+
+  // Detectar si los datos actuales coinciden con un cliente guardado
+  useEffect(() => {
+    if (datos.nombre || datos.empresa) {
+      const existe = clientesGuardados.some(c => 
+        (datos.nombre && c.nombreEmpresa.toLowerCase() === datos.nombre.toLowerCase()) ||
+        (datos.empresa && c.nombreEmpresa.toLowerCase() === datos.empresa.toLowerCase())
+      );
+      setClienteGuardado(existe);
+      setMostrarGuardar(!existe && (datos.nombre.length > 0 || datos.empresa.length > 0));
+    } else {
+      setMostrarGuardar(false);
+      setClienteGuardado(false);
+    }
+  }, [datos, clientesGuardados]);
+
+  const handleSeleccionarCliente = (clienteId: string) => {
+    setClienteSeleccionado(clienteId);
+    if (clienteId === 'nuevo') {
+      // Limpiar todos los campos para nuevo cliente
+      onChange({
+        nombre: '',
+        empresa: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        rfc: '',
+      });
+    } else {
+      const cliente = clientesGuardados.find(c => c.id === clienteId);
+      if (cliente) {
+        onChange({
+          nombre: cliente.nombreEmpresa,
+          empresa: cliente.nombreEmpresa,
+          direccion: cliente.direccion,
+          telefono: cliente.telefono,
+          email: cliente.usuarios[0]?.email || '',
+          rfc: cliente.rfc || '',
+        });
+      }
+    }
+  };
+
+  const handleGuardarCliente = () => {
+    const resultado = onGuardarCliente(datos);
+    if (resultado) {
+      setClienteGuardado(true);
+      setMostrarGuardar(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
@@ -17,11 +77,51 @@ export function ClienteStep({ datos, onChange }: ClienteStepProps) {
         <p className="text-slate-600">Información de quien solicita la cotización</p>
       </div>
 
+      {/* Selector de clientes guardados */}
+      {clientesGuardados.length > 0 && (
+        <Card className="border-slate-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <User className="w-5 h-5 text-blue-600" />
+              Seleccionar Cliente Guardado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={clienteSeleccionado} onValueChange={handleSeleccionarCliente}>
+              <SelectTrigger className="border-slate-300">
+                <SelectValue placeholder="Selecciona un cliente guardado o crea uno nuevo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nuevo">
+                  <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    <span>Crear nuevo cliente</span>
+                  </div>
+                </SelectItem>
+                {clientesGuardados.map((cliente) => (
+                  <SelectItem key={cliente.id} value={cliente.id}>
+                    {cliente.nombreEmpresa} {cliente.rfc && `(${cliente.rfc})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-slate-200">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <User className="w-5 h-5 text-blue-600" />
-            Información del Cliente
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <User className="w-5 h-5 text-blue-600" />
+              Información del Cliente
+            </span>
+            {clienteGuardado && (
+              <span className="text-sm font-normal text-green-600 flex items-center gap-1">
+                <Check className="w-4 h-4" />
+                Cliente guardado
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -51,6 +151,18 @@ export function ClienteStep({ datos, onChange }: ClienteStepProps) {
                 placeholder="Nombre de la empresa"
                 className="border-slate-300"
               />
+              {mostrarGuardar && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGuardarCliente}
+                  className="mt-2 border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Guardar este cliente para futuras cotizaciones
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2 md:col-span-2">

@@ -1,15 +1,72 @@
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Factory, MapPin, Phone, Mail, Building } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Factory, MapPin, Phone, Mail, Building, Save, Plus, Check } from 'lucide-react';
 import type { DatosTaller } from '@/types/cotizacion';
+import type { TallerGuardado } from '@/hooks/useTalleresStore';
 
 interface TallerStepProps {
   datos: DatosTaller;
   onChange: (datos: Partial<DatosTaller>) => void;
+  talleresGuardados: TallerGuardado[];
+  onGuardarTaller: (datos: DatosTaller) => TallerGuardado | null;
 }
 
-export function TallerStep({ datos, onChange }: TallerStepProps) {
+export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller }: TallerStepProps) {
+  const [tallerSeleccionado, setTallerSeleccionado] = useState<string>('');
+  const [mostrarGuardar, setMostrarGuardar] = useState(false);
+  const [tallerGuardado, setTallerGuardado] = useState(false);
+
+  // Detectar si los datos actuales coinciden con un taller guardado
+  useEffect(() => {
+    if (datos.nombre) {
+      const existe = talleresGuardados.some(t => 
+        t.nombre.toLowerCase() === datos.nombre.toLowerCase()
+      );
+      setTallerGuardado(existe);
+      setMostrarGuardar(!existe && datos.nombre.length > 0);
+    } else {
+      setMostrarGuardar(false);
+      setTallerGuardado(false);
+    }
+  }, [datos, talleresGuardados]);
+
+  const handleSeleccionarTaller = (tallerId: string) => {
+    setTallerSeleccionado(tallerId);
+    if (tallerId === 'nuevo') {
+      // Limpiar todos los campos para nuevo taller
+      onChange({
+        nombre: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        rfc: '',
+      });
+    } else {
+      const taller = talleresGuardados.find(t => t.id === tallerId);
+      if (taller) {
+        onChange({
+          nombre: taller.nombre,
+          direccion: taller.direccion,
+          telefono: taller.telefono,
+          email: taller.email,
+          rfc: taller.rfc || '',
+        });
+      }
+    }
+  };
+
+  const handleGuardarTaller = () => {
+    const resultado = onGuardarTaller(datos);
+    if (resultado) {
+      setTallerGuardado(true);
+      setMostrarGuardar(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
@@ -17,11 +74,51 @@ export function TallerStep({ datos, onChange }: TallerStepProps) {
         <p className="text-slate-600">Información de tu empresa que aparecerá en la cotización</p>
       </div>
 
+      {/* Selector de talleres guardados */}
+      {talleresGuardados.length > 0 && (
+        <Card className="border-slate-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Factory className="w-5 h-5 text-blue-600" />
+              Seleccionar Taller Guardado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={tallerSeleccionado} onValueChange={handleSeleccionarTaller}>
+              <SelectTrigger className="border-slate-300">
+                <SelectValue placeholder="Selecciona un taller guardado o crea uno nuevo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nuevo">
+                  <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    <span>Crear nuevo taller</span>
+                  </div>
+                </SelectItem>
+                {talleresGuardados.map((taller) => (
+                  <SelectItem key={taller.id} value={taller.id}>
+                    {taller.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-slate-200">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Factory className="w-5 h-5 text-blue-600" />
-            Información General
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Factory className="w-5 h-5 text-blue-600" />
+              Información General
+            </span>
+            {tallerGuardado && (
+              <span className="text-sm font-normal text-green-600 flex items-center gap-1">
+                <Check className="w-4 h-4" />
+                Taller guardado
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -37,6 +134,18 @@ export function TallerStep({ datos, onChange }: TallerStepProps) {
                 placeholder="Ej: Taller CNC Precision"
                 className="border-slate-300"
               />
+              {mostrarGuardar && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGuardarTaller}
+                  className="mt-2 border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Guardar este taller para futuras cotizaciones
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2 md:col-span-2">

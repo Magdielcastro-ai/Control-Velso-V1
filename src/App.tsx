@@ -25,6 +25,7 @@ import { useCotizacionStore } from '@/hooks/useCotizacionStore';
 import { useCatalogoMateriales } from '@/hooks/useCatalogoMateriales';
 import { useClientesStore } from '@/hooks/useClientesStore';
 import { useProyectosStore } from '@/hooks/useProyectosStore';
+import { useTalleresStore } from '@/hooks/useTalleresStore';
 import { useAuth, type AuthUser } from '@/hooks/useAuth';
 
 // Componentes de pasos
@@ -198,6 +199,11 @@ function App() {
     guardarDatosReales
   } = useProyectosStore();
 
+  const {
+    talleres,
+    guardarTallerDesdeCotizacion,
+  } = useTalleresStore();
+
   // Login handler
   const handleLogin = async (email: string, password: string) => {
     setLoginError(null);
@@ -339,6 +345,32 @@ function App() {
   };
 
   const handleGenerarCotizacion = async () => {
+    // Guardar el taller si no existe
+    if (cotizacion.datosTaller.nombre) {
+      guardarTallerDesdeCotizacion(cotizacion.datosTaller);
+    }
+    
+    // Guardar el cliente si no existe
+    if (cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa) {
+      const clienteData = {
+        nombreEmpresa: cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre,
+        direccion: cotizacion.datosCliente.direccion,
+        telefono: cotizacion.datosCliente.telefono,
+        rfc: cotizacion.datosCliente.rfc || '',
+        terminosPago: '50% anticipo, 50% contra entrega',
+      };
+      
+      // Verificar si el cliente ya existe
+      const existe = clientes.some(c => 
+        c.nombreEmpresa.toLowerCase() === clienteData.nombreEmpresa.toLowerCase()
+      );
+      
+      if (!existe && clienteData.nombreEmpresa) {
+        agregarCliente(clienteData);
+      }
+    }
+    
+    // Guardar la cotización
     await guardarCotizacion('enviada');
     setVistaActual('cotizacion-final');
     toast.success('¡Cotización generada exitosamente!');
@@ -613,10 +645,29 @@ function App() {
             <Card className="border-slate-200 mb-6">
               <CardContent className="p-6">
                 {pasoActual === 'taller' && (
-                  <TallerStep datos={cotizacion.datosTaller} onChange={actualizarDatosTaller} />
+                  <TallerStep 
+                    datos={cotizacion.datosTaller} 
+                    onChange={actualizarDatosTaller}
+                    talleresGuardados={talleres}
+                    onGuardarTaller={guardarTallerDesdeCotizacion}
+                  />
                 )}
                 {pasoActual === 'cliente' && (
-                  <ClienteStep datos={cotizacion.datosCliente} onChange={actualizarDatosCliente} />
+                  <ClienteStep 
+                    datos={cotizacion.datosCliente} 
+                    onChange={actualizarDatosCliente}
+                    clientesGuardados={clientes}
+                    onGuardarCliente={(datos) => {
+                      const clienteData = {
+                        nombreEmpresa: datos.empresa || datos.nombre,
+                        direccion: datos.direccion,
+                        telefono: datos.telefono,
+                        rfc: datos.rfc || '',
+                        terminosPago: '50% anticipo, 50% contra entrega',
+                      };
+                      return agregarCliente(clienteData);
+                    }}
+                  />
                 )}
                 {pasoActual === 'proyecto' && (
                   <ProyectoStep datos={cotizacion.proyecto} onChange={actualizarProyecto} />
@@ -639,6 +690,8 @@ function App() {
                   <CostosStep 
                     costos={cotizacion.costosAdicionales}
                     margenUtilidad={cotizacion.margenUtilidad}
+                    costoMateriales={cotizacion.materiales.reduce((sum, m) => sum + m.costoTotal, 0)}
+                    costoProcesos={cotizacion.procesos.reduce((sum, p) => sum + p.costoTotal, 0)}
                     onChangeCostos={actualizarCostosAdicionales}
                     onChangeMargen={actualizarMargenUtilidad}
                   />

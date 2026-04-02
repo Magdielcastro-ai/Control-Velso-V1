@@ -8,11 +8,20 @@ import type { CostosAdicionales } from '@/types/cotizacion';
 interface CostosStepProps {
   costos: CostosAdicionales;
   margenUtilidad: number;
+  costoMateriales: number;
+  costoProcesos: number;
   onChangeCostos: (costos: Partial<CostosAdicionales>) => void;
   onChangeMargen: (margen: number) => void;
 }
 
-export function CostosStep({ costos, margenUtilidad, onChangeCostos, onChangeMargen }: CostosStepProps) {
+export function CostosStep({ 
+  costos, 
+  margenUtilidad, 
+  costoMateriales, 
+  costoProcesos,
+  onChangeCostos, 
+  onChangeMargen 
+}: CostosStepProps) {
   const costosItems = [
     { key: 'disenoCAD' as keyof CostosAdicionales, label: 'Diseño CAD/CAM', icon: Palette },
     { key: 'programacionCNC' as keyof CostosAdicionales, label: 'Programación CNC', icon: Code },
@@ -22,6 +31,9 @@ export function CostosStep({ costos, margenUtilidad, onChangeCostos, onChangeMar
   ];
 
   const totalAdicionales = Object.values(costos).reduce((sum, v) => sum + v, 0);
+  const costoDirecto = costoMateriales + costoProcesos + totalAdicionales;
+  const margenValor = costoDirecto * (margenUtilidad / 100);
+  const subtotal = costoDirecto + margenValor;
 
   return (
     <div className="space-y-6">
@@ -102,16 +114,33 @@ export function CostosStep({ costos, margenUtilidad, onChangeCostos, onChangeMar
 
             <div className="bg-slate-50 p-4 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Costo directo:</span>
-                <span className="font-medium">$0.00</span>
+                <span className="text-slate-600">Materiales:</span>
+                <span className="font-medium">${costoMateriales.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Margen ({margenUtilidad}%):</span>
-                <span className="font-medium text-green-600">+$0.00</span>
+                <span className="text-slate-600">Procesos:</span>
+                <span className="font-medium">${costoProcesos.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Costos adicionales:</span>
+                <span className="font-medium">${totalAdicionales.toFixed(2)}</span>
               </div>
               <div className="border-t pt-2 flex justify-between">
-                <span className="font-medium">Subtotal:</span>
-                <span className="font-bold">$0.00</span>
+                <span className="text-slate-600">Costo directo:</span>
+                <span className="font-semibold">${costoDirecto.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 flex items-center gap-1">
+                  <TrendingUp className="w-4 h-4" />
+                  Margen ({margenUtilidad}%):
+                </span>
+                <span className="font-medium text-green-600">
+                  +${margenValor.toFixed(2)}
+                </span>
+              </div>
+              <div className="border-t-2 border-green-600 pt-2 flex justify-between">
+                <span className="font-bold text-slate-900">Subtotal:</span>
+                <span className="font-bold text-green-600">${subtotal.toFixed(2)}</span>
               </div>
             </div>
 
