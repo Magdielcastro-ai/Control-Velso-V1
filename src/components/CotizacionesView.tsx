@@ -48,7 +48,6 @@ export function CotizacionesView({
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
 
-  // Cargar cotizaciones al montar
   useEffect(() => {
     if (isAdmin) {
       getAllCotizaciones();
@@ -57,12 +56,10 @@ export function CotizacionesView({
     }
   }, [isAdmin, getAllCotizaciones, getMisCotizaciones]);
 
-  // Verificar si una cotización ya fue convertida en proyecto
   const esComprada = (estado: string) => {
     return estado === 'comprada' || estado === 'convertida';
   };
 
-  // Filtrar cotizaciones
   const cotizacionesFiltradas = cotizaciones.filter(c => {
     const matchBusqueda = 
       c.numero.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -75,7 +72,6 @@ export function CotizacionesView({
     return matchBusqueda && matchEstado;
   });
 
-  // Ordenar por fecha (más reciente primero)
   const cotizacionesOrdenadas = [...cotizacionesFiltradas].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -106,7 +102,6 @@ export function CotizacionesView({
     }
   };
 
-  // Estadísticas
   const totalCotizaciones = cotizaciones.length;
   const totalCompradas = cotizaciones.filter(c => esComprada(c.estado)).length;
   const totalPendientes = totalCotizaciones - totalCompradas;
@@ -128,7 +123,6 @@ export function CotizacionesView({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Button variant="outline" onClick={onVolver} className="border-slate-300 w-fit">
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -143,7 +137,6 @@ export function CotizacionesView({
         </div>
       </div>
 
-      {/* Estadísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-slate-200">
           <CardContent className="p-4">
@@ -179,7 +172,6 @@ export function CotizacionesView({
         </Card>
       </div>
 
-      {/* Filtros */}
       <div className="flex flex-wrap gap-2">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
@@ -208,7 +200,6 @@ export function CotizacionesView({
         </Select>
       </div>
 
-      {/* Lista de cotizaciones */}
       <div className="space-y-4">
         {cotizacionesOrdenadas.length === 0 ? (
           <Card className="border-slate-200">
