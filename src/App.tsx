@@ -546,11 +546,11 @@ function App() {
           </>
         );
 
-      case 'admin-usuarios':
+          case 'admin-usuarios':
         return (
           <>
             <UserHeader user={user} onLogout={handleLogout} />
-            <AdminUsuariosView onVolver={irAHome} />
+            <AdminUsuariosView onVolver={irAHome} userRol={user?.rol} />
           </>
         );
 
