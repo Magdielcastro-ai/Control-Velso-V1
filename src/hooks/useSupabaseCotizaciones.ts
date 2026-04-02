@@ -26,7 +26,6 @@ export function useSupabaseCotizaciones() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener todas las cotizaciones (para admin/superadmin)
   const getAllCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -48,7 +47,6 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Obtener cotizaciones del usuario actual
   const getMisCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -77,7 +75,6 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Guardar cotización completa en Supabase
   const saveCotizacion = useCallback(async (cotizacion: any, estado: string = 'borrador') => {
     setLoading(true);
     setError(null);
@@ -113,7 +110,6 @@ export function useSupabaseCotizaciones() {
 
       if (error) throw error;
       
-      // Actualizar lista local
       setCotizaciones(prev => {
         const index = prev.findIndex(c => c.id === id);
         if (index >= 0) {
@@ -134,7 +130,6 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Obtener una cotización por ID
   const getCotizacionById = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -156,7 +151,6 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Eliminar cotización
   const deleteCotizacion = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -179,7 +173,6 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Actualizar estado de cotización
   const updateEstado = useCallback(async (id: string, estado: string) => {
     setLoading(true);
     setError(null);
