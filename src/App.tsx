@@ -175,7 +175,6 @@ function App() {
     actualizarMargenUtilidad,
     guardarCotizacion,
     cargarCotizacion,
-    eliminarCotizacionGuardada,
     nuevaCotizacion,
   } = useCotizacionStore();
 
