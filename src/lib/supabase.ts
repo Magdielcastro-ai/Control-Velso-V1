@@ -8,13 +8,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false, // Deshabilitar para evitar conflictos con hash URLs
     storage: localStorage,
+    storageKey: 'velso-auth-token', // Key específica para evitar conflictos
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'velso-cnc-app',
+    },
   },
 });
 
 // Tipos para los datos
-type UserRole = 'superadmin' | 'admin' | 'vendedor' | 'produccion';
+type UserRole = 'admin' | 'vendedor' | 'produccion';
 
 export interface PerfilUsuario {
   id: string;
