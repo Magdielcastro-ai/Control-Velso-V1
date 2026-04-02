@@ -12,13 +12,16 @@ interface TallerStepProps {
   datos: DatosTaller;
   onChange: (datos: Partial<DatosTaller>) => void;
   talleresGuardados: TallerGuardado[];
-  onGuardarTaller: (datos: DatosTaller) => TallerGuardado | null;
+  onGuardarTaller?: (datos: DatosTaller) => TallerGuardado | null;
+  userRol?: string;
 }
 
-export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller }: TallerStepProps) {
+export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller, userRol = 'vendedor' }: TallerStepProps) {
   const [tallerSeleccionado, setTallerSeleccionado] = useState<string>('');
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
   const [tallerGuardado, setTallerGuardado] = useState(false);
+
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
 
   // Detectar si los datos actuales coinciden con un taller guardado
   useEffect(() => {
@@ -27,12 +30,13 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
         t.nombre.toLowerCase() === datos.nombre.toLowerCase()
       );
       setTallerGuardado(existe);
-      setMostrarGuardar(!existe && datos.nombre.length > 0);
+      // Solo mostrar botón de guardar si es admin/superadmin
+      setMostrarGuardar(isAdmin && !existe && datos.nombre.length > 0);
     } else {
       setMostrarGuardar(false);
       setTallerGuardado(false);
     }
-  }, [datos, talleresGuardados]);
+  }, [datos, talleresGuardados, isAdmin]);
 
   const handleSeleccionarTaller = (tallerId: string) => {
     setTallerSeleccionado(tallerId);
@@ -60,6 +64,7 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
   };
 
   const handleGuardarTaller = () => {
+    if (!onGuardarTaller) return;
     const resultado = onGuardarTaller(datos);
     if (resultado) {
       setTallerGuardado(true);
@@ -134,7 +139,8 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
                 placeholder="Ej: Taller CNC Precision"
                 className="border-slate-300"
               />
-              {mostrarGuardar && (
+              {/* Botón guardar taller - solo visible para admin/superadmin */}
+              {mostrarGuardar && onGuardarTaller && (
                 <Button
                   type="button"
                   variant="outline"

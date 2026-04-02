@@ -42,6 +42,7 @@ import { CotizacionFinalStep } from '@/components/steps/CotizacionFinalStep';
 // Vistas principales
 import { HomeVelso } from '@/components/HomeVelso';
 import { DashboardView } from '@/components/DashboardView';
+import { ProduccionDashboardView } from '@/components/ProduccionDashboardView';
 import { ClientesView } from '@/components/ClientesView';
 import { ProyectosView } from '@/components/ProyectosView';
 import { MaterialesCatalogoView } from '@/components/MaterialesCatalogoView';
@@ -66,7 +67,7 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
   { id: 'resumen', label: 'Resumen', icon: CheckCircle },
 ];
 
-type VistaPrincipal = 'home' | 'dashboard' | 'clientes' | 'proyectos' | 'materiales' | 
+type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' | 
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' | 
                       'control-codigos' | 'admin-usuarios';
 
@@ -87,6 +88,7 @@ const HORAS_DEFAULT: Record<string, number> = {
 function UserHeader({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const getRolColor = (rol: string) => {
     switch (rol) {
+      case 'superadmin': return 'bg-red-600';
       case 'admin': return 'bg-purple-600';
       case 'vendedor': return 'bg-blue-600';
       case 'produccion': return 'bg-green-600';
@@ -96,6 +98,7 @@ function UserHeader({ user, onLogout }: { user: AuthUser; onLogout: () => void }
 
   const getRolLabel = (rol: string) => {
     switch (rol) {
+      case 'superadmin': return 'Super Admin';
       case 'admin': return 'Administrador';
       case 'vendedor': return 'Vendedor';
       case 'produccion': return 'Producción';
@@ -129,7 +132,7 @@ function App() {
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   
-  // Auth
+  // Auth con todos los permisos
   const { 
     user, 
     loading: authLoading, 
@@ -137,18 +140,30 @@ function App() {
     signIn, 
     signOut,
     refreshSession,
-    canCreateCotizacion,
-    canViewDashboard,
+    isAdmin,
+    isVendedor,
+    isProduccion,
     canManageUsers,
+    canCreateCotizacion,
+    canConvertirAVenta,
+    canViewDashboard,
+    canViewProduccionDashboard,
     canViewControlCodigos,
-    canUpdateProyectoEstado
+    canUpdateProyectoEstado,
+    canManageClientes,
+    canDeleteClientes,
+    canManageTalleres,
+    canManageMateriales,
+    canViewMateriales,
+    canManageProcesos,
+    canViewProcesos,
+    canDeleteProyectos,
   } = useAuth();
 
   // Verificar sesión periódicamente para evitar cierres inesperados
   useEffect(() => {
     if (!initialized || authLoading) return;
 
-    // Verificar sesión cada 5 minutos
     const intervalId = setInterval(async () => {
       if (user) {
         const isValid = await refreshSession();
@@ -157,7 +172,7 @@ function App() {
           toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
         }
       }
-    }, 5 * 60 * 1000); // 5 minutos
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
   }, [initialized, authLoading, user, refreshSession]);
@@ -243,20 +258,65 @@ function App() {
     toast.success('Sesión cerrada');
   };
 
-  // Navegación
+  // Navegación con permisos
   const irAHome = () => setVistaActual('home');
+  
   const irADashboard = () => {
-    if (canViewDashboard()) setVistaActual('dashboard');
-    else toast.error('No tienes permiso para ver el dashboard');
+    if (canViewProduccionDashboard()) {
+      setVistaActual('produccion-dashboard');
+    } else if (canViewDashboard()) {
+      setVistaActual('dashboard');
+    } else {
+      toast.error('No tienes permiso para ver el dashboard');
+    }
   };
-  const irAClientes = () => setVistaActual('clientes');
-  const irAProyectos = () => setVistaActual('proyectos');
-  const irAMateriales = () => setVistaActual('materiales');
-  const irAProcesos = () => setVistaActual('procesos');
-  const irACotizaciones = () => setVistaActual('cotizaciones');
+  
+  const irAClientes = () => {
+    if (canManageClientes()) {
+      setVistaActual('clientes');
+    } else {
+      toast.error('No tienes permiso para ver clientes');
+    }
+  };
+  
+  const irAProyectos = () => {
+    if (isAdmin() || isVendedor() || isProduccion()) {
+      setVistaActual('proyectos');
+    } else {
+      toast.error('No tienes permiso para ver proyectos');
+    }
+  };
+  
+  const irAMateriales = () => {
+    if (canViewMateriales()) {
+      setVistaActual('materiales');
+    } else {
+      toast.error('No tienes permiso para ver materiales');
+    }
+  };
+  
+  const irAProcesos = () => {
+    if (canViewProcesos()) {
+      setVistaActual('procesos');
+    } else {
+      toast.error('No tienes permiso para ver procesos');
+    }
+  };
+  
+  const irACotizaciones = () => {
+    if (isAdmin() || isVendedor()) {
+      setVistaActual('cotizaciones');
+    } else {
+      toast.error('No tienes permiso para ver cotizaciones');
+    }
+  };
+  
   const irAAdminUsuarios = () => {
-    if (canManageUsers()) setVistaActual('admin-usuarios');
-    else toast.error('Solo administradores pueden gestionar usuarios');
+    if (canManageUsers()) {
+      setVistaActual('admin-usuarios');
+    } else {
+      toast.error('Solo superadministradores pueden gestionar usuarios');
+    }
   };
   
   const irANuevaCotizacion = () => {
@@ -277,6 +337,11 @@ function App() {
 
   // Convertir cotización a venta desde la vista de cotizaciones
   const handleConvertirCotizacionAVenta = async (cotizacion: CotizacionGuardada, ordenCompra: string) => {
+    if (!canConvertirAVenta()) {
+      toast.error('No tienes permiso para convertir cotizaciones');
+      return;
+    }
+    
     await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
       ordenCompra,
@@ -364,13 +429,13 @@ function App() {
   };
 
   const handleGenerarCotizacion = async () => {
-    // Guardar el taller si no existe
-    if (cotizacion.datosTaller.nombre) {
+    // Guardar el taller si no existe (solo admin/superadmin)
+    if (canManageTalleres() && cotizacion.datosTaller.nombre) {
       guardarTallerDesdeCotizacion(cotizacion.datosTaller);
     }
     
-    // Guardar el cliente si no existe
-    if (cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa) {
+    // Guardar el cliente si no existe (todos excepto producción)
+    if (canManageClientes() && (cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa)) {
       const clienteData = {
         nombreEmpresa: cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre,
         direccion: cotizacion.datosCliente.direccion,
@@ -379,7 +444,6 @@ function App() {
         terminosPago: '50% anticipo, 50% contra entrega',
       };
       
-      // Verificar si el cliente ya existe
       const existe = clientes.some(c => 
         c.nombreEmpresa.toLowerCase() === clienteData.nombreEmpresa.toLowerCase()
       );
@@ -469,7 +533,7 @@ function App() {
               <div className="mt-6">
                 <Button 
                   onClick={irAAdminUsuarios}
-                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  className="w-full bg-red-600 hover:bg-red-700"
                 >
                   <Shield className="w-4 h-4 mr-2" />
                   Administración de Usuarios
@@ -496,6 +560,17 @@ function App() {
           </>
         );
 
+      case 'produccion-dashboard':
+        return (
+          <>
+            <UserHeader user={user} onLogout={handleLogout} />
+            <ProduccionDashboardView
+              onVolver={irAHome}
+              proyectos={proyectos}
+            />
+          </>
+        );
+
       case 'clientes':
         return (
           <>
@@ -503,8 +578,8 @@ function App() {
             <ClientesView
               onVolver={irAHome}
               clientes={clientes}
-              onAgregarCliente={agregarCliente}
-              onEliminarCliente={eliminarCliente}
+              onAgregarCliente={canManageClientes() ? agregarCliente : undefined}
+              onEliminarCliente={canDeleteClientes() ? eliminarCliente : undefined}
               onAgregarUsuario={agregarUsuario}
               onEliminarUsuario={eliminarUsuario}
             />
@@ -519,12 +594,14 @@ function App() {
               onVolver={irAHome}
               proyectos={proyectos}
               cotizaciones={cotizacionesGuardadas}
-              onConvertirAVenta={convertirAVenta}
-              onEliminarProyecto={eliminarProyecto}
-              onMarcarFabricado={handleMarcarFabricado}
-              onMarcarEntregado={handleMarcarEntregado}
-              onMarcarFacturado={handleMarcarFacturado}
-              onVerControlCodigos={handleVerControlCodigos}
+              onConvertirAVenta={canConvertirAVenta() ? convertirAVenta : undefined}
+              onEliminarProyecto={canDeleteProyectos() ? eliminarProyecto : undefined}
+              onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
+              onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
+              onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
+              onVerControlCodigos={canViewControlCodigos() ? handleVerControlCodigos : undefined}
+              userRol={user.rol}
+              userId={user.id}
             />
           </>
         );
@@ -550,9 +627,9 @@ function App() {
             <MaterialesCatalogoView
               onVolver={irAHome}
               catalogo={catalogo}
-              onAgregar={agregarAlCatalogo}
-              onEliminar={eliminarDelCatalogo}
-              onActualizarPrecio={(id, precio) => {
+              onAgregar={canManageMateriales() ? agregarAlCatalogo : undefined}
+              onEliminar={canManageMateriales() ? eliminarDelCatalogo : undefined}
+              onActualizarPrecio={canManageMateriales() ? (id, precio) => {
                 const mat = catalogo.find(m => m.id === id);
                 if (mat) {
                   const nuevoCatalogo = catalogo.map(m => 
@@ -561,7 +638,7 @@ function App() {
                   localStorage.setItem('catalogo_materiales_cnc', JSON.stringify(nuevoCatalogo));
                   toast.success('Precio actualizado');
                 }
-              }}
+              } : undefined}
             />
           </>
         );
@@ -573,7 +650,7 @@ function App() {
             <CatalogoProcesosView
               onVolver={irAHome}
               horasDisponibles={horasDisponibles}
-              onActualizarHoras={actualizarHorasDisponibles}
+              onActualizarHoras={canManageProcesos() ? actualizarHorasDisponibles : undefined}
             />
           </>
         );
@@ -584,9 +661,9 @@ function App() {
             <UserHeader user={user} onLogout={handleLogout} />
             <CotizacionesView
               onVolver={irAHome}
-              userRol={user?.rol}
+              userRol={user.rol}
               onCargarCotizacion={handleCargarCotizacion}
-              onConvertirAVenta={handleConvertirCotizacionAVenta}
+              onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
             />
           </>
         );
@@ -668,7 +745,8 @@ function App() {
                     datos={cotizacion.datosTaller} 
                     onChange={actualizarDatosTaller}
                     talleresGuardados={talleres}
-                    onGuardarTaller={guardarTallerDesdeCotizacion}
+                    onGuardarTaller={canManageTalleres() ? guardarTallerDesdeCotizacion : undefined}
+                    userRol={user.rol}
                   />
                 )}
                 {pasoActual === 'cliente' && (
@@ -676,7 +754,7 @@ function App() {
                     datos={cotizacion.datosCliente} 
                     onChange={actualizarDatosCliente}
                     clientesGuardados={clientes}
-                    onGuardarCliente={(datos) => {
+                    onGuardarCliente={canManageClientes() ? (datos) => {
                       const clienteData = {
                         nombreEmpresa: datos.empresa || datos.nombre,
                         direccion: datos.direccion,
@@ -685,7 +763,8 @@ function App() {
                         terminosPago: '50% anticipo, 50% contra entrega',
                       };
                       return agregarCliente(clienteData);
-                    }}
+                    } : undefined}
+                    userRol={user.rol}
                   />
                 )}
                 {pasoActual === 'proyecto' && (

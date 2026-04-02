@@ -20,7 +20,7 @@ import type { CatalogoProceso } from '@/types/cotizacion';
 interface CatalogoProcesosViewProps {
   onVolver: () => void;
   horasDisponibles: Record<string, number>;
-  onActualizarHoras: (procesoId: string, horas: number) => void;
+  onActualizarHoras?: (procesoId: string, horas: number) => void;
 }
 
 const categorias = [
@@ -33,7 +33,7 @@ const categorias = [
 export function CatalogoProcesosView({ 
   onVolver, 
   horasDisponibles,
-  onActualizarHoras 
+  onActualizarHoras
 }: CatalogoProcesosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas');
@@ -71,6 +71,7 @@ export function CatalogoProcesosView({
   };
 
   const handleActualizarHoras = (id: string) => {
+    if (!onActualizarHoras) return;
     const horas = parseFloat(nuevasHoras);
     if (horas >= 0) {
       onActualizarHoras(id, horas);
@@ -115,7 +116,7 @@ export function CatalogoProcesosView({
             {CATALOGO_PROCESOS_VELSO.filter(p => p.id !== 'otro').map((proceso) => (
               <div key={proceso.id} className="bg-white p-3 rounded-lg">
                 <p className="text-xs text-slate-500">{proceso.nombre}</p>
-                {editandoHoras === proceso.id ? (
+                {onActualizarHoras && editandoHoras === proceso.id ? (
                   <div className="flex items-center gap-2 mt-1">
                     <Input
                       type="number"
@@ -132,7 +133,7 @@ export function CatalogoProcesosView({
                       <Save className="w-4 h-4" />
                     </Button>
                   </div>
-                ) : (
+                ) : onActualizarHoras ? (
                   <button
                     onClick={() => {
                       setEditandoHoras(proceso.id);
@@ -144,6 +145,11 @@ export function CatalogoProcesosView({
                     <span className="text-sm">h</span>
                     <Edit className="w-3 h-3 ml-1 text-slate-400" />
                   </button>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold">{horasDisponibles[proceso.id]?.toFixed(2) || '0.00'}</span>
+                    <span className="text-sm">h</span>
+                  </div>
                 )}
               </div>
             ))}
@@ -214,7 +220,7 @@ export function CatalogoProcesosView({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {editandoPrecio === proceso.id ? (
+                      {onActualizarHoras && editandoPrecio === proceso.id ? (
                         <div className="flex items-center gap-2 justify-end">
                           <Input
                             type="number"
@@ -231,7 +237,7 @@ export function CatalogoProcesosView({
                             <Save className="w-4 h-4" />
                           </Button>
                         </div>
-                      ) : (
+                      ) : onActualizarHoras ? (
                         <button
                           onClick={() => {
                             setEditandoPrecio(proceso.id);
@@ -243,6 +249,11 @@ export function CatalogoProcesosView({
                           {getCostoReal(proceso).toFixed(2)}
                           <Edit className="w-3 h-3 ml-1 text-slate-400" />
                         </button>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="w-4 h-4" />
+                          {getCostoReal(proceso).toFixed(2)}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

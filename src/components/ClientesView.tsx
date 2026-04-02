@@ -24,10 +24,10 @@ import type { Cliente, UsuarioCliente } from '@/types/ventas';
 interface ClientesViewProps {
   onVolver: () => void;
   clientes: Cliente[];
-  onAgregarCliente: (cliente: Omit<Cliente, 'id' | 'fechaRegistro' | 'usuarios'>) => void;
-  onEliminarCliente: (id: string) => void;
-  onAgregarUsuario: (clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => void;
-  onEliminarUsuario: (clienteId: string, usuarioId: string) => void;
+  onAgregarCliente?: (cliente: Omit<Cliente, 'id' | 'fechaRegistro' | 'usuarios'>) => void;
+  onEliminarCliente?: (id: string) => void;
+  onAgregarUsuario?: (clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => void;
+  onEliminarUsuario?: (clienteId: string, usuarioId: string) => void;
 }
 
 export function ClientesView({ 
@@ -66,7 +66,7 @@ export function ClientesView({
   );
 
   const handleAgregarCliente = () => {
-    if (!nuevoCliente.nombreEmpresa || !nuevoCliente.rfc) return;
+    if (!nuevoCliente.nombreEmpresa || !nuevoCliente.rfc || !onAgregarCliente) return;
     onAgregarCliente(nuevoCliente);
     setNuevoCliente({
       nombreEmpresa: '',
@@ -79,7 +79,7 @@ export function ClientesView({
   };
 
   const handleAgregarUsuario = () => {
-    if (!dialogoNuevoUsuario || !nuevoUsuario.nombre) return;
+    if (!dialogoNuevoUsuario || !nuevoUsuario.nombre || !onAgregarUsuario) return;
     onAgregarUsuario(dialogoNuevoUsuario, nuevoUsuario);
     setNuevoUsuario({
       nombre: '',
@@ -102,69 +102,71 @@ export function ClientesView({
           <h2 className="text-2xl font-bold text-slate-900">Catálogo de Clientes</h2>
           <p className="text-slate-500">{clientes.length} clientes registrados</p>
         </div>
-        <Dialog open={dialogoNuevoCliente} onOpenChange={setDialogoNuevoCliente}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Agregar Nuevo Cliente</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Nombre de la Empresa *</Label>
-                <Input
-                  value={nuevoCliente.nombreEmpresa}
-                  onChange={(e) => setNuevoCliente(prev => ({ ...prev, nombreEmpresa: e.target.value }))}
-                  placeholder="Ej: Industrias del Norte SA de CV"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>RFC *</Label>
-                <Input
-                  value={nuevoCliente.rfc}
-                  onChange={(e) => setNuevoCliente(prev => ({ ...prev, rfc: e.target.value.toUpperCase() }))}
-                  placeholder="ABC010203XXX"
-                  maxLength={13}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Dirección</Label>
-                <Input
-                  value={nuevoCliente.direccion}
-                  onChange={(e) => setNuevoCliente(prev => ({ ...prev, direccion: e.target.value }))}
-                  placeholder="Calle, número, colonia, ciudad"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Teléfono</Label>
-                <Input
-                  value={nuevoCliente.telefono}
-                  onChange={(e) => setNuevoCliente(prev => ({ ...prev, telefono: e.target.value }))}
-                  placeholder="(55) 1234-5678"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Términos de Pago</Label>
-                <Input
-                  value={nuevoCliente.terminosPago}
-                  onChange={(e) => setNuevoCliente(prev => ({ ...prev, terminosPago: e.target.value }))}
-                  placeholder="Ej: 50% anticipo, 50% contra entrega"
-                />
-              </div>
-              <Button 
-                onClick={handleAgregarCliente}
-                disabled={!nuevoCliente.nombreEmpresa || !nuevoCliente.rfc}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                Guardar Cliente
+        {onAgregarCliente && (
+          <Dialog open={dialogoNuevoCliente} onOpenChange={setDialogoNuevoCliente}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Cliente
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Agregar Nuevo Cliente</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Nombre de la Empresa *</Label>
+                  <Input
+                    value={nuevoCliente.nombreEmpresa}
+                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, nombreEmpresa: e.target.value }))}
+                    placeholder="Ej: Industrias del Norte SA de CV"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>RFC *</Label>
+                  <Input
+                    value={nuevoCliente.rfc}
+                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, rfc: e.target.value.toUpperCase() }))}
+                    placeholder="ABC010203XXX"
+                    maxLength={13}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dirección</Label>
+                  <Input
+                    value={nuevoCliente.direccion}
+                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, direccion: e.target.value }))}
+                    placeholder="Calle, número, colonia, ciudad"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Teléfono</Label>
+                  <Input
+                    value={nuevoCliente.telefono}
+                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, teleono: e.target.value }))}
+                    placeholder="(55) 1234-5678"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Términos de Pago</Label>
+                  <Input
+                    value={nuevoCliente.terminosPago}
+                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, terminosPago: e.target.value }))}
+                    placeholder="Ej: 50% anticipo, 50% contra entrega"
+                  />
+                </div>
+                <Button 
+                  onClick={handleAgregarCliente}
+                  disabled={!nuevoCliente.nombreEmpresa || !nuevoCliente.rfc}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  Guardar Cliente
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Búsqueda */}
@@ -227,14 +229,16 @@ export function ClientesView({
                       {clienteExpandido === cliente.id ? 'Ocultar' : 'Ver Usuarios'}
                       <Badge variant="secondary" className="ml-2">{cliente.usuarios.length}</Badge>
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEliminarCliente(cliente.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {onEliminarCliente && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEliminarCliente(cliente.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -247,14 +251,16 @@ export function ClientesView({
                         <Users className="w-4 h-4" />
                         Usuarios de Contacto
                       </h4>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setDialogoNuevoUsuario(cliente.id)}
-                      >
-                        <UserPlus className="w-4 h-4 mr-1" />
-                        Agregar Usuario
-                      </Button>
+                      {onAgregarUsuario && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDialogoNuevoUsuario(cliente.id)}
+                        >
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Agregar Usuario
+                        </Button>
+                      )}
                     </div>
 
                     {cliente.usuarios.length === 0 ? (
@@ -286,14 +292,16 @@ export function ClientesView({
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => onEliminarUsuario(cliente.id, usuario.id)}
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                {onEliminarUsuario && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onEliminarUsuario(cliente.id, usuario.id)}
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}

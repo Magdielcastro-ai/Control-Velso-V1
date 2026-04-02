@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -30,7 +30,7 @@ interface ProyectosViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
   cotizaciones: CotizacionGuardada[];
-  onConvertirAVenta: (datos: {
+  onConvertirAVenta?: (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
     clienteId: string;
@@ -43,11 +43,13 @@ interface ProyectosViewProps {
     procesos: ProcesoProyecto[];
     costosAdicionales: CostosAdicionalesProyecto;
   }) => void;
-  onEliminarProyecto: (id: string) => void;
+  onEliminarProyecto?: (id: string) => void;
   onMarcarFabricado?: (id: string) => void;
   onMarcarEntregado?: (id: string) => void;
   onMarcarFacturado?: (id: string, numeroFactura: string, totalFacturado: number) => void;
   onVerControlCodigos?: (proyecto: ProyectoVenta) => void;
+  userRol?: string;
+  userId?: string;
 }
 
 // Configuración de estados
@@ -87,7 +89,9 @@ export function ProyectosView({
   onMarcarFabricado,
   onMarcarEntregado,
   onMarcarFacturado,
-  onVerControlCodigos
+  onVerControlCodigos,
+  userRol = 'vendedor',
+  userId
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
@@ -99,8 +103,16 @@ export function ProyectosView({
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
 
-  // Filtrar proyectos
-  const proyectosFiltrados = proyectos.filter(p => {
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
+  const isVendedor = userRol === 'vendedor';
+
+  // Filtrar proyectos según rol
+  const proyectosFiltradosPorRol = isAdmin 
+    ? proyectos 
+    : proyectos.filter(p => p.usuarioId === userId);
+
+  // Filtrar proyectos por búsqueda y estado
+  const proyectosFiltrados = proyectosFiltradosPorRol.filter(p => {
     const coincideBusqueda = 
       p.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.clienteNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -112,24 +124,26 @@ export function ProyectosView({
     return coincideBusqueda && coincideEstado;
   });
 
-  // Cotizaciones que aún no son ventas
-  const cotizacionesPendientes = cotizaciones.filter(c => 
-    !proyectos.some(p => p.numeroCotizacion === c.numero)
-  );
+  // Cotizaciones que aún no son ventas (solo admin y vendedor pueden ver)
+  const cotizacionesPendientes = isAdmin 
+    ? cotizaciones.filter(c => !proyectos.some(p => p.numeroCotizacion === c.numero))
+    : cotizaciones.filter(c => 
+        c.usuarioId === userId && !proyectos.some(p => p.numeroCotizacion === c.numero)
+      );
 
-  // Totales por estado
+  // Totales por estado (solo de proyectos visibles para el usuario)
   const totalesPorEstado = {
-    en_fabricacion: proyectos.filter(p => p.estado === 'en_fabricacion').reduce((sum, p) => sum + p.totalCotizado, 0),
-    fabricado: proyectos.filter(p => p.estado === 'fabricado').reduce((sum, p) => sum + p.totalCotizado, 0),
-    entregado: proyectos.filter(p => p.estado === 'entregado').reduce((sum, p) => sum + p.totalCotizado, 0),
-    facturado: proyectos.filter(p => p.estado === 'facturado').reduce((sum, p) => sum + (p.totalFacturado || 0), 0),
+    en_fabricacion: proyectosFiltradosPorRol.filter(p => p.estado === 'en_fabricacion').reduce((sum, p) => sum + p.totalCotizado, 0),
+    fabricado: proyectosFiltradosPorRol.filter(p => p.estado === 'fabricado').reduce((sum, p) => sum + p.totalCotizado, 0),
+    entregado: proyectosFiltradosPorRol.filter(p => p.estado === 'entregado').reduce((sum, p) => sum + p.totalCotizado, 0),
+    facturado: proyectosFiltradosPorRol.filter(p => p.estado === 'facturado').reduce((sum, p) => sum + (p.totalFacturado || 0), 0),
   };
 
-  const totalVendido = proyectos.reduce((sum, p) => sum + p.totalCotizado, 0);
-  const totalFacturado = proyectos.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+  const totalVendido = proyectosFiltradosPorRol.reduce((sum, p) => sum + p.totalCotizado, 0);
+  const totalFacturado = proyectosFiltradosPorRol.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
 
   const handleConvertir = () => {
-    if (!cotizacionSeleccionada || !ordenCompra) return;
+    if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
     
     onConvertirAVenta({
       numeroCotizacion: cotizacionSeleccionada.numero,
@@ -156,13 +170,13 @@ export function ProyectosView({
     setDialogoConvertir(false);
   };
 
-  const handleMarcarFabricado = (id: string) => {
+  const handleMarcarFabricadoClick = (id: string) => {
     if (onMarcarFabricado) {
       onMarcarFabricado(id);
     }
   };
 
-  const handleMarcarEntregado = (id: string) => {
+  const handleMarcarEntregadoClick = (id: string) => {
     if (onMarcarEntregado) {
       onMarcarEntregado(id);
     }
@@ -175,11 +189,9 @@ export function ProyectosView({
   };
 
   const handleFacturar = () => {
-    if (!proyectoSeleccionado || !numeroFactura || !montoFactura) return;
+    if (!proyectoSeleccionado || !numeroFactura || !montoFactura || !onMarcarFacturado) return;
     
-    if (onMarcarFacturado) {
-      onMarcarFacturado(proyectoSeleccionado.id, numeroFactura, parseFloat(montoFactura));
-    }
+    onMarcarFacturado(proyectoSeleccionado.id, numeroFactura, parseFloat(montoFactura));
 
     setNumeroFactura('');
     setMontoFactura('');
@@ -204,67 +216,72 @@ export function ProyectosView({
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Proyectos / Ventas</h2>
           <p className="text-slate-500">
-            {proyectos.length} proyectos · ${totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 2 })} vendido
+            {proyectosFiltradosPorRol.length} proyectos · ${totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 2 })} vendido
             {totalFacturado > 0 && ` · $${totalFacturado.toLocaleString('es-MX', { minimumFractionDigits: 2 })} facturado`}
+            {!isAdmin && <span className="text-blue-600 ml-2">(Vista Personal)</span>}
           </p>
         </div>
-        <Dialog open={dialogoConvertir} onOpenChange={setDialogoConvertir}>
-          <DialogTrigger asChild>
-            <Button className="bg-green-600 hover:bg-green-700">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Convertir Cotización
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Convertir Cotización a Venta</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Seleccionar Cotización</Label>
-                <div className="max-h-[200px] overflow-y-auto border rounded-lg">
-                  {cotizacionesPendientes.length === 0 ? (
-                    <p className="p-4 text-center text-slate-500">No hay cotizaciones pendientes</p>
-                  ) : (
-                    <div className="divide-y">
-                      {cotizacionesPendientes.map((cot) => (
-                        <button
-                          key={cot.id}
-                          onClick={() => setCotizacionSeleccionada(cot)}
-                          className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${
-                            cotizacionSeleccionada?.id === cot.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-                          }`}
-                        >
-                          <div className="font-medium">{cot.numero}</div>
-                          <div className="text-sm text-slate-500">
-                            {cot.clienteNombre} · {cot.proyectoNombre} · ${cot.total.toFixed(2)}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Número de Orden de Compra *</Label>
-                <Input
-                  value={ordenCompra}
-                  onChange={(e) => setOrdenCompra(e.target.value)}
-                  placeholder="Ej: OC-2024-001"
-                />
-              </div>
-
-              <Button 
-                onClick={handleConvertir}
-                disabled={!cotizacionSeleccionada || !ordenCompra}
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                Convertir a Venta
+        
+        {/* Botón Convertir Cotización - solo admin y vendedor */}
+        {(isAdmin || isVendedor) && onConvertirAVenta && (
+          <Dialog open={dialogoConvertir} onOpenChange={setDialogoConvertir}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-600 hover:bg-green-700">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Convertir Cotización
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Convertir Cotización a Venta</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Seleccionar Cotización</Label>
+                  <div className="max-h-[200px] overflow-y-auto border rounded-lg">
+                    {cotizacionesPendientes.length === 0 ? (
+                      <p className="p-4 text-center text-slate-500">No hay cotizaciones pendientes</p>
+                    ) : (
+                      <div className="divide-y">
+                        {cotizacionesPendientes.map((cot) => (
+                          <button
+                            key={cot.id}
+                            onClick={() => setCotizacionSeleccionada(cot)}
+                            className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${
+                              cotizacionSeleccionada?.id === cot.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                            }`}
+                          >
+                            <div className="font-medium">{cot.numero}</div>
+                            <div className="text-sm text-slate-500">
+                              {cot.clienteNombre} · {cot.proyectoNombre} · ${cot.total.toFixed(2)}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Número de Orden de Compra *</Label>
+                  <Input
+                    value={ordenCompra}
+                    onChange={(e) => setOrdenCompra(e.target.value)}
+                    placeholder="Ej: OC-2024-001"
+                  />
+                </div>
+
+                <Button 
+                  onClick={handleConvertir}
+                  disabled={!cotizacionSeleccionada || !ordenCompra}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  Convertir a Venta
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Filtros y búsqueda */}
@@ -401,7 +418,7 @@ export function ProyectosView({
 
                     {/* Acciones */}
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Botón Control de Códigos */}
+                      {/* Botón Control de Códigos - solo admin, superadmin y producción */}
                       {onVerControlCodigos && (
                         <Button
                           variant="outline"
@@ -418,7 +435,7 @@ export function ProyectosView({
                       {proyecto.estado === 'en_fabricacion' && onMarcarFabricado && (
                         <Button
                           size="sm"
-                          onClick={() => handleMarcarFabricado(proyecto.id)}
+                          onClick={() => handleMarcarFabricadoClick(proyecto.id)}
                           className="bg-amber-600 hover:bg-amber-700"
                         >
                           <Package className="w-4 h-4 mr-1" />
@@ -429,7 +446,7 @@ export function ProyectosView({
                       {proyecto.estado === 'fabricado' && onMarcarEntregado && (
                         <Button
                           size="sm"
-                          onClick={() => handleMarcarEntregado(proyecto.id)}
+                          onClick={() => handleMarcarEntregadoClick(proyecto.id)}
                           className="bg-cyan-600 hover:bg-cyan-700"
                         >
                           <Truck className="w-4 h-4 mr-1" />
@@ -448,14 +465,17 @@ export function ProyectosView({
                         </Button>
                       )}
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEliminarProyecto(proyecto.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {/* Botón eliminar - solo admin y superadmin */}
+                      {onEliminarProyecto && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEliminarProyecto(proyecto.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -505,49 +525,11 @@ export function ProyectosView({
               className="w-full bg-purple-600 hover:bg-purple-700"
             >
               <Receipt className="w-4 h-4 mr-2" />
-              Confirmar Facturación
+              Facturar Proyecto
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Resumen mensual */}
-      {proyectos.length > 0 && (
-        <Card className="border-slate-200 bg-slate-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              Resumen de Ventas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-slate-500">Total Vendido</p>
-                <p className="text-2xl font-bold text-green-600">
-                  ${totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-slate-500">Total Facturado</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  ${totalFacturado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-slate-500">Proyectos</p>
-                <p className="text-2xl font-bold text-slate-900">{proyectos.length}</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg">
-                <p className="text-sm text-slate-500">Promedio por Proyecto</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  ${(totalVendido / proyectos.length).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

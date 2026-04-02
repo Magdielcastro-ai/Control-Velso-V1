@@ -26,9 +26,9 @@ import type { CatalogoMaterial, FormaMaterial, UnidadMedida } from '@/types/coti
 interface MaterialesCatalogoViewProps {
   onVolver: () => void;
   catalogo: CatalogoMaterial[];
-  onAgregar: (material: Omit<CatalogoMaterial, 'id'>) => void;
-  onEliminar: (id: string) => void;
-  onActualizarPrecio: (id: string, nuevoPrecio: number) => void;
+  onAgregar?: (material: Omit<CatalogoMaterial, 'id'>) => void;
+  onEliminar?: (id: string) => void;
+  onActualizarPrecio?: (id: string, nuevoPrecio: number) => void;
 }
 
 const tiposMaterial = [
@@ -88,7 +88,7 @@ export function MaterialesCatalogoView({
   });
 
   const handleAgregar = () => {
-    if (!nuevoMaterial.nombre || nuevoMaterial.costoUnitario <= 0) return;
+    if (!nuevoMaterial.nombre || nuevoMaterial.costoUnitario <= 0 || !onAgregar) return;
     onAgregar(nuevoMaterial);
     setNuevoMaterial({
       nombre: '',
@@ -107,6 +107,7 @@ export function MaterialesCatalogoView({
   };
 
   const handleActualizarPrecio = (id: string) => {
+    if (!onActualizarPrecio) return;
     const precio = parseFloat(nuevoPrecio);
     if (precio > 0) {
       onActualizarPrecio(id, precio);
@@ -140,13 +141,15 @@ export function MaterialesCatalogoView({
           <h2 className="text-2xl font-bold text-slate-900">Catálogo de Materiales</h2>
           <p className="text-slate-500">{catalogo.length} materiales registrados</p>
         </div>
-        <Button 
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {mostrarFormulario ? 'Cancelar' : 'Nuevo Material'}
-        </Button>
+        {onAgregar && (
+          <Button 
+            onClick={() => setMostrarFormulario(!mostrarFormulario)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {mostrarFormulario ? 'Cancelar' : 'Nuevo Material'}
+          </Button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -380,14 +383,16 @@ export function MaterialesCatalogoView({
               </div>
             </div>
 
-            <Button 
-              onClick={handleAgregar}
-              disabled={!nuevoMaterial.nombre || nuevoMaterial.costoUnitario <= 0}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Guardar en Catálogo
-            </Button>
+            {onAgregar && (
+              <Button 
+                onClick={handleAgregar}
+                disabled={!nuevoMaterial.nombre || nuevoMaterial.costoUnitario <= 0}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Guardar en Catálogo
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -434,7 +439,7 @@ export function MaterialesCatalogoView({
                         {formatearDimensiones(material)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {editandoPrecio === material.id ? (
+                        {onActualizarPrecio && editandoPrecio === material.id ? (
                           <div className="flex items-center gap-2 justify-end">
                             <Input
                               type="number"
@@ -451,7 +456,7 @@ export function MaterialesCatalogoView({
                               <Save className="w-4 h-4" />
                             </Button>
                           </div>
-                        ) : (
+                        ) : onActualizarPrecio ? (
                           <button
                             onClick={() => {
                               setEditandoPrecio(material.id);
@@ -463,17 +468,24 @@ export function MaterialesCatalogoView({
                             {material.costoUnitario.toFixed(2)}/{material.unidadCosto}
                             <Edit className="w-3 h-3 ml-1 text-slate-400" />
                           </button>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <DollarSign className="w-4 h-4" />
+                            {material.costoUnitario.toFixed(2)}/{material.unidadCosto}
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEliminar(material.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {onEliminar && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEliminar(material.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

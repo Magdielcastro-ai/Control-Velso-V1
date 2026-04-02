@@ -13,7 +13,7 @@ interface CotizacionesViewProps {
   onVolver: () => void;
   userRol?: string;
   onCargarCotizacion: (id: string) => void;
-  onConvertirAVenta: (cotizacion: any, ordenCompra: string) => void;
+  onConvertirAVenta?: (cotizacion: any, ordenCompra: string) => void;
 }
 
 const estadosConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -21,8 +21,6 @@ const estadosConfig: Record<string, { label: string; color: string; icon: any }>
   enviada: { label: 'Enviada', color: 'bg-blue-500', icon: FileText },
   aceptada: { label: 'Aceptada', color: 'bg-green-500', icon: CheckCircle },
   rechazada: { label: 'Rechazada', color: 'bg-red-500', icon: Trash2 },
-  comprada: { label: 'Comprada', color: 'bg-green-600', icon: CheckCircle },
-  convertida: { label: 'Convertida', color: 'bg-green-600', icon: CheckCircle },
 };
 
 export function CotizacionesView({ 
@@ -48,6 +46,7 @@ export function CotizacionesView({
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
 
+  // Cargar cotizaciones al montar
   useEffect(() => {
     if (isAdmin) {
       getAllCotizaciones();
@@ -56,10 +55,12 @@ export function CotizacionesView({
     }
   }, [isAdmin, getAllCotizaciones, getMisCotizaciones]);
 
+  // Verificar si una cotización ya fue convertida en proyecto
   const esComprada = (estado: string) => {
     return estado === 'comprada' || estado === 'convertida';
   };
 
+  // Filtrar cotizaciones
   const cotizacionesFiltradas = cotizaciones.filter(c => {
     const matchBusqueda = 
       c.numero.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -72,12 +73,13 @@ export function CotizacionesView({
     return matchBusqueda && matchEstado;
   });
 
+  // Ordenar por fecha (más reciente primero)
   const cotizacionesOrdenadas = [...cotizacionesFiltradas].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
   const handleConvertir = async () => {
-    if (!cotizacionSeleccionada || !ordenCompra) return;
+    if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
     
     try {
       await updateEstado(cotizacionSeleccionada.id, 'comprada');
@@ -102,6 +104,7 @@ export function CotizacionesView({
     }
   };
 
+  // Estadísticas
   const totalCotizaciones = cotizaciones.length;
   const totalCompradas = cotizaciones.filter(c => esComprada(c.estado)).length;
   const totalPendientes = totalCotizaciones - totalCompradas;
@@ -123,6 +126,7 @@ export function CotizacionesView({
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Button variant="outline" onClick={onVolver} className="border-slate-300 w-fit">
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -132,11 +136,12 @@ export function CotizacionesView({
           <h2 className="text-2xl font-bold text-slate-900">Cotizaciones</h2>
           <p className="text-slate-500">
             {totalCotizaciones} cotizaciones · {totalCompradas} compradas · {totalPendientes} pendientes
-            {isAdmin && <span className="text-blue-600 ml-2">(Vista de Admin)</span>}
+            {isAdmin ? <span className="text-blue-600 ml-2">(Vista de Admin)</span> : <span className="text-blue-600 ml-2">(Vista Personal)</span>}
           </p>
         </div>
       </div>
 
+      {/* Estadísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-slate-200">
           <CardContent className="p-4">
@@ -172,6 +177,7 @@ export function CotizacionesView({
         </Card>
       </div>
 
+      {/* Filtros */}
       <div className="flex flex-wrap gap-2">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
@@ -200,6 +206,7 @@ export function CotizacionesView({
         </Select>
       </div>
 
+      {/* Lista de cotizaciones */}
       <div className="space-y-4">
         {cotizacionesOrdenadas.length === 0 ? (
           <Card className="border-slate-200">
@@ -219,37 +226,89 @@ export function CotizacionesView({
                 <CardContent className="p-4">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${comprada ? 'bg-green-100' : 'bg-blue-100'}`}>
-                        {comprada ? <CheckCircle className="w-5 h-5 text-green-600" /> : <FileText className="w-5 h-5 text-blue-600" />}
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        comprada ? 'bg-green-100' : 'bg-blue-100'
+                      }`}>
+                        {comprada ? (
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <FileText className="w-5 h-5 text-blue-600" />
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold">{cot.numero}</h3>
-                          {comprada && <Badge className="bg-green-600 text-white"><CheckCircle className="w-3 h-3 mr-1" />COMPRADA</Badge>}
-                          {!comprada && <Badge className={`${estadoConfig.color} text-white`}><EstadoIcon className="w-3 h-3 mr-1" />{estadoConfig.label}</Badge>}
+                          {comprada && (
+                            <Badge className="bg-green-600 text-white">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              COMPRADA
+                            </Badge>
+                          )}
+                          {!comprada && (
+                            <Badge className={`${estadoConfig.color} text-white`}>
+                              <EstadoIcon className="w-3 h-3 mr-1" />
+                              {estadoConfig.label}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
-                          <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{cot.cliente_nombre}</span>
-                          <span className="flex items-center gap-1"><FolderKanban className="w-3 h-3" />{cot.proyecto_nombre}</span>
-                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(cot.created_at).toLocaleDateString('es-MX')}</span>
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {cot.cliente_nombre}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <FolderKanban className="w-3 h-3" />
+                            {cot.proyecto_nombre}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(cot.created_at).toLocaleDateString('es-MX')}
+                          </span>
                         </div>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-slate-900">${(cot.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-2xl font-bold text-slate-900">
+                          ${(cot.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => onCargarCotizacion(cot.id)}><Eye className="w-4 h-4 mr-1" />Ver</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onCargarCotizacion(cot.id)}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Ver
+                        </Button>
                         
-                        {!comprada && cot.estado !== 'rechazada' && (
-                          <Dialog open={dialogoConvertir && cotizacionSeleccionada?.id === cot.id} onOpenChange={(open) => { if (!open) { setDialogoConvertir(false); setCotizacionSeleccionada(null); } }}>
+                        {!comprada && cot.estado !== 'rechazada' && onConvertirAVenta && (
+                          <Dialog open={dialogoConvertir && cotizacionSeleccionada?.id === cot.id} 
+                                 onOpenChange={(open) => {
+                                   if (!open) {
+                                     setDialogoConvertir(false);
+                                     setCotizacionSeleccionada(null);
+                                   }
+                                 }}>
                             <DialogTrigger asChild>
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => { setCotizacionSeleccionada(cot); setDialogoConvertir(true); }}><CheckCircle className="w-4 h-4 mr-1" />Comprar</Button>
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => {
+                                  setCotizacionSeleccionada(cot);
+                                  setDialogoConvertir(true);
+                                }}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Comprar
+                              </Button>
                             </DialogTrigger>
                             <DialogContent>
-                              <DialogHeader><DialogTitle>Convertir Cotización a Venta</DialogTitle></DialogHeader>
+                              <DialogHeader>
+                                <DialogTitle>Convertir Cotización a Venta</DialogTitle>
+                              </DialogHeader>
                               <div className="space-y-4 pt-4">
                                 <div className="bg-slate-50 p-3 rounded-lg">
                                   <p className="text-sm text-slate-600">Cotización:</p>
@@ -259,15 +318,32 @@ export function CotizacionesView({
                                 </div>
                                 <div className="space-y-2">
                                   <label className="text-sm font-medium">Número de Orden de Compra *</label>
-                                  <Input value={ordenCompra} onChange={(e) => setOrdenCompra(e.target.value)} placeholder="Ej: OC-2024-001" />
+                                  <Input
+                                    value={ordenCompra}
+                                    onChange={(e) => setOrdenCompra(e.target.value)}
+                                    placeholder="Ej: OC-2024-001"
+                                  />
                                 </div>
-                                <Button onClick={handleConvertir} disabled={!ordenCompra} className="w-full bg-green-600 hover:bg-green-700">Confirmar Compra</Button>
+                                <Button 
+                                  onClick={handleConvertir}
+                                  disabled={!ordenCompra}
+                                  className="w-full bg-green-600 hover:bg-green-700"
+                                >
+                                  Confirmar Compra
+                                </Button>
                               </div>
                             </DialogContent>
                           </Dialog>
                         )}
                         
-                        <Button variant="ghost" size="sm" onClick={() => handleEliminar(cot.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEliminar(cot.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>

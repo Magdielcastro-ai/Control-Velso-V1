@@ -12,13 +12,18 @@ interface ClienteStepProps {
   datos: DatosCliente;
   onChange: (datos: Partial<DatosCliente>) => void;
   clientesGuardados: Cliente[];
-  onGuardarCliente: (datos: DatosCliente) => Cliente | null;
+  onGuardarCliente?: (datos: DatosCliente) => Cliente | null;
+  userRol?: string;
 }
 
-export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente }: ClienteStepProps) {
+export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, userRol = 'vendedor' }: ClienteStepProps) {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
   const [clienteGuardado, setClienteGuardado] = useState(false);
+
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
+  const isVendedor = userRol === 'vendedor';
+  const canSaveClientes = isAdmin || isVendedor;
 
   // Detectar si los datos actuales coinciden con un cliente guardado
   useEffect(() => {
@@ -28,12 +33,13 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
         (datos.empresa && c.nombreEmpresa.toLowerCase() === datos.empresa.toLowerCase())
       );
       setClienteGuardado(existe);
-      setMostrarGuardar(!existe && (datos.nombre.length > 0 || datos.empresa.length > 0));
+      // Mostrar botón de guardar si puede guardar clientes y no existe
+      setMostrarGuardar(canSaveClientes && !existe && (datos.nombre.length > 0 || datos.empresa.length > 0));
     } else {
       setMostrarGuardar(false);
       setClienteGuardado(false);
     }
-  }, [datos, clientesGuardados]);
+  }, [datos, clientesGuardados, canSaveClientes]);
 
   const handleSeleccionarCliente = (clienteId: string) => {
     setClienteSeleccionado(clienteId);
@@ -63,6 +69,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
   };
 
   const handleGuardarCliente = () => {
+    if (!onGuardarCliente) return;
     const resultado = onGuardarCliente(datos);
     if (resultado) {
       setClienteGuardado(true);
@@ -151,7 +158,8 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
                 placeholder="Nombre de la empresa"
                 className="border-slate-300"
               />
-              {mostrarGuardar && (
+              {/* Botón guardar cliente - visible para admin, superadmin y vendedor */}
+              {mostrarGuardar && onGuardarCliente && (
                 <Button
                   type="button"
                   variant="outline"
