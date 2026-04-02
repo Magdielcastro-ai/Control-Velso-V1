@@ -531,16 +531,14 @@ function App() {
           </>
         );
 
-      case 'cotizaciones':
+     case 'cotizaciones':
         return (
           <>
             <UserHeader user={user} onLogout={handleLogout} />
             <CotizacionesView
               onVolver={irAHome}
-              cotizaciones={cotizacionesGuardadas}
-              proyectos={proyectos}
+              userRol={user?.rol}
               onCargarCotizacion={handleCargarCotizacion}
-              onEliminarCotizacion={handleEliminarCotizacion}
               onConvertirAVenta={handleConvertirCotizacionAVenta}
             />
           </>
