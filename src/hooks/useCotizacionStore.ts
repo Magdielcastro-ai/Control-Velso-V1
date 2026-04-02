@@ -13,6 +13,7 @@ import type {
   TipoProcesoVelso
 } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO, COSTOS_MANO_OBRA } from '@/types/cotizacion';
+import { toast } from 'sonner';
 
 const generarNumeroCotizacion = () => {
   const fecha = new Date();
@@ -311,10 +312,49 @@ export const useCotizacionStore = () => {
       return [guardada, ...prev];
     });
 
-    // Guardar la cotización completa
+    // Guardar la cotización completa en localStorage (backup local)
     const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
     cotizacionesCompletas[id] = { ...nuevaCotizacion, usuarioId: user?.id };
     localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
+
+    // Guardar en Supabase
+    if (user) {
+      try {
+        const cotizacionDB = {
+          id,
+          numero: nuevaCotizacion.numero,
+          usuario_id: user.id,
+          cliente_nombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
+          proyecto_nombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
+          datos_taller: nuevaCotizacion.datosTaller,
+          datos_cliente: nuevaCotizacion.datosCliente,
+          materiales: nuevaCotizacion.materiales,
+          procesos: nuevaCotizacion.procesos,
+          costos_adicionales: nuevaCotizacion.costosAdicionales,
+          margen_utilidad: nuevaCotizacion.margenUtilidad,
+          iva_porcentaje: nuevaCotizacion.ivaPorcentaje,
+          subtotal: nuevaCotizacion.subtotal,
+          total: nuevaCotizacion.total,
+          estado,
+        };
+
+        const { error } = await supabase
+          .from('cotizaciones')
+          .upsert(cotizacionDB);
+
+        if (error) {
+          console.error('Error al guardar en Supabase:', error);
+          toast.error('Error al sincronizar con la nube: ' + error.message);
+        } else {
+          console.log('Cotización guardada en Supabase exitosamente');
+        }
+      } catch (err: any) {
+        console.error('Error de conexión con Supabase:', err);
+        toast.error('Error de conexión: ' + err.message);
+      }
+    } else {
+      toast.warning('No hay sesión activa. La cotización se guardó solo localmente.');
+    }
 
     return id;
   }, [cotizacion]);
