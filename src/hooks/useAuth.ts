@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, getPerfilUsuario, signIn as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
 
-export type UserRole = 'superadmin' | 'admin' | 'vendedor' | 'produccion';
+export type UserRole = 'admin' | 'vendedor' | 'produccion';
 
 export interface AuthUser {
   id: string;
@@ -15,113 +15,124 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const authSubscription = useRef<{ unsubscribe: () => void } | null>(null);
+  const isProcessingAuth = useRef(false);
+
+  // Función para cargar el perfil del usuario
+  const loadUserProfile = useCallback(async (userId: string, email: string): Promise<AuthUser | null> => {
+    try {
+      const perfil = await getPerfilUsuario(userId);
+      if (perfil) {
+        return {
+          id: userId,
+          email: email,
+          nombre: perfil.nombre,
+          rol: perfil.rol,
+          activo: perfil.activo,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('[useAuth] Error cargando perfil:', error);
+      return null;
+    }
+  }, []);
 
   // Cargar usuario al iniciar
   useEffect(() => {
     let isMounted = true;
-    let safetyTimeout: ReturnType<typeof setTimeout>;
 
-    // Timeout de seguridad - si todo falla, mostrar login después de 8 segundos
-    safetyTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('[useAuth] Safety timeout - forzando fin de carga');
-        setUser(null);
-        setLoading(false);
-        setInitialized(true);
-      }
-    }, 8000);
+    const initializeAuth = async () => {
+      if (isProcessingAuth.current) return;
+      isProcessingAuth.current = true;
 
-    // Configurar listener de auth PRIMERO (antes de cargar la sesión)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[useAuth] Auth state changed:', event, session?.user?.id);
-      
-      if (!isMounted) return;
-
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (session?.user) {
-          console.log('[useAuth] Cargando perfil para:', session.user.id);
-          try {
-            const perfil = await getPerfilUsuario(session.user.id);
-            console.log('[useAuth] Perfil obtenido:', perfil);
-            if (perfil) {
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                nombre: perfil.nombre,
-                rol: perfil.rol,
-                activo: perfil.activo,
-              });
-            } else {
-              console.warn('[useAuth] Usuario sin perfil');
-              setUser(null);
-            }
-          } catch (error) {
-            console.error('[useAuth] Error cargando perfil:', error);
-            setUser(null);
-          }
-        } else {
-          console.log('[useAuth] No hay usuario en sesión');
-          setUser(null);
-        }
-        // SIEMPRE marcar como inicializado al final
-        setLoading(false);
-        setInitialized(true);
-        clearTimeout(safetyTimeout);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setLoading(false);
-        setInitialized(true);
-        clearTimeout(safetyTimeout);
-      }
-    });
-
-    // Forzar verificación de sesión existente
-    const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('[useAuth] Sesión inicial:', session?.user?.id);
+        // Obtener sesión actual primero
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        // Si no hay sesión, marcar como inicializado
-        if (!session && isMounted) {
-          setUser(null);
-          setLoading(false);
-          setInitialized(true);
-          clearTimeout(safetyTimeout);
+        if (sessionError) {
+          console.error('[useAuth] Error obteniendo sesión:', sessionError);
         }
-        // Si hay sesión, onAuthStateChange ya se habrá disparado
-      } catch (err) {
-        console.error('[useAuth] Error verificando sesión:', err);
+
+        if (session?.user && isMounted) {
+          const authUser = await loadUserProfile(session.user.id, session.user.email || '');
+          if (authUser && isMounted) {
+            setUser(authUser);
+          }
+        }
+      } catch (error) {
+        console.error('[useAuth] Error inicializando auth:', error);
+      } finally {
         if (isMounted) {
           setLoading(false);
           setInitialized(true);
-          clearTimeout(safetyTimeout);
+          isProcessingAuth.current = false;
         }
       }
     };
 
-    checkSession();
+    initializeAuth();
+
+    // Configurar listener de auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] Auth event:', event);
+      
+      if (!isMounted) return;
+
+      switch (event) {
+        case 'SIGNED_IN':
+          if (session?.user) {
+            const authUser = await loadUserProfile(session.user.id, session.user.email || '');
+            if (authUser && isMounted) {
+              setUser(authUser);
+            }
+          }
+          break;
+          
+        case 'SIGNED_OUT':
+          if (isMounted) {
+            setUser(null);
+          }
+          break;
+          
+        case 'TOKEN_REFRESHED':
+          // El token se refrescó automáticamente, mantener la sesión
+          console.log('[useAuth] Token refrescado exitosamente');
+          break;
+          
+        case 'USER_UPDATED':
+          // Actualizar datos del usuario si cambiaron
+          if (session?.user) {
+            const authUser = await loadUserProfile(session.user.id, session.user.email || '');
+            if (authUser && isMounted) {
+              setUser(authUser);
+            }
+          }
+          break;
+          
+        case 'INITIAL_SESSION':
+          // Ya manejado en initializeAuth
+          break;
+      }
+    });
+
+    authSubscription.current = subscription;
 
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
+      if (authSubscription.current) {
+        authSubscription.current.unsubscribe();
+      }
     };
-  }, []);
+  }, [loadUserProfile]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<AuthUser> => {
     setLoading(true);
     try {
       const data = await supabaseSignIn(email, password);
       if (data.user) {
-        const perfil = await getPerfilUsuario(data.user.id);
-        if (perfil) {
-          const authUser: AuthUser = {
-            id: data.user.id,
-            email: data.user.email || '',
-            nombre: perfil.nombre,
-            rol: perfil.rol,
-            activo: perfil.activo,
-          };
+        const authUser = await loadUserProfile(data.user.id, data.user.email || '');
+        if (authUser) {
           setUser(authUser);
           return authUser;
         } else {
@@ -135,7 +146,7 @@ export function useAuth() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadUserProfile]);
 
   const signOut = useCallback(async () => {
     setLoading(true);
@@ -147,30 +158,45 @@ export function useAuth() {
     }
   }, []);
 
-  // Permisos basados en roles
-  // SUPERADMIN: Todo el acceso
-  // ADMIN: Ver y modificar todo, pero NO crear usuarios ni cambiar roles
-  // VENDEDOR: Cotizar y facturar
-  // PRODUCCION: Actualizar estados de producción
+  // Función para refrescar la sesión manualmente
+  const refreshSession = useCallback(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      
+      if (session?.user) {
+        const authUser = await loadUserProfile(session.user.id, session.user.email || '');
+        if (authUser) {
+          setUser(authUser);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('[useAuth] Error refrescando sesión:', error);
+      return false;
+    }
+  }, [loadUserProfile]);
 
+  // Permisos basados en roles
   const canCreateCotizacion = useCallback(() => {
     if (!user) return false;
-    return ['superadmin', 'admin', 'vendedor'].includes(user.rol);
+    return user.rol === 'admin' || user.rol === 'vendedor';
   }, [user]);
 
   const canEditCotizacion = useCallback(() => {
     if (!user) return false;
-    return ['superadmin', 'admin', 'vendedor'].includes(user.rol);
+    return user.rol === 'admin' || user.rol === 'vendedor';
   }, [user]);
 
   const canViewProyectos = useCallback(() => {
     if (!user) return false;
-    return true; // Todos pueden ver proyectos
+    return true;
   }, [user]);
 
   const canUpdateProyectoEstado = useCallback((nuevoEstado?: string) => {
     if (!user) return false;
-    if (['superadmin', 'admin'].includes(user.rol)) return true;
+    if (user.rol === 'admin') return true;
     if (user.rol === 'produccion') {
       return nuevoEstado === 'fabricado' || nuevoEstado === 'entregado';
     }
@@ -180,26 +206,18 @@ export function useAuth() {
     return false;
   }, [user]);
 
-  // SOLO SUPERADMIN puede crear usuarios y cambiar roles
   const canManageUsers = useCallback(() => {
-    return user?.rol === 'superadmin';
+    return user?.rol === 'admin';
   }, [user]);
 
-  // SUPERADMIN y ADMIN pueden ver dashboard
   const canViewDashboard = useCallback(() => {
     if (!user) return false;
-    return ['superadmin', 'admin', 'vendedor'].includes(user.rol);
+    return user.rol === 'admin' || user.rol === 'vendedor';
   }, [user]);
 
   const canViewControlCodigos = useCallback(() => {
     if (!user) return false;
-    return ['superadmin', 'admin', 'produccion'].includes(user.rol);
-  }, [user]);
-
-  // SUPERADMIN y ADMIN pueden modificar catálogos
-  const canManageCatalogos = useCallback(() => {
-    if (!user) return false;
-    return ['superadmin', 'admin'].includes(user.rol);
+    return user.rol === 'admin' || user.rol === 'produccion';
   }, [user]);
 
   return {
@@ -208,6 +226,7 @@ export function useAuth() {
     initialized,
     signIn,
     signOut,
+    refreshSession,
     isAuthenticated: !!user,
     // Permisos
     canCreateCotizacion,
@@ -217,6 +236,5 @@ export function useAuth() {
     canManageUsers,
     canViewDashboard,
     canViewControlCodigos,
-    canManageCatalogos,
   };
 }
