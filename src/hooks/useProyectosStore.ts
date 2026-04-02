@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
 
 const STORAGE_KEY_PROYECTOS = 'velso_proyectos';
@@ -28,7 +29,7 @@ export const useProyectosStore = () => {
   }, [proyectos, cargado]);
 
   // Convertir cotización a proyecto/venta
-  const convertirAVenta = useCallback((datos: {
+  const convertirAVenta = useCallback(async (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
     clienteId: string;
@@ -41,6 +42,9 @@ export const useProyectosStore = () => {
     procesos: ProcesoProyecto[];
     costosAdicionales: CostosAdicionalesProyecto;
   }) => {
+    // Obtener el usuario actual
+    const { data: { user } } = await supabase.auth.getUser();
+    
     const nuevo: ProyectoVenta = {
       ...datos,
       id: crypto.randomUUID(),
@@ -48,6 +52,7 @@ export const useProyectosStore = () => {
       estado: 'en_fabricacion',
       totalFacturado: undefined,
       numeroFactura: undefined,
+      usuarioId: user?.id,
     };
     setProyectos(prev => [nuevo, ...prev]);
     return nuevo;

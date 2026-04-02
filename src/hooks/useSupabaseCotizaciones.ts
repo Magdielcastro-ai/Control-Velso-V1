@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Cotizacion } from '@/types/cotizacion';
 
 export interface CotizacionDB {
   id: string;
@@ -26,6 +27,7 @@ export function useSupabaseCotizaciones() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Obtener todas las cotizaciones (para admin/superadmin)
   const getAllCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -47,6 +49,7 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
+  // Obtener cotizaciones del usuario actual
   const getMisCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -75,7 +78,8 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  const saveCotizacion = useCallback(async (cotizacion: any, estado: string = 'borrador') => {
+  // Guardar cotización completa en Supabase
+  const saveCotizacion = useCallback(async (cotizacion: Cotizacion, estado: string = 'borrador') => {
     setLoading(true);
     setError(null);
     try {
@@ -88,17 +92,17 @@ export function useSupabaseCotizaciones() {
         id,
         numero: cotizacion.numero,
         usuario_id: user.id,
-        cliente_nombre: cotizacion.datosCliente?.nombre || cotizacion.datosCliente?.empresa || 'Sin cliente',
-        proyecto_nombre: cotizacion.proyecto?.nombre || 'Sin nombre',
-        datos_taller: cotizacion.datosTaller || {},
-        datos_cliente: cotizacion.datosCliente || {},
-        materiales: cotizacion.materiales || [],
-        procesos: cotizacion.procesos || [],
-        costos_adicionales: cotizacion.costosAdicionales || {},
-        margen_utilidad: cotizacion.margenUtilidad || 30,
-        iva_porcentaje: cotizacion.ivaPorcentaje || 16,
-        subtotal: cotizacion.subtotal || 0,
-        total: cotizacion.total || 0,
+        cliente_nombre: cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa || 'Sin cliente',
+        proyecto_nombre: cotizacion.proyecto.nombre || 'Sin nombre',
+        datos_taller: cotizacion.datosTaller,
+        datos_cliente: cotizacion.datosCliente,
+        materiales: cotizacion.materiales,
+        procesos: cotizacion.procesos,
+        costos_adicionales: cotizacion.costosAdicionales,
+        margen_utilidad: cotizacion.margenUtilidad,
+        iva_porcentaje: cotizacion.ivaPorcentaje,
+        subtotal: cotizacion.subtotal,
+        total: cotizacion.total,
         estado,
       };
 
@@ -110,6 +114,7 @@ export function useSupabaseCotizaciones() {
 
       if (error) throw error;
       
+      // Actualizar lista local
       setCotizaciones(prev => {
         const index = prev.findIndex(c => c.id === id);
         if (index >= 0) {
@@ -130,6 +135,7 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
+  // Obtener una cotización por ID
   const getCotizacionById = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -151,6 +157,7 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
+  // Eliminar cotización
   const deleteCotizacion = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -173,6 +180,7 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
+  // Actualizar estado de cotización
   const updateEstado = useCallback(async (id: string, estado: string) => {
     setLoading(true);
     setError(null);

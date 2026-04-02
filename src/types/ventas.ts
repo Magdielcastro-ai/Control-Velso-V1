@@ -82,6 +82,7 @@ export interface ProyectoVenta {
   totalFacturado?: number;
   margenUtilidad: number;
   ivaPorcentaje: number;
+  usuarioId?: string;
   // Datos de cotización
   materiales: MaterialProyecto[];
   procesos: ProcesoProyecto[];

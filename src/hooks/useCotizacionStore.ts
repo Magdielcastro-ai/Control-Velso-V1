@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import type { 
   Cotizacion, 
   DatosTaller, 
@@ -280,11 +281,14 @@ export const useCotizacionStore = () => {
     });
   }, [recalcularTotales]);
 
-  const guardarCotizacion = useCallback((estado: CotizacionGuardada['estado'] = 'borrador') => {
+  const guardarCotizacion = useCallback(async (estado: CotizacionGuardada['estado'] = 'borrador') => {
     const id = cotizacion.id || crypto.randomUUID();
     const nuevaCotizacion = { ...cotizacion, id };
     
     setCotizacion(nuevaCotizacion);
+    
+    // Obtener el usuario actual
+    const { data: { user } } = await supabase.auth.getUser();
     
     const guardada: CotizacionGuardada = {
       id,
@@ -294,6 +298,7 @@ export const useCotizacionStore = () => {
       proyectoNombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
       total: nuevaCotizacion.total,
       estado,
+      usuarioId: user?.id,
     };
 
     setCotizacionesGuardadas(prev => {
@@ -308,7 +313,7 @@ export const useCotizacionStore = () => {
 
     // Guardar la cotización completa
     const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
-    cotizacionesCompletas[id] = nuevaCotizacion;
+    cotizacionesCompletas[id] = { ...nuevaCotizacion, usuarioId: user?.id };
     localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
 
     return id;

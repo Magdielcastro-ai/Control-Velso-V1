@@ -251,4 +251,5 @@ export interface CotizacionGuardada {
   proyectoNombre: string;
   total: number;
   estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
+  usuarioId?: string;
 }

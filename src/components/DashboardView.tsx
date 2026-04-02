@@ -24,6 +24,8 @@ interface DashboardViewProps {
   cotizacionesCompletas: any[];
   horasDisponibles: Record<string, number>;
   proyectos: ProyectoVenta[];
+  userRol?: string;
+  userId?: string;
 }
 
 const MESES = [
@@ -36,28 +38,46 @@ export function DashboardView({
   cotizaciones, 
   cotizacionesCompletas,
   horasDisponibles,
-  proyectos
+  proyectos,
+  userRol = 'vendedor',
+  userId
 }: DashboardViewProps) {
   const hoy = new Date();
   const [mesSeleccionado, setMesSeleccionado] = useState(hoy.getMonth());
   const [anioSeleccionado, setAnioSeleccionado] = useState(hoy.getFullYear());
 
+  // Determinar si es admin/superadmin
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
+
+  // Filtrar datos por usuario si es vendedor
+  const cotizacionesFiltradas = isAdmin 
+    ? cotizaciones 
+    : cotizaciones.filter(c => c.usuarioId === userId);
+
+  const proyectosFiltrados = isAdmin 
+    ? proyectos 
+    : proyectos.filter(p => p.usuarioId === userId);
+
+  const cotizacionesCompletasFiltradas = isAdmin 
+    ? cotizacionesCompletas 
+    : cotizacionesCompletas.filter((c: any) => c.usuario_id === userId);
+
   // Filtrar datos por mes seleccionado
   const datosMes = useMemo(() => {
-    // Cotizaciones del mes
-    const cotizacionesMes = cotizaciones.filter(c => {
+    // Cotizaciones del mes (usando datos filtrados por usuario)
+    const cotizacionesMes = cotizacionesFiltradas.filter(c => {
       const fecha = new Date(c.fecha);
       return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
     });
 
-    // Proyectos vendidos en el mes
-    const proyectosMes = proyectos.filter(p => {
+    // Proyectos vendidos en el mes (usando datos filtrados por usuario)
+    const proyectosMes = proyectosFiltrados.filter(p => {
       const fecha = new Date(p.fechaVenta);
       return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
     });
 
-    // Proyectos facturados en el mes
-    const proyectosFacturadosMes = proyectos.filter(p => {
+    // Proyectos facturados en el mes (usando datos filtrados por usuario)
+    const proyectosFacturadosMes = proyectosFiltrados.filter(p => {
       if (!p.fechaFacturado) return false;
       const fecha = new Date(p.fechaFacturado);
       return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
@@ -82,8 +102,8 @@ export function DashboardView({
       horasFacturadas[p.id] = 0;
     });
 
-    // Horas cotizadas (de cotizaciones)
-    cotizacionesCompletas.forEach((cot: any) => {
+    // Horas cotizadas (de cotizaciones filtradas por usuario)
+    cotizacionesCompletasFiltradas.forEach((cot: any) => {
       const fecha = new Date(cot.fecha);
       if (fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado) {
         cot.procesos?.forEach((p: any) => {
@@ -151,7 +171,7 @@ export function DashboardView({
       horasFacturadas,
       clientesData,
     };
-  }, [cotizaciones, proyectos, cotizacionesCompletas, mesSeleccionado, anioSeleccionado]);
+  }, [cotizacionesFiltradas, proyectosFiltrados, cotizacionesCompletasFiltradas, mesSeleccionado, anioSeleccionado]);
 
   // Datos para gráficas
   const datosGraficaMontos = [
@@ -235,7 +255,11 @@ export function DashboardView({
           Volver
         </Button>
         <div className="flex-1">
-          <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Dashboard
+            {!isAdmin && <span className="text-sm font-normal text-blue-600 ml-2">(Vista Personal)</span>}
+            {isAdmin && <span className="text-sm font-normal text-purple-600 ml-2">(Vista de Admin)</span>}
+          </h2>
         </div>
         <div className="flex gap-2">
           <Select value={mesSeleccionado.toString()} onValueChange={(v) => setMesSeleccionado(parseInt(v))}>

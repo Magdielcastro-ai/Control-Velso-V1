@@ -128,7 +128,7 @@ function App() {
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   
-   // Auth
+  // Auth
   const { 
     user, 
     loading: authLoading, 
@@ -198,7 +198,7 @@ function App() {
     guardarDatosReales
   } = useProyectosStore();
 
-   // Login handler
+  // Login handler
   const handleLogin = async (email: string, password: string) => {
     setLoginError(null);
     try {
@@ -251,8 +251,8 @@ function App() {
   };
 
   // Convertir cotización a venta desde la vista de cotizaciones
-  const handleConvertirCotizacionAVenta = (cotizacion: CotizacionGuardada, ordenCompra: string) => {
-    convertirAVenta({
+  const handleConvertirCotizacionAVenta = async (cotizacion: CotizacionGuardada, ordenCompra: string) => {
+    await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
       ordenCompra,
       clienteId: '',
@@ -333,13 +333,13 @@ function App() {
     }
   };
 
-  const handleGuardar = () => {
-    guardarCotizacion('borrador');
+  const handleGuardar = async () => {
+    await guardarCotizacion('borrador');
     toast.success('Cotización guardada correctamente');
   };
 
-  const handleGenerarCotizacion = () => {
-    guardarCotizacion('enviada');
+  const handleGenerarCotizacion = async () => {
+    await guardarCotizacion('enviada');
     setVistaActual('cotizacion-final');
     toast.success('¡Cotización generada exitosamente!');
   };
@@ -375,7 +375,7 @@ function App() {
   const indicePasoActual = pasos.findIndex(p => p.id === pasoActual);
   const progreso = ((indicePasoActual + 1) / pasos.length) * 100;
 
-     // Mostrar loading mientras inicializa auth
+  // Mostrar loading mientras inicializa auth
   if (!initialized || authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -439,6 +439,8 @@ function App() {
               cotizacionesCompletas={Object.values(cotizacionesCompletas)}
               horasDisponibles={horasDisponibles}
               proyectos={proyectos}
+              userRol={user.rol}
+              userId={user.id}
             />
           </>
         );
@@ -525,7 +527,7 @@ function App() {
           </>
         );
 
-     case 'cotizaciones':
+      case 'cotizaciones':
         return (
           <>
             <UserHeader user={user} onLogout={handleLogout} />
@@ -538,11 +540,11 @@ function App() {
           </>
         );
 
-          case 'admin-usuarios':
+      case 'admin-usuarios':
         return (
           <>
             <UserHeader user={user} onLogout={handleLogout} />
-            <AdminUsuariosView onVolver={irAHome} userRol={user?.rol} />
+            <AdminUsuariosView onVolver={irAHome} />
           </>
         );
 
