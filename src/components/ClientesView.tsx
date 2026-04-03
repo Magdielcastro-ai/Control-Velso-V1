@@ -144,7 +144,7 @@ export function ClientesView({
                   <Label>Teléfono</Label>
                   <Input
                     value={nuevoCliente.telefono}
-                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, teleono: e.target.value }))}
+                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, telefono: e.target.value }))}
                     placeholder="(55) 1234-5678"
                   />
                 </div>

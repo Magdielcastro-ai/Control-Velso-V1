@@ -144,18 +144,21 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
       if (authError) throw authError;
       if (!authData.user) throw new Error('No se pudo crear el usuario');
 
-      // 2. Crear perfil con email incluido
+      // 2. Crear/actualizar perfil (usar upsert por si el trigger ya lo creó)
       const { error: perfilError } = await supabase
         .from('perfiles')
-        .insert([{ 
+        .upsert([{ 
           id: authData.user.id, 
           nombre, 
           email,
           rol,
           activo: true 
-        }]);
+        }], { onConflict: 'id' });
 
-      if (perfilError) throw perfilError;
+      if (perfilError) {
+        console.error('Error creando perfil:', perfilError);
+        throw perfilError;
+      }
 
       toast.success('Usuario creado exitosamente');
       setDialogoAbierto(false);
