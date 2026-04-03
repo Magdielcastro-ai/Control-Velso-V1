@@ -88,6 +88,12 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
             telefono: contactoPrincipal.telefono || contactoPrincipal.celular || cliente.telefono,
             email: contactoPrincipal.email,
             rfc: cliente.rfc || '',
+            clienteId: cliente.id, // Guardar el ID del cliente para cargar contactos después
+          });
+        } else {
+          // Si no hay contactos, igual guardar el clienteId
+          onChange({
+            clienteId: cliente.id,
           });
         }
       }

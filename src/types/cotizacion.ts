@@ -16,6 +16,7 @@ export interface DatosCliente {
   telefono: string;
   email: string;
   rfc?: string;
+  clienteId?: string; // ID del cliente en la tabla clientes (para cargar contactos)
 }
 
 export interface EspecificacionesProyecto {

@@ -354,6 +354,7 @@ export const useCotizacionStore = () => {
           id,
           numero: nuevaCotizacion.numero,
           usuario_id: user.id,
+          cliente_id: nuevaCotizacion.datosCliente.clienteId || null,
           cliente_nombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
           proyecto_nombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
           datos_taller: nuevaCotizacion.datosTaller,
@@ -410,13 +411,45 @@ export const useCotizacionStore = () => {
       } else if (data) {
         console.log('[cargarCotizacion] Cotización cargada de Supabase:', data);
         
+        // Si hay cliente_id, cargar los contactos del cliente
+        let contactosCliente: any[] = [];
+        if (data.cliente_id) {
+          console.log('[cargarCotizacion] Cargando contactos del cliente:', data.cliente_id);
+          const { data: contactosData, error: contactosError } = await supabase
+            .from('contactos')
+            .select('*')
+            .eq('cliente_id', data.cliente_id);
+          
+          if (contactosError) {
+            console.warn('[cargarCotizacion] Error cargando contactos:', contactosError);
+          } else if (contactosData) {
+            contactosCliente = contactosData;
+            console.log('[cargarCotizacion] Contactos cargados:', contactosData.length);
+          }
+        }
+        
         // Transformar datos de Supabase al formato de la app
+        const datosCliente = data.datos_cliente || cotizacionVacia.datosCliente;
+        
+        // Agregar contactos al datosCliente si se cargaron
+        if (contactosCliente.length > 0) {
+          datosCliente.contactos = contactosCliente.map(c => ({
+            id: c.id,
+            nombre: c.nombre,
+            departamento: c.departamento || '',
+            email: c.email || '',
+            telefono: c.telefono || '',
+            celular: c.celular || '',
+            esPrincipal: c.es_principal,
+          }));
+        }
+        
         const cotizacionCargada: Cotizacion = {
           id: data.id,
           numero: data.numero,
           fecha: data.fecha || new Date().toISOString().split('T')[0],
           datosTaller: data.datos_taller || cotizacionVacia.datosTaller,
-          datosCliente: data.datos_cliente || cotizacionVacia.datosCliente,
+          datosCliente: datosCliente,
           proyecto: {
             nombre: data.proyecto_nombre || '',
             descripcion: '',
