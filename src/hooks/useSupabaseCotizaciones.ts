@@ -31,17 +31,25 @@ export function useSupabaseCotizaciones() {
   const getAllCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
+    console.log('[getAllCotizaciones] Cargando todas las cotizaciones...');
     try {
       const { data, error } = await supabase
         .from('cotizaciones')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('[getAllCotizaciones] Respuesta:', { data, error });
+
+      if (error) {
+        console.error('[getAllCotizaciones] Error:', error);
+        throw error;
+      }
+      
+      console.log('[getAllCotizaciones] Cotizaciones cargadas:', data?.length || 0);
       setCotizaciones(data || []);
       return data || [];
     } catch (err: any) {
-      console.error('Error al cargar cotizaciones:', err);
+      console.error('[getAllCotizaciones] Error:', err);
       setError(err.message);
       return [];
     } finally {

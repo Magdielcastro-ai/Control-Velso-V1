@@ -72,7 +72,7 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
       setLoading(true);
       console.log('[cargarUsuarios] Iniciando carga...');
       
-      // Obtener perfiles
+      // Obtener perfiles (que ya incluyen el email)
       const { data: perfiles, error: perfilesError } = await supabase
         .from('perfiles')
         .select('*')
@@ -85,33 +85,17 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
 
       console.log('[cargarUsuarios] Perfiles obtenidos:', perfiles);
 
-      // Obtener todos los usuarios de auth.users
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) {
-        console.log('[cargarUsuarios] Error obteniendo usuarios de auth:', authError);
-      }
+      // Transformar a formato de usuario
+      const usuariosConEmail: UsuarioConEmail[] = (perfiles || []).map(perfil => ({
+        id: perfil.id,
+        nombre: perfil.nombre,
+        email: perfil.email || 'Sin email',
+        rol: perfil.rol,
+        activo: perfil.activo,
+        created_at: perfil.created_at,
+      }));
 
-      console.log('[cargarUsuarios] Usuarios de auth:', authUsers);
-
-      // Para cada perfil, obtener el email de auth.users
-      const usuariosConEmail: UsuarioConEmail[] = [];
-      for (const perfil of (perfiles || [])) {
-        // Buscar el email en auth.users
-        const authUser = authUsers?.users?.find(u => u.id === perfil.id);
-        const email = authUser?.email || perfil.email || 'Sin email';
-
-        usuariosConEmail.push({
-          id: perfil.id,
-          nombre: perfil.nombre,
-          email: email,
-          rol: perfil.rol,
-          activo: perfil.activo,
-          created_at: perfil.created_at,
-        });
-      }
-
-      console.log('[cargarUsuarios] Usuarios con email:', usuariosConEmail);
+      console.log('[cargarUsuarios] Usuarios:', usuariosConEmail);
       setUsuarios(usuariosConEmail);
     } catch (error) {
       console.error('Error cargando usuarios:', error);
