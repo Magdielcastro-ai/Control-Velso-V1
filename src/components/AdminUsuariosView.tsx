@@ -85,24 +85,21 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
 
       console.log('[cargarUsuarios] Perfiles obtenidos:', perfiles);
 
+      // Obtener todos los usuarios de auth.users
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        console.log('[cargarUsuarios] Error obteniendo usuarios de auth:', authError);
+      }
+
+      console.log('[cargarUsuarios] Usuarios de auth:', authUsers);
+
       // Para cada perfil, obtener el email de auth.users
       const usuariosConEmail: UsuarioConEmail[] = [];
       for (const perfil of (perfiles || [])) {
-        let email = perfil.email || '';
-        
-        // Si no hay email en perfiles, intentar obtener de auth.users
-        if (!email) {
-          try {
-            const { data: userData, error: userError } = await supabase.auth.admin.getUserById(perfil.id);
-            if (userError) {
-              console.log('[cargarUsuarios] Error obteniendo usuario:', userError);
-            } else if (userData?.user?.email) {
-              email = userData.user.email;
-            }
-          } catch (e) {
-            console.log('[cargarUsuarios] No se pudo obtener email de auth.users:', e);
-          }
-        }
+        // Buscar el email en auth.users
+        const authUser = authUsers?.users?.find(u => u.id === perfil.id);
+        const email = authUser?.email || perfil.email || 'Sin email';
 
         usuariosConEmail.push({
           id: perfil.id,

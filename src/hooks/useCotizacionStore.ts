@@ -85,16 +85,51 @@ export const useCotizacionStore = () => {
   const [cotizacion, setCotizacion] = useState<Cotizacion>(cotizacionVacia);
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
 
-  // Cargar cotizaciones guardadas del localStorage
+  // Cargar cotizaciones guardadas del localStorage y Supabase
   useEffect(() => {
-    const guardadas = localStorage.getItem('cotizaciones_cnc');
-    if (guardadas) {
-      try {
-        setCotizacionesGuardadas(JSON.parse(guardadas));
-      } catch (e) {
-        console.error('Error al cargar cotizaciones:', e);
+    const cargarCotizaciones = async () => {
+      // Primero cargar de localStorage (más rápido)
+      const guardadas = localStorage.getItem('cotizaciones_cnc');
+      if (guardadas) {
+        try {
+          setCotizacionesGuardadas(JSON.parse(guardadas));
+        } catch (e) {
+          console.error('Error al cargar cotizaciones del localStorage:', e);
+        }
       }
-    }
+
+      // Luego intentar cargar de Supabase
+      try {
+        const { data, error } = await supabase
+          .from('cotizaciones')
+          .select('id, numero, fecha, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.warn('Error cargando cotizaciones de Supabase:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const cotizacionesFormateadas: CotizacionGuardada[] = data.map(c => ({
+            id: c.id,
+            numero: c.numero,
+            fecha: c.fecha,
+            clienteNombre: c.cliente_nombre,
+            proyectoNombre: c.proyecto_nombre,
+            total: c.total,
+            estado: c.estado,
+            usuarioId: c.usuario_id,
+          }));
+          setCotizacionesGuardadas(cotizacionesFormateadas);
+          localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
+        }
+      } catch (err) {
+        console.warn('Error de conexión con Supabase:', err);
+      }
+    };
+
+    cargarCotizaciones();
   }, []);
 
   // Guardar cotizaciones en localStorage
@@ -142,7 +177,6 @@ export const useCotizacionStore = () => {
     }));
   }, []);
 
-  // Agregar material desde el catálogo o manual
   const agregarMaterial = useCallback((material: Omit<Material, 'id' | 'costoTotal'>) => {
     const nuevoMaterial: Material = {
       ...material,
@@ -183,17 +217,14 @@ export const useCotizacionStore = () => {
     });
   }, [recalcularTotales]);
 
-  // Agregar proceso desde el catálogo Velso
   const agregarProceso = useCallback((tipoProceso: TipoProcesoVelso, tiempoMinutos: number, descripcion?: string, tipoManoObra?: 'mo_s' | 'mo_e') => {
     const catalogoItem = CATALOGO_PROCESOS_VELSO.find(p => p.id === tipoProceso);
     if (!catalogoItem) return;
 
-    // Calcular costo de mano de obra adicional si aplica
     let costoManoObra = 0;
     let incluyeManoObra = false;
     let tipoManoObraSeleccionada: 'mo_s' | 'mo_e' | undefined = undefined;
     
-    // Para máquinas, usar el tipo de mano de obra seleccionado por el usuario
     if (catalogoItem.categoria === 'maquina' && tipoManoObra) {
       costoManoObra = COSTOS_MANO_OBRA[tipoManoObra];
       incluyeManoObra = true;
@@ -215,13 +246,12 @@ export const useCotizacionStore = () => {
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
       costoManoObra,
-      costoTotal: 0, // Se calcula abajo
+      costoTotal: 0,
       descripcion: descripcion || catalogoItem.descripcion,
       incluyeManoObra,
       tipoManoObraSeleccionada,
     };
 
-    // Calcular costo total
     nuevoProceso.costoTotal = calcularCostoProceso(nuevoProceso);
 
     setCotizacion(prev => {
@@ -338,8 +368,8 @@ export const useCotizacionStore = () => {
           estado,
         };
 
-        console.log('[guardarCotizacion] Intentando guardar en Supabase:', cotizacionDB);
-        
+        console.log('[guardarCotizacion] Guardando en Supabase:', cotizacionDB);
+
         const { data, error } = await supabase
           .from('cotizaciones')
           .upsert(cotizacionDB)
@@ -355,7 +385,7 @@ export const useCotizacionStore = () => {
           toast.success('Cotización guardada en la nube');
         }
       } catch (err: any) {
-        console.error('Error de conexión con Supabase:', err);
+        console.error('[guardarCotizacion] Error de conexión con Supabase:', err);
         toast.error('Error de conexión: ' + err.message);
       }
     } else {
@@ -375,11 +405,26 @@ export const useCotizacionStore = () => {
     return false;
   }, []);
 
-  const eliminarCotizacionGuardada = useCallback((id: string) => {
+  const eliminarCotizacionGuardada = useCallback(async (id: string) => {
+    // Eliminar de localStorage
     setCotizacionesGuardadas(prev => prev.filter(c => c.id !== id));
     const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
     delete cotizacionesCompletas[id];
     localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
+
+    // Eliminar de Supabase
+    try {
+      const { error } = await supabase
+        .from('cotizaciones')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error eliminando de Supabase:', error);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    }
   }, []);
 
   const nuevaCotizacion = useCallback(() => {
