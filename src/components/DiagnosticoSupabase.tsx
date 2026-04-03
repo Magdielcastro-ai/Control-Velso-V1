@@ -101,11 +101,13 @@ export function DiagnosticoSupabase() {
 
     // Test 8: Insertar y eliminar una cotización de prueba
     try {
-      const testId = 'test-' + Date.now();
+      const testId = crypto.randomUUID();
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { error: insertError } = await supabase.from('cotizaciones').insert([{
         id: testId,
         numero: 'TEST-001',
-        usuario_id: (await supabase.auth.getUser()).data.user?.id,
+        usuario_id: user?.id,
         cliente_nombre: 'Cliente Test',
         proyecto_nombre: 'Proyecto Test',
         total: 100,
