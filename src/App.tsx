@@ -466,11 +466,14 @@ function App() {
     toast.success('¡Cotización generada exitosamente!');
   };
 
-  const handleCargarCotizacion = (id: string) => {
-    if (cargarCotizacion(id)) {
+  const handleCargarCotizacion = async (id: string) => {
+    const cargada = await cargarCotizacion(id);
+    if (cargada) {
       setPasoActual('resumen');
       setVistaActual('cotizacion');
       toast.success('Cotización cargada correctamente');
+    } else {
+      toast.error('No se pudo cargar la cotización');
     }
   };
 

@@ -395,7 +395,59 @@ export const useCotizacionStore = () => {
     return id;
   }, [cotizacion]);
 
-  const cargarCotizacion = useCallback((id: string) => {
+  const cargarCotizacion = useCallback(async (id: string): Promise<boolean> => {
+    // Primero intentar cargar desde Supabase
+    try {
+      console.log('[cargarCotizacion] Intentando cargar desde Supabase:', id);
+      const { data, error } = await supabase
+        .from('cotizaciones')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.warn('[cargarCotizacion] Error cargando de Supabase:', error);
+      } else if (data) {
+        console.log('[cargarCotizacion] Cotización cargada de Supabase:', data);
+        
+        // Transformar datos de Supabase al formato de la app
+        const cotizacionCargada: Cotizacion = {
+          id: data.id,
+          numero: data.numero,
+          fecha: data.fecha || new Date().toISOString().split('T')[0],
+          datosTaller: data.datos_taller || cotizacionVacia.datosTaller,
+          datosCliente: data.datos_cliente || cotizacionVacia.datosCliente,
+          proyecto: {
+            nombre: data.proyecto_nombre || '',
+            descripcion: '',
+            cantidad: 1,
+          },
+          materiales: data.materiales || [],
+          procesos: data.procesos || [],
+          costosAdicionales: data.costos_adicionales || cotizacionVacia.costosAdicionales,
+          condiciones: cotizacionVacia.condiciones,
+          subtotal: data.subtotal || 0,
+          ivaPorcentaje: data.iva_porcentaje || 16,
+          iva: (data.subtotal || 0) * (data.iva_porcentaje || 16) / 100,
+          total: data.total || 0,
+          margenUtilidad: data.margen_utilidad || 30,
+        };
+        
+        setCotizacion(cotizacionCargada);
+        
+        // También guardar en localStorage para offline
+        const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
+        cotizacionesCompletas[id] = cotizacionCargada;
+        localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
+        
+        return true;
+      }
+    } catch (err) {
+      console.warn('[cargarCotizacion] Error de conexión con Supabase:', err);
+    }
+
+    // Fallback a localStorage
+    console.log('[cargarCotizacion] Intentando cargar desde localStorage:', id);
     const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
     const cotizacionGuardada = cotizacionesCompletas[id];
     if (cotizacionGuardada) {
