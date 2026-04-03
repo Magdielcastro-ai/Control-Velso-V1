@@ -70,25 +70,37 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
-      // Obtener perfiles con email usando join con auth.users
+      console.log('[cargarUsuarios] Iniciando carga...');
+      
+      // Obtener perfiles
       const { data: perfiles, error: perfilesError } = await supabase
         .from('perfiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (perfilesError) throw perfilesError;
+      if (perfilesError) {
+        console.error('[cargarUsuarios] Error:', perfilesError);
+        throw perfilesError;
+      }
+
+      console.log('[cargarUsuarios] Perfiles obtenidos:', perfiles);
 
       // Para cada perfil, obtener el email de auth.users
       const usuariosConEmail: UsuarioConEmail[] = [];
       for (const perfil of (perfiles || [])) {
-        // Intentar obtener el email de la tabla perfiles primero
         let email = perfil.email || '';
         
         // Si no hay email en perfiles, intentar obtener de auth.users
         if (!email) {
-          const { data: userData } = await supabase.auth.admin.getUserById(perfil.id);
-          if (userData?.user?.email) {
-            email = userData.user.email;
+          try {
+            const { data: userData, error: userError } = await supabase.auth.admin.getUserById(perfil.id);
+            if (userError) {
+              console.log('[cargarUsuarios] Error obteniendo usuario:', userError);
+            } else if (userData?.user?.email) {
+              email = userData.user.email;
+            }
+          } catch (e) {
+            console.log('[cargarUsuarios] No se pudo obtener email de auth.users:', e);
           }
         }
 
@@ -102,6 +114,7 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
         });
       }
 
+      console.log('[cargarUsuarios] Usuarios con email:', usuariosConEmail);
       setUsuarios(usuariosConEmail);
     } catch (error) {
       console.error('Error cargando usuarios:', error);
@@ -140,7 +153,7 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
         .insert([{ 
           id: authData.user.id, 
           nombre, 
-          email, // Guardar email en perfiles
+          email,
           rol,
           activo: true 
         }]);
@@ -163,6 +176,8 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
   };
 
   const handleCambiarRol = async (userId: string, nuevoRol: string) => {
+    console.log('[handleCambiarRol] Intentando cambiar rol:', { userId, nuevoRol, isSuperAdmin });
+    
     // Solo Superadmin puede cambiar roles
     if (!isSuperAdmin) {
       toast.error('Solo el Super Admin puede cambiar roles');
@@ -170,31 +185,53 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('perfiles')
         .update({ rol: nuevoRol })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
 
-      if (error) throw error;
-      toast.success('Rol actualizado');
-      cargarUsuarios();
-    } catch (error) {
-      toast.error('Error al actualizar rol');
+      if (error) {
+        console.error('[handleCambiarRol] Error:', error);
+        throw error;
+      }
+
+      console.log('[handleCambiarRol] Éxito:', data);
+      toast.success('Rol actualizado correctamente');
+      await cargarUsuarios();
+    } catch (error: any) {
+      console.error('[handleCambiarRol] Error:', error);
+      toast.error('Error al actualizar rol: ' + error.message);
     }
   };
 
   const handleActivarDesactivar = async (userId: string, activo: boolean) => {
+    console.log('[handleActivarDesactivar] Intentando:', { userId, activo, isSuperAdmin });
+    
+    // Solo Superadmin puede activar/desactivar usuarios
+    if (!isSuperAdmin) {
+      toast.error('Solo el Super Admin puede activar/desactivar usuarios');
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('perfiles')
         .update({ activo: !activo })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[handleActivarDesactivar] Error:', error);
+        throw error;
+      }
+
+      console.log('[handleActivarDesactivar] Éxito:', data);
       toast.success(activo ? 'Usuario desactivado' : 'Usuario activado');
-      cargarUsuarios();
-    } catch (error) {
-      toast.error('Error al cambiar estado');
+      await cargarUsuarios();
+    } catch (error: any) {
+      console.error('[handleActivarDesactivar] Error:', error);
+      toast.error('Error al cambiar estado: ' + error.message);
     }
   };
 
@@ -348,12 +385,13 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
                         </div>
                         <p className="text-sm text-slate-600">{usuario.email || 'Sin email'}</p>
                         <p className="text-xs text-slate-400 mt-1">
-                          Registrado: {new Date(usuario.created_at).toLocaleDateString('es-MX')}
+                          ID: {usuario.id.substring(0, 8)}... | Registrado: {new Date(usuario.created_at).toLocaleDateString('es-MX')}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Select de rol - solo Superadmin puede cambiar */}
                       <Select
                         value={usuario.rol}
                         onValueChange={(v) => handleCambiarRol(usuario.id, v)}
@@ -371,14 +409,17 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
                         </SelectContent>
                       </Select>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleActivarDesactivar(usuario.id, usuario.activo)}
-                        className={usuario.activo ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
-                      >
-                        {usuario.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                      </Button>
+                      {/* Botón activar/desactivar - SOLO Superadmin */}
+                      {isSuperAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleActivarDesactivar(usuario.id, usuario.activo)}
+                          className={usuario.activo ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
+                        >
+                          {usuario.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -409,15 +450,15 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
                       <li>• Acceso total al sistema</li>
                       <li>• Crear/eliminar usuarios</li>
                       <li>• Cambiar roles</li>
-                      <li>• Dashboard completo</li>
+                      <li>• Activar/desactivar usuarios</li>
                     </>
                   )}
                   {rol.value === 'admin' && (
                     <>
-                      <li>• Todo el acceso</li>
                       <li>• Ver todos los datos</li>
                       <li>• Dashboard completo</li>
                       <li>• Control de códigos</li>
+                      <li>• Ver usuarios (solo lectura)</li>
                     </>
                   )}
                   {rol.value === 'vendedor' && (
