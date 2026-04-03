@@ -18,7 +18,8 @@ import {
   FileCheck,
   LogOut,
   Shield,
-  Loader2
+  Loader2,
+  ArrowLeft
 } from 'lucide-react';
 
 // Hooks
@@ -52,6 +53,7 @@ import { CotizacionesView } from '@/components/CotizacionesView';
 import { ControlDeCodigosView } from '@/components/ControlDeCodigosView';
 import { LoginView } from '@/components/LoginView';
 import { AdminUsuariosView } from '@/components/AdminUsuariosView';
+import { DiagnosticoSupabase } from '@/components/DiagnosticoSupabase';
 
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
@@ -70,7 +72,7 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 
 type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' | 
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' | 
-                      'control-codigos' | 'admin-usuarios';
+                      'control-codigos' | 'admin-usuarios' | 'diagnostico';
 
 // Horas disponibles por defecto
 const HORAS_DEFAULT: Record<string, number> = {
@@ -319,6 +321,10 @@ function App() {
       toast.error('Solo superadministradores pueden gestionar usuarios');
     }
   };
+
+  const irADiagnostico = () => {
+    setVistaActual('diagnostico');
+  };
   
   const irANuevaCotizacion = () => {
     if (!canCreateCotizacion()) {
@@ -529,6 +535,7 @@ function App() {
               onProcesos={irAProcesos}
               onCotizaciones={irACotizaciones}
               onNuevaCotizacion={irANuevaCotizacion}
+              onDiagnostico={irADiagnostico}
             />
             {canManageUsers() && (
               <div className="mt-6">
@@ -685,6 +692,20 @@ function App() {
           <>
             <UserHeader user={user} onLogout={handleLogout} />
             <AdminUsuariosView onVolver={irAHome} userRol={user.rol} />
+          </>
+        );
+
+      case 'diagnostico':
+        return (
+          <>
+            <UserHeader user={user} onLogout={handleLogout} />
+            <div className="mb-4">
+              <Button variant="outline" onClick={irAHome} className="border-slate-300">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Volver
+              </Button>
+            </div>
+            <DiagnosticoSupabase />
           </>
         );
 

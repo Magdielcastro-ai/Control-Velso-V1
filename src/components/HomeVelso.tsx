@@ -9,7 +9,8 @@ import {
   FileText,
   ClipboardList,
   TrendingUp,
-  Factory
+  Factory,
+  Activity
 } from 'lucide-react';
 
 interface HomeVelsoProps {
@@ -20,6 +21,7 @@ interface HomeVelsoProps {
   onProcesos: () => void;
   onCotizaciones: () => void;
   onNuevaCotizacion: () => void;
+  onDiagnostico?: () => void;
 }
 
 export function HomeVelso({ 
@@ -29,7 +31,8 @@ export function HomeVelso({
   onMateriales,
   onProcesos,
   onCotizaciones,
-  onNuevaCotizacion 
+  onNuevaCotizacion,
+  onDiagnostico
 }: HomeVelsoProps) {
   const funcionalidades = [
     { 
@@ -136,6 +139,34 @@ export function HomeVelso({
             </button>
           ))}
         </div>
+
+        {/* Botón de diagnóstico (solo para debug) */}
+        {onDiagnostico && (
+          <div className="mt-8 pt-8 border-t border-slate-200">
+            <button
+              onClick={onDiagnostico}
+              className="w-full text-left"
+            >
+              <Card className="border-slate-300 hover:border-amber-400 hover:shadow-lg transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-amber-600 p-2 rounded-lg">
+                      <Activity className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-900">
+                        Diagnóstico de Conexión
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        Verificar estado de conexión con Supabase
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
