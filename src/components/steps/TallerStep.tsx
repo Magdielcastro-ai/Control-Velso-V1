@@ -12,7 +12,7 @@ interface TallerStepProps {
   datos: DatosTaller;
   onChange: (datos: Partial<DatosTaller>) => void;
   talleresGuardados: TallerGuardado[];
-  onGuardarTaller?: (datos: DatosTaller) => TallerGuardado | null;
+  onGuardarTaller?: (datos: DatosTaller) => TallerGuardado | null | Promise<TallerGuardado | null>;
   userRol?: string;
 }
 
@@ -63,9 +63,9 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
     }
   };
 
-  const handleGuardarTaller = () => {
+  const handleGuardarTaller = async () => {
     if (!onGuardarTaller) return;
-    const resultado = onGuardarTaller(datos);
+    const resultado = await onGuardarTaller(datos);
     if (resultado) {
       setTallerGuardado(true);
       setMostrarGuardar(false);

@@ -12,7 +12,7 @@ interface ClienteStepProps {
   datos: DatosCliente;
   onChange: (datos: Partial<DatosCliente>) => void;
   clientesGuardados: Cliente[];
-  onGuardarCliente?: (datos: DatosCliente) => Cliente | null;
+  onGuardarCliente?: (datos: DatosCliente) => Cliente | null | Promise<Cliente | null>;
   userRol?: string;
 }
 
@@ -68,9 +68,9 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
     }
   };
 
-  const handleGuardarCliente = () => {
+  const handleGuardarCliente = async () => {
     if (!onGuardarCliente) return;
-    const resultado = onGuardarCliente(datos);
+    const resultado = await onGuardarCliente(datos);
     if (resultado) {
       setClienteGuardado(true);
       setMostrarGuardar(false);

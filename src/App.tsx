@@ -757,7 +757,10 @@ function App() {
                     datos={cotizacion.datosTaller} 
                     onChange={actualizarDatosTaller}
                     talleresGuardados={talleres}
-                    onGuardarTaller={canManageTalleres() ? guardarTallerDesdeCotizacion : undefined}
+                    onGuardarTaller={canManageTalleres() ? async (datos) => {
+                      const result = await guardarTallerDesdeCotizacion(datos);
+                      return result;
+                    } : undefined}
                     userRol={user.rol}
                   />
                 )}
@@ -766,7 +769,7 @@ function App() {
                     datos={cotizacion.datosCliente} 
                     onChange={actualizarDatosCliente}
                     clientesGuardados={clientes}
-                    onGuardarCliente={canManageClientes() ? (datos) => {
+                    onGuardarCliente={canManageClientes() ? async (datos) => {
                       const clienteData = {
                         nombreEmpresa: datos.empresa || datos.nombre,
                         direccion: datos.direccion,
@@ -774,7 +777,7 @@ function App() {
                         rfc: datos.rfc || '',
                         terminosPago: '50% anticipo, 50% contra entrega',
                       };
-                      return agregarCliente(clienteData);
+                      return await agregarCliente(clienteData);
                     } : undefined}
                     userRol={user.rol}
                   />
