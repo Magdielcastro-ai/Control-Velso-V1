@@ -118,30 +118,50 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
     }
 
     setGuardando(true);
+    console.log('[handleCrearUsuario] Iniciando creación de usuario:', { nombre, email, rol });
+    
     try {
       // 1. Crear usuario en auth
+      console.log('[handleCrearUsuario] Paso 1: Creando usuario en auth...');
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('No se pudo crear el usuario');
+      console.log('[handleCrearUsuario] Respuesta auth:', { authData, authError });
+
+      if (authError) {
+        console.error('[handleCrearUsuario] Error en auth:', authError);
+        throw authError;
+      }
+      if (!authData.user) {
+        throw new Error('No se pudo crear el usuario - authData.user es null');
+      }
+
+      console.log('[handleCrearUsuario] Usuario creado en auth:', authData.user.id);
 
       // 2. Crear/actualizar perfil (usar upsert por si el trigger ya lo creó)
-      const { error: perfilError } = await supabase
+      console.log('[handleCrearUsuario] Paso 2: Creando perfil...');
+      const perfilData = {
+        id: authData.user.id, 
+        nombre, 
+        email,
+        rol,
+        activo: true 
+      };
+      console.log('[handleCrearUsuario] Datos del perfil:', perfilData);
+
+      const { data: perfilDataResp, error: perfilError } = await supabase
         .from('perfiles')
-        .upsert([{ 
-          id: authData.user.id, 
-          nombre, 
-          email,
-          rol,
-          activo: true 
-        }], { onConflict: 'id' });
+        .upsert([perfilData], { onConflict: 'id' })
+        .select();
+
+      console.log('[handleCrearUsuario] Respuesta perfil:', { perfilDataResp, perfilError });
 
       if (perfilError) {
-        console.error('Error creando perfil:', perfilError);
-        throw perfilError;
+        console.error('[handleCrearUsuario] Error creando perfil:', perfilError);
+        toast.error('Error creando perfil: ' + perfilError.message);
+        // No lanzamos error para que el usuario auth se mantenga
       }
 
       toast.success('Usuario creado exitosamente');
@@ -150,9 +170,13 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
       setEmail('');
       setPassword('');
       setRol('vendedor');
-      cargarUsuarios();
+      
+      // Recargar usuarios
+      console.log('[handleCrearUsuario] Recargando usuarios...');
+      await cargarUsuarios();
+      
     } catch (error: any) {
-      console.error('Error creando usuario:', error);
+      console.error('[handleCrearUsuario] Error completo:', error);
       toast.error(error.message || 'Error al crear usuario');
     } finally {
       setGuardando(false);

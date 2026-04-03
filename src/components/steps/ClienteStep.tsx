@@ -4,9 +4,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Building2, MapPin, Phone, Mail, Briefcase, Save, Plus, Check } from 'lucide-react';
+import { User, Building2, MapPin, Phone, Mail, Briefcase, Save, Plus, Check, Users } from 'lucide-react';
 import type { DatosCliente } from '@/types/cotizacion';
-import type { Cliente } from '@/types/ventas';
+import type { Cliente, UsuarioCliente } from '@/types/ventas';
 
 interface ClienteStepProps {
   datos: DatosCliente;
@@ -18,8 +18,10 @@ interface ClienteStepProps {
 
 export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, userRol = 'vendedor' }: ClienteStepProps) {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
+  const [contactoSeleccionado, setContactoSeleccionado] = useState<string>('');
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
   const [clienteGuardado, setClienteGuardado] = useState(false);
+  const [contactosDisponibles, setContactosDisponibles] = useState<UsuarioCliente[]>([]);
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
   const isVendedor = userRol === 'vendedor';
@@ -43,8 +45,11 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
 
   const handleSeleccionarCliente = (clienteId: string) => {
     setClienteSeleccionado(clienteId);
+    setContactoSeleccionado('');
+    
     if (clienteId === 'nuevo') {
       // Limpiar todos los campos para nuevo cliente
+      setContactosDisponibles([]);
       onChange({
         nombre: '',
         empresa: '',
@@ -56,13 +61,61 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
     } else {
       const cliente = clientesGuardados.find(c => c.id === clienteId);
       if (cliente) {
+        // Establecer contactos disponibles
+        const contactos = cliente.usuarios || [];
+        setContactosDisponibles(contactos);
+        
+        // Buscar contacto principal o usar el primero
+        const contactoPrincipal = contactos.find(c => c.esPrincipal) || contactos[0];
+        
         onChange({
           nombre: cliente.nombreEmpresa,
           empresa: cliente.nombreEmpresa,
           direccion: cliente.direccion,
           telefono: cliente.telefono,
-          email: cliente.usuarios[0]?.email || '',
+          email: contactoPrincipal?.email || '',
           rfc: cliente.rfc || '',
+        });
+        
+        // Si hay contacto principal, seleccionarlo
+        if (contactoPrincipal) {
+          setContactoSeleccionado(contactoPrincipal.id);
+          // Actualizar con datos del contacto
+          onChange({
+            nombre: contactoPrincipal.nombre,
+            empresa: cliente.nombreEmpresa,
+            direccion: cliente.direccion,
+            telefono: contactoPrincipal.telefono || contactoPrincipal.celular || cliente.telefono,
+            email: contactoPrincipal.email,
+            rfc: cliente.rfc || '',
+          });
+        }
+      }
+    }
+  };
+
+  const handleSeleccionarContacto = (contactoId: string) => {
+    setContactoSeleccionado(contactoId);
+    
+    if (contactoId === 'ninguno') {
+      // Mantener solo los datos de la empresa, limpiar contacto
+      const cliente = clientesGuardados.find(c => c.id === clienteSeleccionado);
+      if (cliente) {
+        onChange({
+          nombre: '',
+          telefono: cliente.telefono,
+          email: '',
+        });
+      }
+    } else {
+      const contacto = contactosDisponibles.find(c => c.id === contactoId);
+      const cliente = clientesGuardados.find(c => c.id === clienteSeleccionado);
+      
+      if (contacto && cliente) {
+        onChange({
+          nombre: contacto.nombre,
+          telefono: contacto.telefono || contacto.celular || cliente.telefono,
+          email: contacto.email,
         });
       }
     }
@@ -93,7 +146,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
               Seleccionar Cliente Guardado
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Select value={clienteSeleccionado} onValueChange={handleSeleccionarCliente}>
               <SelectTrigger className="border-slate-300">
                 <SelectValue placeholder="Selecciona un cliente guardado o crea uno nuevo" />
@@ -108,10 +161,68 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
                 {clientesGuardados.map((cliente) => (
                   <SelectItem key={cliente.id} value={cliente.id}>
                     {cliente.nombreEmpresa} {cliente.rfc && `(${cliente.rfc})`}
+                    {cliente.usuarios.length > 0 && (
+                      <span className="ml-2 text-xs text-slate-500">
+                        ({cliente.usuarios.length} contacto{cliente.usuarios.length !== 1 ? 's' : ''})
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Selector de contactos - aparece cuando se selecciona un cliente con contactos */}
+            {clienteSeleccionado && clienteSeleccionado !== 'nuevo' && contactosDisponibles.length > 0 && (
+              <div className="pt-4 border-t border-slate-200">
+                <Label className="flex items-center gap-2 mb-2 text-slate-700">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  Seleccionar Contacto
+                </Label>
+                <Select value={contactoSeleccionado} onValueChange={handleSeleccionarContacto}>
+                  <SelectTrigger className="border-slate-300">
+                    <SelectValue placeholder="Selecciona un contacto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ninguno">
+                      <span className="text-slate-500">-- Sin contacto específico --</span>
+                    </SelectItem>
+                    {contactosDisponibles.map((contacto) => (
+                      <SelectItem key={contacto.id} value={contacto.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{contacto.nombre}</span>
+                          {contacto.esPrincipal && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              Principal
+                            </span>
+                          )}
+                          {contacto.departamento && (
+                            <span className="text-xs text-slate-500">
+                              ({contacto.departamento})
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {contactoSeleccionado && contactoSeleccionado !== 'ninguno' && (
+                  <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Datos del contacto cargados automáticamente
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Mensaje si el cliente no tiene contactos */}
+            {clienteSeleccionado && clienteSeleccionado !== 'nuevo' && contactosDisponibles.length === 0 && (
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-sm text-amber-600 flex items-center gap-2">
+                  <span className="text-amber-500">⚠</span>
+                  Este cliente no tiene contactos guardados. Los datos se tomarán de la información general del cliente.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

@@ -18,6 +18,7 @@ export function useAuth() {
   const authSubscription = useRef<{ unsubscribe: () => void } | null>(null);
   const isProcessingAuth = useRef(false);
 
+  // Función para cargar el perfil del usuario
   const loadUserProfile = useCallback(async (userId: string, email: string): Promise<AuthUser | null> => {
     try {
       const perfil = await getPerfilUsuario(userId);
@@ -37,17 +38,27 @@ export function useAuth() {
     }
   }, []);
 
+  // Cargar usuario al iniciar
   useEffect(() => {
     let isMounted = true;
+
     const initializeAuth = async () => {
       if (isProcessingAuth.current) return;
       isProcessingAuth.current = true;
+
       try {
+        // Obtener sesión actual primero
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) console.error('[useAuth] Error obteniendo sesión:', sessionError);
+        
+        if (sessionError) {
+          console.error('[useAuth] Error obteniendo sesión:', sessionError);
+        }
+
         if (session?.user && isMounted) {
           const authUser = await loadUserProfile(session.user.id, session.user.email || '');
-          if (authUser && isMounted) setUser(authUser);
+          if (authUser && isMounted) {
+            setUser(authUser);
+          }
         }
       } catch (error) {
         console.error('[useAuth] Error inicializando auth:', error);
@@ -59,31 +70,53 @@ export function useAuth() {
         }
       }
     };
+
     initializeAuth();
+
+    // Configurar listener de auth state
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] Auth event:', event);
+      
       if (!isMounted) return;
+
       switch (event) {
         case 'SIGNED_IN':
           if (session?.user) {
             const authUser = await loadUserProfile(session.user.id, session.user.email || '');
-            if (authUser && isMounted) setUser(authUser);
+            if (authUser && isMounted) {
+              setUser(authUser);
+            }
           }
           break;
+          
         case 'SIGNED_OUT':
-          if (isMounted) setUser(null);
+          if (isMounted) {
+            setUser(null);
+          }
           break;
+          
+        case 'TOKEN_REFRESHED':
+          console.log('[useAuth] Token refrescado exitosamente');
+          break;
+          
         case 'USER_UPDATED':
           if (session?.user) {
             const authUser = await loadUserProfile(session.user.id, session.user.email || '');
-            if (authUser && isMounted) setUser(authUser);
+            if (authUser && isMounted) {
+              setUser(authUser);
+            }
           }
           break;
       }
     });
+
     authSubscription.current = subscription;
+
     return () => {
       isMounted = false;
-      if (authSubscription.current) authSubscription.current.unsubscribe();
+      if (authSubscription.current) {
+        authSubscription.current.unsubscribe();
+      }
     };
   }, [loadUserProfile]);
 
@@ -96,7 +129,9 @@ export function useAuth() {
         if (authUser) {
           setUser(authUser);
           return authUser;
-        } else throw new Error('Usuario no tiene perfil asignado');
+        } else {
+          throw new Error('Usuario no tiene perfil asignado');
+        }
       }
       throw new Error('No se pudo iniciar sesión');
     } catch (error: any) {
@@ -117,10 +152,12 @@ export function useAuth() {
     }
   }, []);
 
+  // Función para refrescar la sesión manualmente
   const refreshSession = useCallback(async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) throw error;
+      
       if (session?.user) {
         const authUser = await loadUserProfile(session.user.id, session.user.email || '');
         if (authUser) {
@@ -135,51 +172,194 @@ export function useAuth() {
     }
   }, [loadUserProfile]);
 
-  const isAdmin = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
-  const isSuperAdmin = useCallback(() => user?.rol === 'superadmin', [user]);
-  const isVendedor = useCallback(() => user?.rol === 'vendedor', [user]);
-  const isProduccion = useCallback(() => user?.rol === 'produccion', [user]);
+  // ============ PERMISOS BASADOS EN ROLES ============
 
-  const canManageUsers = useCallback(() => user?.rol === 'superadmin' || user?.rol === 'admin', [user]);
-  const canCreateUsers = useCallback(() => user?.rol === 'superadmin', [user]);
-  const canCreateCotizacion = useCallback(() => !!user && ['admin', 'superadmin', 'vendedor'].includes(user.rol), [user]);
+  // Verificar si es admin o superadmin
+  const isAdmin = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  const isSuperAdmin = useCallback(() => {
+    return user?.rol === 'superadmin';
+  }, [user]);
+
+  const isVendedor = useCallback(() => {
+    return user?.rol === 'vendedor';
+  }, [user]);
+
+  const isProduccion = useCallback(() => {
+    return user?.rol === 'produccion';
+  }, [user]);
+
+  // Gestión de usuarios: SUPERADMIN y ADMIN pueden gestionar usuarios
+  // Solo SUPERADMIN puede crear/eliminar usuarios
+  const canManageUsers = useCallback(() => {
+    return user?.rol === 'superadmin' || user?.rol === 'admin';
+  }, [user]);
+
+  // Solo superadmin puede crear usuarios nuevos
+  const canCreateUsers = useCallback(() => {
+    return user?.rol === 'superadmin';
+  }, [user]);
+
+  // Crear cotizaciones: admin, superadmin, vendedor
+  const canCreateCotizacion = useCallback(() => {
+    if (!user) return false;
+    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+  }, [user]);
+
+  // Editar cotizaciones: admin, superadmin, vendedor (solo las suyas)
   const canEditCotizacion = useCallback((cotizacionUserId?: string) => {
     if (!user) return false;
     if (user.rol === 'admin' || user.rol === 'superadmin') return true;
-    if (user.rol === 'vendedor') return !cotizacionUserId || cotizacionUserId === user.id;
+    if (user.rol === 'vendedor') {
+      // Vendedor solo puede editar sus propias cotizaciones
+      return !cotizacionUserId || cotizacionUserId === user.id;
+    }
     return false;
   }, [user]);
-  const canViewCotizaciones = useCallback(() => !!user, [user]);
-  const canViewAllProyectos = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
-  const canViewOwnProyectos = useCallback(() => user?.rol === 'vendedor', [user]);
-  const canConvertirAVenta = useCallback(() => !!user && ['admin', 'superadmin', 'vendedor'].includes(user.rol), [user]);
+
+  // Ver cotizaciones: todos pueden ver, pero con filtros
+  const canViewCotizaciones = useCallback(() => {
+    return !!user;
+  }, [user]);
+
+  // Ver todos los proyectos: admin y superadmin ven todos, vendedor solo los suyos
+  const canViewAllProyectos = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  // Ver proyectos (propio): vendedor puede ver sus proyectos
+  const canViewOwnProyectos = useCallback(() => {
+    return user?.rol === 'vendedor';
+  }, [user]);
+
+  // Convertir cotización a venta: admin, superadmin, vendedor
+  const canConvertirAVenta = useCallback(() => {
+    if (!user) return false;
+    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+  }, [user]);
+
+  // Actualizar estado de proyecto
   const canUpdateProyectoEstado = useCallback((nuevoEstado?: string) => {
     if (!user) return false;
+    
+    // Admin y superadmin pueden hacer todo
     if (user.rol === 'admin' || user.rol === 'superadmin') return true;
-    if (user.rol === 'produccion') return nuevoEstado === 'fabricado';
-    if (user.rol === 'vendedor') return nuevoEstado === 'entregado' || nuevoEstado === 'facturado';
+    
+    // Producción solo puede marcar como fabricado
+    if (user.rol === 'produccion') {
+      return nuevoEstado === 'fabricado';
+    }
+    
+    // Vendedor puede marcar como entregado y facturado (de sus propios proyectos)
+    if (user.rol === 'vendedor') {
+      return nuevoEstado === 'entregado' || nuevoEstado === 'facturado';
+    }
+    
     return false;
   }, [user]);
-  const canViewDashboard = useCallback(() => !!user && ['admin', 'superadmin', 'vendedor'].includes(user.rol), [user]);
-  const canViewProduccionDashboard = useCallback(() => user?.rol === 'produccion', [user]);
-  const canViewControlCodigos = useCallback(() => !!user && ['admin', 'superadmin', 'produccion'].includes(user.rol), [user]);
-  const canManageClientes = useCallback(() => !!user && ['admin', 'superadmin', 'vendedor'].includes(user.rol), [user]);
-  const canDeleteClientes = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
-  const canManageTalleres = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
-  const canViewTalleres = useCallback(() => !!user && user.rol !== 'produccion', [user]);
-  const canManageMateriales = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
-  const canViewMateriales = useCallback(() => !!user && user.rol !== 'produccion', [user]);
-  const canManageProcesos = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
-  const canViewProcesos = useCallback(() => !!user && user.rol !== 'produccion', [user]);
-  const canDeleteProyectos = useCallback(() => user?.rol === 'admin' || user?.rol === 'superadmin', [user]);
+
+  // Ver dashboard: admin, superadmin, vendedor (con datos filtrados)
+  const canViewDashboard = useCallback(() => {
+    if (!user) return false;
+    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+  }, [user]);
+
+  // Ver dashboard de producción
+  const canViewProduccionDashboard = useCallback(() => {
+    return user?.rol === 'produccion';
+  }, [user]);
+
+  // Ver control de códigos: admin, superadmin, producción
+  const canViewControlCodigos = useCallback(() => {
+    if (!user) return false;
+    return ['admin', 'superadmin', 'produccion'].includes(user.rol);
+  }, [user]);
+
+  // Gestionar clientes: admin, superadmin, vendedor (agregar)
+  const canManageClientes = useCallback(() => {
+    if (!user) return false;
+    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+  }, [user]);
+
+  // Eliminar clientes: solo admin y superadmin
+  const canDeleteClientes = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  // Gestionar talleres: solo admin y superadmin
+  const canManageTalleres = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  // Ver talleres guardados: todos excepto producción
+  const canViewTalleres = useCallback(() => {
+    if (!user) return false;
+    return user.rol !== 'produccion';
+  }, [user]);
+
+  // Gestionar materiales: solo admin y superadmin
+  const canManageMateriales = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  // Ver materiales: todos excepto producción
+  const canViewMateriales = useCallback(() => {
+    if (!user) return false;
+    return user.rol !== 'produccion';
+  }, [user]);
+
+  // Gestionar procesos: solo admin y superadmin
+  const canManageProcesos = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  // Ver procesos: todos excepto producción
+  const canViewProcesos = useCallback(() => {
+    if (!user) return false;
+    return user.rol !== 'produccion';
+  }, [user]);
+
+  // Eliminar proyectos: solo admin y superadmin
+  const canDeleteProyectos = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
 
   return {
-    user, loading, initialized, signIn, signOut, refreshSession, isAuthenticated: !!user,
-    isAdmin, isSuperAdmin, isVendedor, isProduccion,
-    canManageUsers, canCreateUsers, canCreateCotizacion, canEditCotizacion,
-    canViewCotizaciones, canViewAllProyectos, canViewOwnProyectos, canConvertirAVenta,
-    canUpdateProyectoEstado, canViewDashboard, canViewProduccionDashboard, canViewControlCodigos,
-    canManageClientes, canDeleteClientes, canManageTalleres, canViewTalleres,
-    canManageMateriales, canViewMateriales, canManageProcesos, canViewProcesos, canDeleteProyectos,
+    user,
+    loading,
+    initialized,
+    signIn,
+    signOut,
+    refreshSession,
+    isAuthenticated: !!user,
+    // Helpers de rol
+    isAdmin,
+    isSuperAdmin,
+    isVendedor,
+    isProduccion,
+    // Permisos
+    canManageUsers,
+    canCreateUsers,
+    canCreateCotizacion,
+    canEditCotizacion,
+    canViewCotizaciones,
+    canViewAllProyectos,
+    canViewOwnProyectos,
+    canConvertirAVenta,
+    canUpdateProyectoEstado,
+    canViewDashboard,
+    canViewProduccionDashboard,
+    canViewControlCodigos,
+    canManageClientes,
+    canDeleteClientes,
+    canManageTalleres,
+    canViewTalleres,
+    canManageMateriales,
+    canViewMateriales,
+    canManageProcesos,
+    canViewProcesos,
+    canDeleteProyectos,
   };
 }

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { 
   ArrowLeft, 
@@ -21,8 +22,10 @@ import {
   Receipt,
   Package,
   Clock,
-  DollarSign
+  DollarSign,
+  User
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
@@ -50,6 +53,11 @@ interface ProyectosViewProps {
   onVerControlCodigos?: (proyecto: ProyectoVenta) => void;
   userRol?: string;
   userId?: string;
+}
+
+interface Vendedor {
+  id: string;
+  nombre: string;
 }
 
 // Configuración de estados
@@ -95,6 +103,8 @@ export function ProyectosView({
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
+  const [vendedorFiltro, setVendedorFiltro] = useState<string>('todos');
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [dialogoConvertir, setDialogoConvertir] = useState(false);
   const [dialogoFacturar, setDialogoFacturar] = useState(false);
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
@@ -106,12 +116,35 @@ export function ProyectosView({
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
   const isVendedor = userRol === 'vendedor';
 
+  // Cargar lista de vendedores (solo para admin)
+  useEffect(() => {
+    if (isAdmin) {
+      cargarVendedores();
+    }
+  }, [isAdmin]);
+
+  const cargarVendedores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('perfiles')
+        .select('id, nombre')
+        .in('rol', ['vendedor', 'admin', 'superadmin'])
+        .eq('activo', true)
+        .order('nombre');
+
+      if (error) throw error;
+      setVendedores(data || []);
+    } catch (err) {
+      console.error('Error cargando vendedores:', err);
+    }
+  };
+
   // Filtrar proyectos según rol
   const proyectosFiltradosPorRol = isAdmin 
     ? proyectos 
     : proyectos.filter(p => p.usuarioId === userId);
 
-  // Filtrar proyectos por búsqueda y estado
+  // Filtrar proyectos por búsqueda, estado y vendedor
   const proyectosFiltrados = proyectosFiltradosPorRol.filter(p => {
     const coincideBusqueda = 
       p.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -120,8 +153,9 @@ export function ProyectosView({
       (p.numeroFactura?.toLowerCase().includes(busqueda.toLowerCase()) ?? false);
     
     const coincideEstado = filtroEstado === 'todos' || p.estado === filtroEstado;
+    const coincideVendedor = vendedorFiltro === 'todos' || p.usuarioId === vendedorFiltro;
     
-    return coincideBusqueda && coincideEstado;
+    return coincideBusqueda && coincideEstado && coincideVendedor;
   });
 
   // Cotizaciones que aún no son ventas (solo admin y vendedor pueden ver)
@@ -133,14 +167,21 @@ export function ProyectosView({
 
   // Totales por estado (solo de proyectos visibles para el usuario)
   const totalesPorEstado = {
-    en_fabricacion: proyectosFiltradosPorRol.filter(p => p.estado === 'en_fabricacion').reduce((sum, p) => sum + p.totalCotizado, 0),
-    fabricado: proyectosFiltradosPorRol.filter(p => p.estado === 'fabricado').reduce((sum, p) => sum + p.totalCotizado, 0),
-    entregado: proyectosFiltradosPorRol.filter(p => p.estado === 'entregado').reduce((sum, p) => sum + p.totalCotizado, 0),
-    facturado: proyectosFiltradosPorRol.filter(p => p.estado === 'facturado').reduce((sum, p) => sum + (p.totalFacturado || 0), 0),
+    en_fabricacion: proyectosFiltrados.filter(p => p.estado === 'en_fabricacion').reduce((sum, p) => sum + p.totalCotizado, 0),
+    fabricado: proyectosFiltrados.filter(p => p.estado === 'fabricado').reduce((sum, p) => sum + p.totalCotizado, 0),
+    entregado: proyectosFiltrados.filter(p => p.estado === 'entregado').reduce((sum, p) => sum + p.totalCotizado, 0),
+    facturado: proyectosFiltrados.filter(p => p.estado === 'facturado').reduce((sum, p) => sum + (p.totalFacturado || 0), 0),
   };
 
-  const totalVendido = proyectosFiltradosPorRol.reduce((sum, p) => sum + p.totalCotizado, 0);
-  const totalFacturado = proyectosFiltradosPorRol.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+  const totalVendido = proyectosFiltrados.reduce((sum, p) => sum + p.totalCotizado, 0);
+  const totalFacturado = proyectosFiltrados.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+
+  // Obtener nombre del vendedor
+  const getNombreVendedor = (usuarioId: string | undefined) => {
+    if (!usuarioId) return 'Desconocido';
+    const vendedor = vendedores.find(v => v.id === usuarioId);
+    return vendedor?.nombre || 'Desconocido';
+  };
 
   const handleConvertir = () => {
     if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
@@ -216,7 +257,7 @@ export function ProyectosView({
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Proyectos / Ventas</h2>
           <p className="text-slate-500">
-            {proyectosFiltradosPorRol.length} proyectos · ${totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 2 })} vendido
+            {proyectosFiltrados.length} proyectos · ${totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 2 })} vendido
             {totalFacturado > 0 && ` · $${totalFacturado.toLocaleString('es-MX', { minimumFractionDigits: 2 })} facturado`}
             {!isAdmin && <span className="text-blue-600 ml-2">(Vista Personal)</span>}
           </p>
@@ -255,6 +296,12 @@ export function ProyectosView({
                             <div className="text-sm text-slate-500">
                               {cot.clienteNombre} · {cot.proyectoNombre} · ${cot.total.toFixed(2)}
                             </div>
+                            {isAdmin && cot.usuarioId && (
+                              <div className="text-xs text-blue-600 mt-1">
+                                <User className="w-3 h-3 inline mr-1" />
+                                {getNombreVendedor(cot.usuarioId)}
+                              </div>
+                            )}
                           </button>
                         ))}
                       </div>
@@ -316,6 +363,24 @@ export function ProyectosView({
             </Button>
           ))}
         </div>
+        {isAdmin && (
+          <Select value={vendedorFiltro} onValueChange={setVendedorFiltro}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Todos los vendedores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los vendedores</SelectItem>
+              {vendedores.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {v.nombre}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Resumen por estado */}
@@ -412,6 +477,12 @@ export function ProyectosView({
                             <DollarSign className="w-3 h-3" />
                             ${proyecto.totalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                           </span>
+                          {isAdmin && (
+                            <span className="flex items-center gap-1 text-blue-600">
+                              <User className="w-3 h-3" />
+                              {getNombreVendedor(proyecto.usuarioId)}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -495,6 +566,12 @@ export function ProyectosView({
             <div className="space-y-2">
               <Label>Proyecto</Label>
               <p className="text-sm text-slate-600">{proyectoSeleccionado?.proyectoNombre}</p>
+              {isAdmin && proyectoSeleccionado && (
+                <p className="text-xs text-blue-600">
+                  <User className="w-3 h-3 inline mr-1" />
+                  Vendedor: {getNombreVendedor(proyectoSeleccionado.usuarioId)}
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">

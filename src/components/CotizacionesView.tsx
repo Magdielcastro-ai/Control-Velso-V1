@@ -5,8 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowLeft, FileText, Calendar, Building2, Search, CheckCircle, Clock, Trash2, FolderKanban, Eye } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Calendar, Building2, Search, CheckCircle, Clock, Trash2, FolderKanban, Eye, User } from 'lucide-react';
 import { useSupabaseCotizaciones } from '@/hooks/useSupabaseCotizaciones';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface CotizacionesViewProps {
@@ -14,6 +15,11 @@ interface CotizacionesViewProps {
   userRol?: string;
   onCargarCotizacion: (id: string) => void;
   onConvertirAVenta?: (cotizacion: any, ordenCompra: string) => void;
+}
+
+interface Vendedor {
+  id: string;
+  nombre: string;
 }
 
 const estadosConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -31,6 +37,8 @@ export function CotizacionesView({
 }: CotizacionesViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
+  const [vendedorFiltro, setVendedorFiltro] = useState<string>('todos');
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<any>(null);
   const [ordenCompra, setOrdenCompra] = useState('');
   const [dialogoConvertir, setDialogoConvertir] = useState(false);
@@ -55,6 +63,29 @@ export function CotizacionesView({
     }
   }, [isAdmin, getAllCotizaciones, getMisCotizaciones]);
 
+  // Cargar lista de vendedores (solo para admin)
+  useEffect(() => {
+    if (isAdmin) {
+      cargarVendedores();
+    }
+  }, [isAdmin]);
+
+  const cargarVendedores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('perfiles')
+        .select('id, nombre')
+        .in('rol', ['vendedor', 'admin', 'superadmin'])
+        .eq('activo', true)
+        .order('nombre');
+
+      if (error) throw error;
+      setVendedores(data || []);
+    } catch (err) {
+      console.error('Error cargando vendedores:', err);
+    }
+  };
+
   // Verificar si una cotización ya fue convertida en proyecto
   const esComprada = (estado: string) => {
     return estado === 'comprada' || estado === 'convertida';
@@ -70,7 +101,9 @@ export function CotizacionesView({
                         estadoFiltro === 'comprada' ? esComprada(c.estado) :
                         estadoFiltro === 'pendiente' ? !esComprada(c.estado) :
                         c.estado === estadoFiltro;
-    return matchBusqueda && matchEstado;
+    const matchVendedor = vendedorFiltro === 'todos' ? true :
+                          c.usuario_id === vendedorFiltro;
+    return matchBusqueda && matchEstado && matchVendedor;
   });
 
   // Ordenar por fecha (más reciente primero)
@@ -104,12 +137,19 @@ export function CotizacionesView({
     }
   };
 
+  // Obtener nombre del vendedor
+  const getNombreVendedor = (usuarioId: string | undefined) => {
+    if (!usuarioId) return 'Desconocido';
+    const vendedor = vendedores.find(v => v.id === usuarioId);
+    return vendedor?.nombre || 'Desconocido';
+  };
+
   // Estadísticas
-  const totalCotizaciones = cotizaciones.length;
-  const totalCompradas = cotizaciones.filter(c => esComprada(c.estado)).length;
+  const totalCotizaciones = cotizacionesFiltradas.length;
+  const totalCompradas = cotizacionesFiltradas.filter(c => esComprada(c.estado)).length;
   const totalPendientes = totalCotizaciones - totalCompradas;
-  const totalMonto = cotizaciones.reduce((sum, c) => sum + (c.total || 0), 0);
-  const montoComprado = cotizaciones
+  const totalMonto = cotizacionesFiltradas.reduce((sum, c) => sum + (c.total || 0), 0);
+  const montoComprado = cotizacionesFiltradas
     .filter(c => esComprada(c.estado))
     .reduce((sum, c) => sum + (c.total || 0), 0);
 
@@ -204,6 +244,24 @@ export function CotizacionesView({
             <SelectItem value="rechazada">Rechazadas</SelectItem>
           </SelectContent>
         </Select>
+        {isAdmin && (
+          <Select value={vendedorFiltro} onValueChange={setVendedorFiltro}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Todos los vendedores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los vendedores</SelectItem>
+              {vendedores.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    {v.nombre}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Lista de cotizaciones */}
@@ -264,6 +322,12 @@ export function CotizacionesView({
                             <Calendar className="w-3 h-3" />
                             {new Date(cot.created_at).toLocaleDateString('es-MX')}
                           </span>
+                          {isAdmin && (
+                            <span className="flex items-center gap-1 text-blue-600">
+                              <User className="w-3 h-3" />
+                              {getNombreVendedor(cot.usuario_id)}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -315,6 +379,12 @@ export function CotizacionesView({
                                   <p className="font-semibold">{cot.numero}</p>
                                   <p className="text-sm">{cot.cliente_nombre} - {cot.proyecto_nombre}</p>
                                   <p className="text-lg font-bold text-green-600">${(cot.total || 0).toFixed(2)}</p>
+                                  {isAdmin && (
+                                    <p className="text-xs text-blue-600 mt-1">
+                                      <User className="w-3 h-3 inline mr-1" />
+                                      Vendedor: {getNombreVendedor(cot.usuario_id)}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="space-y-2">
                                   <label className="text-sm font-medium">Número de Orden de Compra *</label>
