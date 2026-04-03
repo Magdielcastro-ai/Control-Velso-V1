@@ -147,10 +147,10 @@ export function ProyectosView({
   // Filtrar proyectos por búsqueda, estado y vendedor
   const proyectosFiltrados = proyectosFiltradosPorRol.filter(p => {
     const coincideBusqueda = 
-      p.proyectoNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.clienteNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.ordenCompra.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.numeroFactura?.toLowerCase().includes(busqueda.toLowerCase()) ?? false);
+      (p.proyectoNombre?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
+      (p.clienteNombre?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
+      (p.ordenCompra?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
+      (p.numeroFactura?.toLowerCase() || '').includes(busqueda.toLowerCase());
     
     const coincideEstado = filtroEstado === 'todos' || p.estado === filtroEstado;
     const coincideVendedor = vendedorFiltro === 'todos' || p.usuarioId === vendedorFiltro;
