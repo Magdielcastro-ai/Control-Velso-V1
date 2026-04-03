@@ -17,7 +17,8 @@ import {
   CheckCircle,
   FileCheck,
   LogOut,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react';
 
 // Hooks
@@ -669,10 +670,21 @@ function App() {
         );
 
       case 'admin-usuarios':
+        // Asegurar que el usuario esté cargado antes de renderizar
+        if (!user) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 mb-2" />
+                <p className="text-slate-500">Cargando usuario...</p>
+              </div>
+            </div>
+          );
+        }
         return (
           <>
             <UserHeader user={user} onLogout={handleLogout} />
-            <AdminUsuariosView onVolver={irAHome} />
+            <AdminUsuariosView onVolver={irAHome} userRol={user.rol} />
           </>
         );
 
