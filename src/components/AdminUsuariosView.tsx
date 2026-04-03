@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,8 +20,17 @@ import {
   XCircle,
   Crown
 } from 'lucide-react';
-import { supabase, type PerfilUsuario } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+
+interface UsuarioConEmail {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: 'superadmin' | 'admin' | 'vendedor' | 'produccion';
+  activo: boolean;
+  created_at: string;
+}
 
 interface AdminUsuariosViewProps {
   onVolver: () => void;
@@ -29,27 +38,30 @@ interface AdminUsuariosViewProps {
 }
 
 const ROLES = [
-  { value: 'superadmin', label: 'Super Admin', icon: Crown, color: 'bg-yellow-600' },
-  { value: 'admin', label: 'Administrador', icon: Shield, color: 'bg-purple-600' },
-  { value: 'vendedor', label: 'Vendedor', icon: User, color: 'bg-blue-600' },
-  { value: 'produccion', label: 'Producción', icon: Factory, color: 'bg-green-600' },
+  { value: 'superadmin' as const, label: 'Super Admin', icon: Crown, color: 'bg-red-600' },
+  { value: 'admin' as const, label: 'Administrador', icon: Shield, color: 'bg-purple-600' },
+  { value: 'vendedor' as const, label: 'Vendedor', icon: User, color: 'bg-blue-600' },
+  { value: 'produccion' as const, label: 'Producción', icon: Factory, color: 'bg-green-600' },
 ];
 
-export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuariosViewProps) {
-  const [usuarios, setUsuarios] = useState<PerfilUsuario[]>([]);
+export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps) {
+  const [usuarios, setUsuarios] = useState<UsuarioConEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
   
-  // SOLO superadmin puede gestionar usuarios
-  const isSuperAdmin = userRol === 'superadmin';
-  
-  console.log('[AdminUsuariosView] userRol:', userRol, 'isSuperAdmin:', isSuperAdmin);
-  
+  // Formulario nuevo usuario
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rol, setRol] = useState<'admin' | 'vendedor' | 'produccion'>('vendedor');
+  const [rol, setRol] = useState<'superadmin' | 'admin' | 'vendedor' | 'produccion'>('vendedor');
+
+  // Determinar permisos basados en el rol
+  const isSuperAdmin = userRol === 'superadmin';
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
+  
+  // Log para debug
+  console.log('[AdminUsuariosView] userRol:', userRol, 'isSuperAdmin:', isSuperAdmin, 'isAdmin:', isAdmin);
 
   useEffect(() => {
     cargarUsuarios();
@@ -58,13 +70,39 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Obtener perfiles con email usando join con auth.users
+      const { data: perfiles, error: perfilesError } = await supabase
         .from('perfiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUsuarios(data || []);
+      if (perfilesError) throw perfilesError;
+
+      // Para cada perfil, obtener el email de auth.users
+      const usuariosConEmail: UsuarioConEmail[] = [];
+      for (const perfil of (perfiles || [])) {
+        // Intentar obtener el email de la tabla perfiles primero
+        let email = perfil.email || '';
+        
+        // Si no hay email en perfiles, intentar obtener de auth.users
+        if (!email) {
+          const { data: userData } = await supabase.auth.admin.getUserById(perfil.id);
+          if (userData?.user?.email) {
+            email = userData.user.email;
+          }
+        }
+
+        usuariosConEmail.push({
+          id: perfil.id,
+          nombre: perfil.nombre,
+          email: email,
+          rol: perfil.rol,
+          activo: perfil.activo,
+          created_at: perfil.created_at,
+        });
+      }
+
+      setUsuarios(usuariosConEmail);
     } catch (error) {
       console.error('Error cargando usuarios:', error);
       toast.error('Error al cargar usuarios');
@@ -74,18 +112,20 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
   };
 
   const handleCrearUsuario = async () => {
-    if (!isSuperAdmin) {
-      toast.error('Solo el Super Admin puede crear usuarios');
-      return;
-    }
-    
     if (!nombre || !email || !password) {
       toast.error('Completa todos los campos');
       return;
     }
 
+    // Solo superadmin puede crear usuarios
+    if (!isSuperAdmin) {
+      toast.error('Solo el Super Admin puede crear usuarios');
+      return;
+    }
+
     setGuardando(true);
     try {
+      // 1. Crear usuario en auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -94,11 +134,13 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
       if (authError) throw authError;
       if (!authData.user) throw new Error('No se pudo crear el usuario');
 
+      // 2. Crear perfil con email incluido
       const { error: perfilError } = await supabase
         .from('perfiles')
         .insert([{ 
           id: authData.user.id, 
           nombre, 
+          email, // Guardar email en perfiles
           rol,
           activo: true 
         }]);
@@ -121,8 +163,9 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
   };
 
   const handleCambiarRol = async (userId: string, nuevoRol: string) => {
-    if (!isSuperAdmin) {
-      toast.error('Solo el Super Admin puede cambiar roles');
+    // Admin y Superadmin pueden cambiar roles
+    if (!isAdmin) {
+      toast.error('No tienes permiso para cambiar roles');
       return;
     }
 
@@ -141,11 +184,6 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
   };
 
   const handleActivarDesactivar = async (userId: string, activo: boolean) => {
-    if (!isSuperAdmin) {
-      toast.error('Solo el Super Admin puede activar/desactivar usuarios');
-      return;
-    }
-
     try {
       const { error } = await supabase
         .from('perfiles')
@@ -164,8 +202,14 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
     return ROLES.find(r => r.value === rolValue) || ROLES[2];
   };
 
+  // Filtrar roles disponibles según el rol del usuario actual
+  const rolesDisponibles = isSuperAdmin 
+    ? ROLES 
+    : ROLES.filter(r => r.value !== 'superadmin');
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Button variant="outline" onClick={onVolver} className="border-slate-300 w-fit">
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -180,8 +224,6 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
             {usuarios.length} usuarios registrados
           </p>
         </div>
-        
-        {/* SOLO Super Admin ve el botón de crear usuario */}
         {isSuperAdmin && (
           <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
             <DialogTrigger asChild>
@@ -231,13 +273,23 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* Superadmin NO puede crear otros superadmins */}
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="vendedor">Vendedor</SelectItem>
-                      <SelectItem value="produccion">Producción</SelectItem>
+                      {ROLES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          <div className="flex items-center gap-2">
+                            <r.icon className="w-4 h-4" />
+                            {r.label}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                <Alert className="bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-blue-700 text-sm">
+                    El usuario recibirá un correo de confirmación para activar su cuenta.
+                  </AlertDescription>
+                </Alert>
 
                 <Button
                   onClick={handleCrearUsuario}
@@ -258,15 +310,6 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
           </Dialog>
         )}
       </div>
-
-      {/* Mensaje para Admin (no superadmin) */}
-      {!isSuperAdmin && (
-        <Alert className="bg-amber-50 border-amber-200">
-          <AlertDescription className="text-amber-700 text-sm">
-            Como Administrador, puedes ver todos los usuarios pero solo el Super Admin puede crear, editar o desactivar usuarios.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Lista de usuarios */}
       {loading ? (
@@ -294,7 +337,7 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
                         <rolConfig.icon className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold">{usuario.nombre}</h3>
                           <Badge 
                             variant={usuario.activo ? 'default' : 'secondary'}
@@ -303,7 +346,7 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
                             {usuario.activo ? 'Activo' : 'Inactivo'}
                           </Badge>
                         </div>
-                        <p className="text-sm text-slate-500">{usuario.email || 'Sin email'}</p>
+                        <p className="text-sm text-slate-600">{usuario.email || 'Sin email'}</p>
                         <p className="text-xs text-slate-400 mt-1">
                           Registrado: {new Date(usuario.created_at).toLocaleDateString('es-MX')}
                         </p>
@@ -311,40 +354,31 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {/* SOLO Super Admin puede cambiar roles */}
-                      {isSuperAdmin ? (
-                        <Select
-                          value={usuario.rol}
-                          onValueChange={(v) => handleCambiarRol(usuario.id, v)}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ROLES.map((r) => (
-                              <SelectItem key={r.value} value={r.value}>
-                                {r.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge className={`${rolConfig.color} text-white`}>
-                          {rolConfig.label}
-                        </Badge>
-                      )}
+                      <Select
+                        value={usuario.rol}
+                        onValueChange={(v) => handleCambiarRol(usuario.id, v)}
+                        disabled={!isAdmin}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rolesDisponibles.map((r) => (
+                            <SelectItem key={r.value} value={r.value}>
+                              {r.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                      {/* SOLO Super Admin puede activar/desactivar */}
-                      {isSuperAdmin && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleActivarDesactivar(usuario.id, usuario.activo)}
-                          className={usuario.activo ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
-                        >
-                          {usuario.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleActivarDesactivar(usuario.id, usuario.activo)}
+                        className={usuario.activo ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
+                      >
+                        {usuario.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -353,6 +387,61 @@ export function AdminUsuariosView({ onVolver, userRol = 'admin' }: AdminUsuarios
           })}
         </div>
       )}
+
+      {/* Leyenda de permisos */}
+      <Card className="border-slate-200 bg-slate-50">
+        <CardHeader>
+          <CardTitle className="text-lg">Permisos por Rol</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {ROLES.map((rol) => (
+              <div key={rol.value} className="bg-white p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-6 h-6 ${rol.color} rounded flex items-center justify-center`}>
+                    <rol.icon className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="font-medium">{rol.label}</span>
+                </div>
+                <ul className="text-xs text-slate-500 space-y-1">
+                  {rol.value === 'superadmin' && (
+                    <>
+                      <li>• Acceso total al sistema</li>
+                      <li>• Crear/eliminar usuarios</li>
+                      <li>• Cambiar roles</li>
+                      <li>• Dashboard completo</li>
+                    </>
+                  )}
+                  {rol.value === 'admin' && (
+                    <>
+                      <li>• Todo el acceso</li>
+                      <li>• Ver todos los datos</li>
+                      <li>• Dashboard completo</li>
+                      <li>• Control de códigos</li>
+                    </>
+                  )}
+                  {rol.value === 'vendedor' && (
+                    <>
+                      <li>• Crear cotizaciones</li>
+                      <li>• Ver sus proyectos</li>
+                      <li>• Facturar proyectos</li>
+                      <li>• Dashboard personal</li>
+                    </>
+                  )}
+                  {rol.value === 'produccion' && (
+                    <>
+                      <li>• Actualizar estados</li>
+                      <li>• Marcar fabricado</li>
+                      <li>• Marcar entregado</li>
+                      <li>• Control de códigos</li>
+                    </>
+                  )}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
