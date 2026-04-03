@@ -17,8 +17,7 @@ import {
   CheckCircle,
   FileCheck,
   LogOut,
-  Shield,
-  Loader2
+  Shield
 } from 'lucide-react';
 
 // Hooks
@@ -669,7 +668,7 @@ function App() {
           </>
         );
 
-      case 'admin-usuarios':
+       case 'admin-usuarios':
         // Asegurar que el usuario esté cargado antes de renderizar
         if (!user) {
           return (
