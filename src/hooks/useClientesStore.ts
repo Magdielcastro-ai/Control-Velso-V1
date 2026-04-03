@@ -16,8 +16,21 @@ export const useClientesStore = () => {
       setLoading(true);
       setError(null);
       
+      // PRIMERO: Cargar de localStorage inmediatamente (para que la UI no quede vacía)
+      const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
+      if (guardado) {
+        try {
+          const clientesLocal = JSON.parse(guardado);
+          console.log('[useClientesStore] Cargados desde localStorage:', clientesLocal.length);
+          setClientes(clientesLocal);
+        } catch (e) {
+          console.error('[useClientesStore] Error parseando localStorage:', e);
+        }
+      }
+      
+      // LUEGO: Intentar sincronizar con Supabase
       try {
-        // Intentar cargar desde Supabase primero
+        console.log('[useClientesStore] Intentando cargar desde Supabase...');
         const { data, error: supabaseError } = await supabase
           .from('clientes')
           .select('*')
@@ -25,12 +38,10 @@ export const useClientesStore = () => {
 
         if (supabaseError) {
           console.warn('[useClientesStore] Error cargando de Supabase:', supabaseError);
-          // Fallback a localStorage
-          const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
-          if (guardado) {
-            setClientes(JSON.parse(guardado));
-          }
-        } else if (data && data.length > 0) {
+          setError('Error de conexión: ' + supabaseError.message);
+        } else if (data) {
+          console.log('[useClientesStore] Clientes cargados de Supabase:', data.length);
+          
           // Cargar contactos de cada cliente
           const { data: contactosData, error: contactosError } = await supabase
             .from('contactos')
@@ -38,6 +49,8 @@ export const useClientesStore = () => {
           
           if (contactosError) {
             console.warn('[useClientesStore] Error cargando contactos:', contactosError);
+          } else {
+            console.log('[useClientesStore] Contactos cargados:', contactosData?.length || 0);
           }
 
           // Transformar datos de Supabase al formato de la app
@@ -66,24 +79,15 @@ export const useClientesStore = () => {
               usuarios: contactosCliente,
             };
           });
+          
           setClientes(clientesFormateados);
           // Actualizar localStorage como caché
           localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
-        } else {
-          // Si no hay datos en Supabase, cargar de localStorage
-          const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
-          if (guardado) {
-            setClientes(JSON.parse(guardado));
-          }
+          console.log('[useClientesStore] Clientes sincronizados con Supabase');
         }
       } catch (err: any) {
         console.error('[useClientesStore] Error:', err);
         setError(err.message);
-        // Fallback a localStorage
-        const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
-        if (guardado) {
-          setClientes(JSON.parse(guardado));
-        }
       } finally {
         setLoading(false);
         setCargado(true);
