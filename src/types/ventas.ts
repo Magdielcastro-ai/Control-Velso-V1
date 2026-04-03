@@ -7,13 +7,15 @@ export type EstadoProyecto =
   | 'entregado' 
   | 'facturado';
 
-// Cliente con usuarios
+// Contacto de cliente
 export interface UsuarioCliente {
   id: string;
   nombre: string;
-  celular: string;
-  email: string;
   departamento: string;
+  email: string;
+  telefono: string;
+  celular: string;
+  esPrincipal: boolean;
 }
 
 export interface Cliente {

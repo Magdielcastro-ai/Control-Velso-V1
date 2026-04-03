@@ -31,17 +31,41 @@ export const useClientesStore = () => {
             setClientes(JSON.parse(guardado));
           }
         } else if (data && data.length > 0) {
+          // Cargar contactos de cada cliente
+          const { data: contactosData, error: contactosError } = await supabase
+            .from('contactos')
+            .select('*');
+          
+          if (contactosError) {
+            console.warn('[useClientesStore] Error cargando contactos:', contactosError);
+          }
+
           // Transformar datos de Supabase al formato de la app
-          const clientesFormateados: Cliente[] = data.map(c => ({
-            id: c.id,
-            nombreEmpresa: c.nombre_empresa,
-            direccion: c.direccion || '',
-            telefono: c.telefono || '',
-            rfc: c.rfc || '',
-            terminosPago: c.terminos_pago || '50% anticipo, 50% contra entrega',
-            fechaRegistro: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-            usuarios: [], // Los usuarios de contacto se manejan separadamente
-          }));
+          const clientesFormateados: Cliente[] = data.map(c => {
+            // Filtrar contactos de este cliente
+            const contactosCliente = (contactosData || [])
+              .filter(contacto => contacto.cliente_id === c.id)
+              .map(contacto => ({
+                id: contacto.id,
+                nombre: contacto.nombre,
+                departamento: contacto.departamento || '',
+                email: contacto.email || '',
+                telefono: contacto.telefono || '',
+                celular: contacto.celular || '',
+                esPrincipal: contacto.es_principal,
+              }));
+
+            return {
+              id: c.id,
+              nombreEmpresa: c.nombre_empresa,
+              direccion: c.direccion || '',
+              telefono: c.telefono || '',
+              rfc: c.rfc || '',
+              terminosPago: c.terminos_pago || '50% anticipo, 50% contra entrega',
+              fechaRegistro: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+              usuarios: contactosCliente,
+            };
+          });
           setClientes(clientesFormateados);
           // Actualizar localStorage como caché
           localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
@@ -158,12 +182,35 @@ export const useClientesStore = () => {
     setClientes(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  // Agregar usuario a cliente
-  const agregarUsuario = useCallback((clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => {
+  // Agregar contacto a cliente (ahora sincroniza con Supabase)
+  const agregarUsuario = useCallback(async (clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => {
     const nuevoUsuario: UsuarioCliente = {
       ...usuario,
       id: crypto.randomUUID(),
     };
+
+    // Guardar en Supabase
+    try {
+      const { error } = await supabase
+        .from('contactos')
+        .insert([{
+          id: nuevoUsuario.id,
+          cliente_id: clienteId,
+          nombre: nuevoUsuario.nombre,
+          departamento: nuevoUsuario.departamento,
+          email: nuevoUsuario.email,
+          telefono: nuevoUsuario.telefono,
+          celular: nuevoUsuario.celular,
+          es_principal: nuevoUsuario.esPrincipal,
+        }]);
+
+      if (error) {
+        console.error('[useClientesStore] Error guardando contacto:', error);
+      }
+    } catch (err) {
+      console.error('[useClientesStore] Error:', err);
+    }
+
     setClientes(prev => prev.map(c => {
       if (c.id !== clienteId) return c;
       return { ...c, usuarios: [...c.usuarios, nuevoUsuario] };
@@ -171,8 +218,22 @@ export const useClientesStore = () => {
     return nuevoUsuario;
   }, []);
 
-  // Eliminar usuario de cliente
-  const eliminarUsuario = useCallback((clienteId: string, usuarioId: string) => {
+  // Eliminar contacto de cliente (ahora sincroniza con Supabase)
+  const eliminarUsuario = useCallback(async (clienteId: string, usuarioId: string) => {
+    // Eliminar de Supabase
+    try {
+      const { error } = await supabase
+        .from('contactos')
+        .delete()
+        .eq('id', usuarioId);
+
+      if (error) {
+        console.error('[useClientesStore] Error eliminando contacto:', error);
+      }
+    } catch (err) {
+      console.error('[useClientesStore] Error:', err);
+    }
+
     setClientes(prev => prev.map(c => {
       if (c.id !== clienteId) return c;
       return { ...c, usuarios: c.usuarios.filter(u => u.id !== usuarioId) };
@@ -201,10 +262,11 @@ export const useClientesStore = () => {
     );
   }, [clientes]);
 
-  // Recargar clientes desde Supabase
+  // Recargar clientes desde Supabase (con contactos)
   const recargarClientes = useCallback(async () => {
     setLoading(true);
     try {
+      // Cargar clientes
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
@@ -212,17 +274,41 @@ export const useClientesStore = () => {
 
       if (error) throw error;
       
+      // Cargar contactos
+      const { data: contactosData, error: contactosError } = await supabase
+        .from('contactos')
+        .select('*');
+      
+      if (contactosError) {
+        console.warn('[useClientesStore] Error cargando contactos:', contactosError);
+      }
+      
       if (data) {
-        const clientesFormateados: Cliente[] = data.map(c => ({
-          id: c.id,
-          nombreEmpresa: c.nombre_empresa,
-          direccion: c.direccion || '',
-          telefono: c.telefono || '',
-          rfc: c.rfc || '',
-          terminosPago: c.terminos_pago || '50% anticipo, 50% contra entrega',
-          fechaRegistro: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-          usuarios: [],
-        }));
+        const clientesFormateados: Cliente[] = data.map(c => {
+          // Filtrar contactos de este cliente
+          const contactosCliente = (contactosData || [])
+            .filter(contacto => contacto.cliente_id === c.id)
+            .map(contacto => ({
+              id: contacto.id,
+              nombre: contacto.nombre,
+              departamento: contacto.departamento || '',
+              email: contacto.email || '',
+              telefono: contacto.telefono || '',
+              celular: contacto.celular || '',
+              esPrincipal: contacto.es_principal,
+            }));
+
+          return {
+            id: c.id,
+            nombreEmpresa: c.nombre_empresa,
+            direccion: c.direccion || '',
+            telefono: c.telefono || '',
+            rfc: c.rfc || '',
+            terminosPago: c.terminos_pago || '50% anticipo, 50% contra entrega',
+            fechaRegistro: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            usuarios: contactosCliente,
+          };
+        });
         setClientes(clientesFormateados);
         localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
       }

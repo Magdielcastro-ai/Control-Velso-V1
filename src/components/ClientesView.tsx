@@ -52,12 +52,14 @@ export function ClientesView({
     terminosPago: '50% anticipo, 50% contra entrega',
   });
 
-  // Formulario nuevo usuario
+  // Formulario nuevo contacto
   const [nuevoUsuario, setNuevoUsuario] = useState({
     nombre: '',
-    celular: '',
-    email: '',
     departamento: '',
+    email: '',
+    telefono: '',
+    celular: '',
+    esPrincipal: false,
   });
 
   const clientesFiltrados = clientes.filter(c => 
@@ -83,9 +85,11 @@ export function ClientesView({
     onAgregarUsuario(dialogoNuevoUsuario, nuevoUsuario);
     setNuevoUsuario({
       nombre: '',
-      celular: '',
-      email: '',
       departamento: '',
+      email: '',
+      telefono: '',
+      celular: '',
+      esPrincipal: false,
     });
     setDialogoNuevoUsuario(null);
   };
@@ -226,7 +230,7 @@ export function ClientesView({
                       size="sm"
                       onClick={() => setClienteExpandido(clienteExpandido === cliente.id ? null : cliente.id)}
                     >
-                      {clienteExpandido === cliente.id ? 'Ocultar' : 'Ver Usuarios'}
+                      {clienteExpandido === cliente.id ? 'Ocultar' : 'Ver Contactos'}
                       <Badge variant="secondary" className="ml-2">{cliente.usuarios.length}</Badge>
                     </Button>
                     {onEliminarCliente && (
@@ -249,7 +253,7 @@ export function ClientesView({
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium flex items-center gap-2">
                         <Users className="w-4 h-4" />
-                        Usuarios de Contacto
+                        Contactos
                       </h4>
                       {onAgregarUsuario && (
                         <Button
@@ -258,13 +262,13 @@ export function ClientesView({
                           onClick={() => setDialogoNuevoUsuario(cliente.id)}
                         >
                           <UserPlus className="w-4 h-4 mr-1" />
-                          Agregar Usuario
+                          Agregar Contacto
                         </Button>
                       )}
                     </div>
 
                     {cliente.usuarios.length === 0 ? (
-                      <p className="text-sm text-slate-500">No hay usuarios registrados</p>
+                      <p className="text-sm text-slate-500">No hay contactos registrados</p>
                     ) : (
                       <Table>
                         <TableHeader>
@@ -316,11 +320,11 @@ export function ClientesView({
         )}
       </div>
 
-      {/* Diálogo para agregar usuario */}
+      {/* Diálogo para agregar contacto */}
       <Dialog open={!!dialogoNuevoUsuario} onOpenChange={() => setDialogoNuevoUsuario(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Agregar Usuario de Contacto</DialogTitle>
+            <DialogTitle>Agregar Contacto</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
@@ -345,7 +349,15 @@ export function ClientesView({
                 type="email"
                 value={nuevoUsuario.email}
                 onChange={(e) => setNuevoUsuario(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="usuario@empresa.com"
+                placeholder="contacto@empresa.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Teléfono</Label>
+              <Input
+                value={nuevoUsuario.telefono}
+                onChange={(e) => setNuevoUsuario(prev => ({ ...prev, telefono: e.target.value }))}
+                placeholder="(55) 1234-5678"
               />
             </div>
             <div className="space-y-2">
@@ -353,15 +365,25 @@ export function ClientesView({
               <Input
                 value={nuevoUsuario.celular}
                 onChange={(e) => setNuevoUsuario(prev => ({ ...prev, celular: e.target.value }))}
-                placeholder="(55) 1234-5678"
+                placeholder="(55) 8765-4321"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="esPrincipal"
+                checked={nuevoUsuario.esPrincipal}
+                onChange={(e) => setNuevoUsuario(prev => ({ ...prev, esPrincipal: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="esPrincipal" className="cursor-pointer">Contacto principal</Label>
             </div>
             <Button 
               onClick={handleAgregarUsuario}
               disabled={!nuevoUsuario.nombre}
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
-              Guardar Usuario
+              Guardar Contacto
             </Button>
           </div>
         </DialogContent>
