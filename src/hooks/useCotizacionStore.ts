@@ -85,20 +85,21 @@ export const useCotizacionStore = () => {
   const [cotizacion, setCotizacion] = useState<Cotizacion>(cotizacionVacia);
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
 
-  // Cargar cotizaciones guardadas del localStorage y Supabase
+  // Cargar cotizaciones: primero localStorage (rápido), luego Supabase (sincronización)
   useEffect(() => {
-    const cargarCotizaciones = async () => {
-      // Primero cargar de localStorage (más rápido)
-      const guardadas = localStorage.getItem('cotizaciones_cnc');
-      if (guardadas) {
-        try {
-          setCotizacionesGuardadas(JSON.parse(guardadas));
-        } catch (e) {
-          console.error('Error al cargar cotizaciones del localStorage:', e);
-        }
+    // PASO 1: Cargar de localStorage INMEDIATAMENTE
+    const guardadas = localStorage.getItem('cotizaciones_cnc');
+    if (guardadas) {
+      try {
+        setCotizacionesGuardadas(JSON.parse(guardadas));
+        console.log('[useCotizacionStore] Cargadas desde localStorage');
+      } catch (e) {
+        console.error('Error al cargar cotizaciones del localStorage:', e);
       }
+    }
 
-      // Luego intentar cargar de Supabase
+    // PASO 2: Sincronizar con Supabase en segundo plano
+    const sincronizarConSupabase = async () => {
       try {
         const { data, error } = await supabase
           .from('cotizaciones')
@@ -121,15 +122,22 @@ export const useCotizacionStore = () => {
             estado: c.estado,
             usuarioId: c.usuario_id,
           }));
-          setCotizacionesGuardadas(cotizacionesFormateadas);
-          localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
+          
+          // Solo actualizar si hay cambios
+          const actuales = JSON.parse(localStorage.getItem('cotizaciones_cnc') || '[]');
+          if (JSON.stringify(actuales) !== JSON.stringify(cotizacionesFormateadas)) {
+            setCotizacionesGuardadas(cotizacionesFormateadas);
+            localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
+            console.log('[useCotizacionStore] Sincronizado con Supabase:', data.length);
+          }
         }
       } catch (err) {
         console.warn('Error de conexión con Supabase:', err);
       }
     };
 
-    cargarCotizaciones();
+    // Ejecutar sin await (no bloquea)
+    sincronizarConSupabase();
   }, []);
 
   // Guardar cotizaciones en localStorage

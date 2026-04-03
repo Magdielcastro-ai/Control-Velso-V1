@@ -10,27 +10,26 @@ export const useClientesStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar clientes desde Supabase primero, luego localStorage como fallback
+  // Cargar clientes: primero localStorage (rápido), luego Supabase (sincronización)
   useEffect(() => {
-    const cargarClientes = async () => {
-      setLoading(true);
-      setError(null);
-      
-      // PRIMERO: Cargar de localStorage inmediatamente (para que la UI no quede vacía)
-      const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
-      if (guardado) {
-        try {
-          const clientesLocal = JSON.parse(guardado);
-          console.log('[useClientesStore] Cargados desde localStorage:', clientesLocal.length);
-          setClientes(clientesLocal);
-        } catch (e) {
-          console.error('[useClientesStore] Error parseando localStorage:', e);
-        }
-      }
-      
-      // LUEGO: Intentar sincronizar con Supabase
+    // PASO 1: Cargar de localStorage INMEDIATAMENTE (sin esperar)
+    const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
+    if (guardado) {
       try {
-        console.log('[useClientesStore] Intentando cargar desde Supabase...');
+        const clientesLocal = JSON.parse(guardado);
+        console.log('[useClientesStore] Cargados desde localStorage:', clientesLocal.length);
+        setClientes(clientesLocal);
+      } catch (e) {
+        console.error('[useClientesStore] Error parseando localStorage:', e);
+      }
+    }
+    // Marcar como cargado para que la UI muestre datos inmediatamente
+    setCargado(true);
+    
+    // PASO 2: Sincronizar con Supabase en segundo plano (sin bloquear)
+    const sincronizarConSupabase = async () => {
+      try {
+        console.log('[useClientesStore] Sincronizando con Supabase...');
         const { data, error: supabaseError } = await supabase
           .from('clientes')
           .select('*')
@@ -38,24 +37,23 @@ export const useClientesStore = () => {
 
         if (supabaseError) {
           console.warn('[useClientesStore] Error cargando de Supabase:', supabaseError);
-          setError('Error de conexión: ' + supabaseError.message);
-        } else if (data) {
-          console.log('[useClientesStore] Clientes cargados de Supabase:', data.length);
+          return;
+        }
+        
+        if (data && data.length > 0) {
+          console.log('[useClientesStore] Clientes de Supabase:', data.length);
           
-          // Cargar contactos de cada cliente
+          // Cargar contactos
           const { data: contactosData, error: contactosError } = await supabase
             .from('contactos')
             .select('*');
           
           if (contactosError) {
             console.warn('[useClientesStore] Error cargando contactos:', contactosError);
-          } else {
-            console.log('[useClientesStore] Contactos cargados:', contactosData?.length || 0);
           }
 
-          // Transformar datos de Supabase al formato de la app
+          // Transformar datos
           const clientesFormateados: Cliente[] = data.map(c => {
-            // Filtrar contactos de este cliente
             const contactosCliente = (contactosData || [])
               .filter(contacto => contacto.cliente_id === c.id)
               .map(contacto => ({
@@ -80,21 +78,21 @@ export const useClientesStore = () => {
             };
           });
           
-          setClientes(clientesFormateados);
-          // Actualizar localStorage como caché
-          localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
-          console.log('[useClientesStore] Clientes sincronizados con Supabase');
+          // Solo actualizar si hay cambios
+          const clientesActuales = JSON.parse(localStorage.getItem(STORAGE_KEY_CLIENTES) || '[]');
+          if (JSON.stringify(clientesActuales) !== JSON.stringify(clientesFormateados)) {
+            setClientes(clientesFormateados);
+            localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
+            console.log('[useClientesStore] Clientes actualizados desde Supabase');
+          }
         }
       } catch (err: any) {
-        console.error('[useClientesStore] Error:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-        setCargado(true);
+        console.error('[useClientesStore] Error sincronizando:', err);
       }
     };
 
-    cargarClientes();
+    // Ejecutar sincronización sin await (no bloquea)
+    sincronizarConSupabase();
   }, []);
 
   // Guardar clientes en localStorage cuando cambien
