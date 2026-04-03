@@ -163,9 +163,9 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
   };
 
   const handleCambiarRol = async (userId: string, nuevoRol: string) => {
-    // Admin y Superadmin pueden cambiar roles
-    if (!isAdmin) {
-      toast.error('No tienes permiso para cambiar roles');
+    // Solo Superadmin puede cambiar roles
+    if (!isSuperAdmin) {
+      toast.error('Solo el Super Admin puede cambiar roles');
       return;
     }
 
@@ -357,7 +357,7 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
                       <Select
                         value={usuario.rol}
                         onValueChange={(v) => handleCambiarRol(usuario.id, v)}
-                        disabled={!isAdmin}
+                        disabled={!isSuperAdmin}
                       >
                         <SelectTrigger className="w-40">
                           <SelectValue />

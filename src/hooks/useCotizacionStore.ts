@@ -338,15 +338,21 @@ export const useCotizacionStore = () => {
           estado,
         };
 
-        const { error } = await supabase
+        console.log('[guardarCotizacion] Intentando guardar en Supabase:', cotizacionDB);
+        
+        const { data, error } = await supabase
           .from('cotizaciones')
-          .upsert(cotizacionDB);
+          .upsert(cotizacionDB)
+          .select();
 
         if (error) {
-          console.error('Error al guardar en Supabase:', error);
+          console.error('[guardarCotizacion] Error al guardar en Supabase:', error);
+          console.error('[guardarCotizacion] Error code:', error.code);
+          console.error('[guardarCotizacion] Error details:', error.details);
           toast.error('Error al sincronizar con la nube: ' + error.message);
         } else {
-          console.log('Cotización guardada en Supabase exitosamente');
+          console.log('[guardarCotizacion] Cotización guardada exitosamente:', data);
+          toast.success('Cotización guardada en la nube');
         }
       } catch (err: any) {
         console.error('Error de conexión con Supabase:', err);
