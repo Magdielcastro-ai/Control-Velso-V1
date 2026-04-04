@@ -10,65 +10,20 @@ export const useProyectosStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar proyectos: primero Supabase, localStorage como fallback (modo offline)
+  // Cargar proyectos desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
-    const cargarProyectos = async () => {
-      setLoading(true);
-      
-      try {
-        console.log('[useProyectosStore] Cargando desde Supabase...');
-        const { data, error: supabaseError } = await supabase
-          .from('proyectos')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (supabaseError) throw supabaseError;
-
-        if (data) {
-          const proyectosFormateados: ProyectoVenta[] = data.map(p => ({
-            id: p.id,
-            numeroCotizacion: p.numero_cotizacion,
-            ordenCompra: p.orden_compra,
-            usuarioId: p.usuario_id,
-            clienteId: p.cliente_id || '',
-            clienteNombre: p.cliente_nombre,
-            proyectoNombre: p.proyecto_nombre,
-            totalCotizado: p.total_cotizado,
-            totalFacturado: p.total_facturado,
-            margenUtilidad: p.margen_utilidad,
-            ivaPorcentaje: p.iva_porcentaje,
-            materiales: p.materiales || [],
-            procesos: p.procesos || [],
-            costosAdicionales: p.costos_adicionales || {},
-            estado: p.estado as EstadoProyecto,
-            numeroFactura: p.numero_factura,
-            fechaVenta: p.fecha_venta ? p.fecha_venta.split('T')[0] : new Date().toISOString().split('T')[0],
-            fechaFabricado: p.fecha_fabricado ? p.fecha_fabricado.split('T')[0] : undefined,
-            fechaEntregado: p.fecha_entregado ? p.fecha_entregado.split('T')[0] : undefined,
-            fechaFacturado: p.fecha_facturado ? p.fecha_facturado.split('T')[0] : undefined,
-            utilidadReal: p.utilidad_real,
-          }));
-          
-          setProyectos(proyectosFormateados);
-          localStorage.setItem(STORAGE_KEY_PROYECTOS, JSON.stringify(proyectosFormateados));
-          console.log('[useProyectosStore] Cargados desde Supabase:', data.length);
+    const cargarProyectos = () => {
+      const guardado = localStorage.getItem(STORAGE_KEY_PROYECTOS);
+      if (guardado) {
+        try {
+          setProyectos(JSON.parse(guardado));
+          console.log('[useProyectosStore] Cargados desde localStorage:', JSON.parse(guardado).length);
+        } catch (e) {
+          console.error('[useProyectosStore] Error parseando localStorage:', e);
         }
-      } catch (err: any) {
-        console.warn('[useProyectosStore] Error de conexión, usando localStorage:', err.message);
-        // MODO OFFLINE: Cargar de localStorage
-        const guardado = localStorage.getItem(STORAGE_KEY_PROYECTOS);
-        if (guardado) {
-          try {
-            setProyectos(JSON.parse(guardado));
-            console.log('[useProyectosStore] Cargados desde localStorage (offline)');
-          } catch (e) {
-            console.error('[useProyectosStore] Error parseando localStorage:', e);
-          }
-        }
-      } finally {
-        setLoading(false);
-        setCargado(true);
       }
+      setLoading(false);
+      setCargado(true);
     };
 
     cargarProyectos();

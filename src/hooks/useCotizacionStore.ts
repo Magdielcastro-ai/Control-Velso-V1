@@ -86,51 +86,19 @@ export const useCotizacionStore = () => {
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
   const [cargado, setCargado] = useState(false);
 
-  // Cargar cotizaciones: primero Supabase, localStorage como fallback (modo offline)
+  // Cargar cotizaciones desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
-    const cargarCotizaciones = async () => {
-      setCargado(false);
-      
-      try {
-        console.log('[useCotizacionStore] Cargando desde Supabase...');
-        const { data, error } = await supabase
-          .from('cotizaciones')
-          .select('id, numero, fecha, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (data) {
-          const cotizacionesFormateadas: CotizacionGuardada[] = data.map(c => ({
-            id: c.id,
-            numero: c.numero,
-            fecha: c.fecha,
-            clienteNombre: c.cliente_nombre,
-            proyectoNombre: c.proyecto_nombre,
-            total: c.total,
-            estado: c.estado,
-            usuarioId: c.usuario_id,
-          }));
-          
-          setCotizacionesGuardadas(cotizacionesFormateadas);
-          localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
-          console.log('[useCotizacionStore] Cargadas desde Supabase:', data.length);
+    const cargarCotizaciones = () => {
+      const guardadas = localStorage.getItem('cotizaciones_cnc');
+      if (guardadas) {
+        try {
+          setCotizacionesGuardadas(JSON.parse(guardadas));
+          console.log('[useCotizacionStore] Cargadas desde localStorage:', JSON.parse(guardadas).length);
+        } catch (e) {
+          console.error('Error al cargar cotizaciones del localStorage:', e);
         }
-      } catch (err) {
-        console.warn('[useCotizacionStore] Error de conexión, usando localStorage:', err);
-        // MODO OFFLINE: Cargar de localStorage
-        const guardadas = localStorage.getItem('cotizaciones_cnc');
-        if (guardadas) {
-          try {
-            setCotizacionesGuardadas(JSON.parse(guardadas));
-            console.log('[useCotizacionStore] Cargadas desde localStorage (offline)');
-          } catch (e) {
-            console.error('Error al cargar cotizaciones del localStorage:', e);
-          }
-        }
-      } finally {
-        setCargado(true);
       }
+      setCargado(true);
     };
 
     cargarCotizaciones();

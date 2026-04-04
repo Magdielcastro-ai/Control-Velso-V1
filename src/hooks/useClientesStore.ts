@@ -10,81 +10,21 @@ export const useClientesStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar clientes: primero Supabase, localStorage como fallback (modo offline)
+  // Cargar clientes desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
-    const cargarClientes = async () => {
-      setLoading(true);
-      
-      try {
-        console.log('[useClientesStore] Cargando desde Supabase...');
-        
-        // Cargar clientes de Supabase
-        const { data, error: supabaseError } = await supabase
-          .from('clientes')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (supabaseError) throw supabaseError;
-        
-        if (data) {
-          console.log('[useClientesStore] Clientes de Supabase:', data.length);
-          
-          // Cargar contactos
-          const { data: contactosData, error: contactosError } = await supabase
-            .from('contactos')
-            .select('*');
-          
-          if (contactosError) {
-            console.warn('[useClientesStore] Error cargando contactos:', contactosError);
-          }
-
-          // Transformar datos
-          const clientesFormateados: Cliente[] = data.map(c => {
-            const contactosCliente = (contactosData || [])
-              .filter(contacto => contacto.cliente_id === c.id)
-              .map(contacto => ({
-                id: contacto.id,
-                nombre: contacto.nombre,
-                departamento: contacto.departamento || '',
-                email: contacto.email || '',
-                telefono: contacto.telefono || '',
-                celular: contacto.celular || '',
-                esPrincipal: contacto.es_principal,
-              }));
-
-            return {
-              id: c.id,
-              nombreEmpresa: c.nombre_empresa,
-              direccion: c.direccion || '',
-              telefono: c.telefono || '',
-              rfc: c.rfc || '',
-              terminosPago: c.terminos_pago || '50% anticipo, 50% contra entrega',
-              fechaRegistro: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-              usuarios: contactosCliente,
-            };
-          });
-          
-          setClientes(clientesFormateados);
-          localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
-          console.log('[useClientesStore] Clientes cargados desde Supabase');
+    const cargarClientes = () => {
+      const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
+      if (guardado) {
+        try {
+          const clientesLocal = JSON.parse(guardado);
+          console.log('[useClientesStore] Cargados desde localStorage:', clientesLocal.length);
+          setClientes(clientesLocal);
+        } catch (e) {
+          console.error('[useClientesStore] Error parseando localStorage:', e);
         }
-      } catch (err: any) {
-        console.warn('[useClientesStore] Error de conexión, usando localStorage:', err.message);
-        // MODO OFFLINE: Cargar de localStorage
-        const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
-        if (guardado) {
-          try {
-            const clientesLocal = JSON.parse(guardado);
-            console.log('[useClientesStore] Cargados desde localStorage (offline):', clientesLocal.length);
-            setClientes(clientesLocal);
-          } catch (e) {
-            console.error('[useClientesStore] Error parseando localStorage:', e);
-          }
-        }
-      } finally {
-        setLoading(false);
-        setCargado(true);
       }
+      setLoading(false);
+      setCargado(true);
     };
 
     cargarClientes();
