@@ -186,7 +186,17 @@ export function ClientesView({
 
       {/* Lista de clientes */}
       <div className="space-y-4">
-        {clientesFiltrados.length === 0 ? (
+        {clientes.length === 0 ? (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-8 text-center">
+              <Building2 className="w-12 h-12 mx-auto mb-3 text-amber-400" />
+              <p className="text-amber-700 font-medium">No hay clientes registrados</p>
+              <p className="text-amber-600 text-sm mt-1">
+                Agrega tu primer cliente para comenzar a crear cotizaciones
+              </p>
+            </CardContent>
+          </Card>
+        ) : clientesFiltrados.length === 0 ? (
           <Card className="border-slate-200">
             <CardContent className="p-8 text-center text-slate-500">
               <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />

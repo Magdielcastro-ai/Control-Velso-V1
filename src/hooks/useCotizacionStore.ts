@@ -84,6 +84,7 @@ const cotizacionVacia: Cotizacion = {
 export const useCotizacionStore = () => {
   const [cotizacion, setCotizacion] = useState<Cotizacion>(cotizacionVacia);
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
+  const [cargado, setCargado] = useState(false);
 
   // Cargar cotizaciones: primero localStorage (rápido), luego Supabase (sincronización)
   useEffect(() => {
@@ -92,11 +93,15 @@ export const useCotizacionStore = () => {
     if (guardadas) {
       try {
         setCotizacionesGuardadas(JSON.parse(guardadas));
-        console.log('[useCotizacionStore] Cargadas desde localStorage');
+        console.log('[useCotizacionStore] Cargadas desde localStorage:', JSON.parse(guardadas).length);
       } catch (e) {
         console.error('Error al cargar cotizaciones del localStorage:', e);
       }
+    } else {
+      console.log('[useCotizacionStore] No hay datos en localStorage');
     }
+    // Marcar como cargado inmediatamente
+    setCargado(true);
 
     // PASO 2: Sincronizar con Supabase en segundo plano
     const sincronizarConSupabase = async () => {
@@ -531,6 +536,7 @@ export const useCotizacionStore = () => {
   return {
     cotizacion,
     cotizacionesGuardadas,
+    cargado,
     actualizarDatosTaller,
     actualizarDatosCliente,
     actualizarProyecto,

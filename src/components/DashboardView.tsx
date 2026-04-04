@@ -285,6 +285,18 @@ export function DashboardView({
         </div>
       </div>
 
+      {/* Mensaje si no hay datos */}
+      {cotizacionesFiltradas.length === 0 && proyectosFiltrados.length === 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-6 text-center">
+            <p className="text-amber-700 font-medium">No hay datos disponibles para este período</p>
+            <p className="text-amber-600 text-sm mt-1">
+              Crea cotizaciones o conviértelas en ventas para ver métricas aquí
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPIs Principales */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-blue-200">
