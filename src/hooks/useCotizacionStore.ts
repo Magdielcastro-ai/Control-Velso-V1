@@ -86,6 +86,40 @@ export const useCotizacionStore = () => {
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
   const [cargado, setCargado] = useState(false);
 
+  // Función para refrescar datos desde Supabase
+  const refrescarDesdeSupabase = useCallback(async () => {
+    try {
+      console.log('[useCotizacionStore] Refrescando desde Supabase...');
+      const { data, error } = await supabase
+        .from('cotizaciones')
+        .select('id, numero, created_at, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const cotizacionesFormateadas: CotizacionGuardada[] = data.map(c => ({
+          id: c.id,
+          numero: c.numero,
+          fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          clienteNombre: c.cliente_nombre,
+          proyectoNombre: c.proyecto_nombre,
+          total: c.total,
+          estado: c.estado,
+          usuarioId: c.usuario_id,
+        }));
+        
+        setCotizacionesGuardadas(cotizacionesFormateadas);
+        localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
+        console.log('[useCotizacionStore] Refrescado desde Supabase:', data.length);
+      }
+      return true;
+    } catch (err) {
+      console.warn('[useCotizacionStore] Error refrescando:', err);
+      return false;
+    }
+  }, []);
+
   // Cargar cotizaciones desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
     const cargarCotizaciones = () => {
@@ -99,10 +133,12 @@ export const useCotizacionStore = () => {
         }
       }
       setCargado(true);
+      // Refrescar en segundo plano desde Supabase
+      refrescarDesdeSupabase();
     };
 
     cargarCotizaciones();
-  }, []);
+  }, [refrescarDesdeSupabase]);
 
   // Guardar cotizaciones en localStorage
   useEffect(() => {
@@ -512,5 +548,6 @@ export const useCotizacionStore = () => {
     cargarCotizacion,
     eliminarCotizacionGuardada,
     nuevaCotizacion,
+    refrescarDesdeSupabase,
   };
 };

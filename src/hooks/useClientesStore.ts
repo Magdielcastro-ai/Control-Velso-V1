@@ -10,6 +10,56 @@ export const useClientesStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Función para refrescar datos desde Supabase
+  const refrescarDesdeSupabase = useCallback(async () => {
+    try {
+      console.log('[useClientesStore] Refrescando desde Supabase...');
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const { data: contactosData } = await supabase.from('contactos').select('*');
+        
+        const clientesFormateados = data.map(c => {
+          const contactosCliente = (contactosData || [])
+            .filter(contacto => contacto.cliente_id === c.id)
+            .map(contacto => ({
+              id: contacto.id,
+              nombre: contacto.nombre,
+              departamento: contacto.departamento || '',
+              email: contacto.email || '',
+              telefono: contacto.telefono || '',
+              celular: contacto.celular || '',
+              esPrincipal: contacto.es_principal,
+            }));
+
+          return {
+            id: c.id,
+            nombreEmpresa: c.nombre_empresa,
+            direccion: c.direccion || '',
+            telefono: c.telefono || '',
+            rfc: c.rfc || '',
+            terminosPago: c.terminos_pago || '50% anticipo, 50% contra entrega',
+            fechaRegistro: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            usuarios: contactosCliente,
+          };
+        });
+        
+        setClientes(clientesFormateados);
+        localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
+        console.log('[useClientesStore] Refrescado desde Supabase:', data.length);
+      }
+      return true;
+    } catch (err) {
+      console.warn('[useClientesStore] Error refrescando:', err);
+      return false;
+    }
+  }, []);
+
   // Cargar clientes desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
     const cargarClientes = () => {
@@ -25,10 +75,12 @@ export const useClientesStore = () => {
       }
       setLoading(false);
       setCargado(true);
+      // Refrescar en segundo plano desde Supabase
+      refrescarDesdeSupabase();
     };
 
     cargarClientes();
-  }, []);
+  }, [refrescarDesdeSupabase]);
 
   // Guardar clientes en localStorage cuando cambien
   useEffect(() => {
@@ -271,5 +323,6 @@ export const useClientesStore = () => {
     getClienteById,
     existeCliente,
     recargarClientes,
+    refrescarDesdeSupabase,
   };
 };

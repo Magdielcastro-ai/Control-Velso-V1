@@ -10,6 +10,53 @@ export const useProyectosStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Función para refrescar datos desde Supabase
+  const refrescarDesdeSupabase = useCallback(async () => {
+    try {
+      console.log('[useProyectosStore] Refrescando desde Supabase...');
+      const { data, error } = await supabase
+        .from('proyectos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const proyectosFormateados: ProyectoVenta[] = data.map(p => ({
+          id: p.id,
+          numeroCotizacion: p.numero_cotizacion,
+          ordenCompra: p.orden_compra,
+          usuarioId: p.usuario_id,
+          clienteId: p.cliente_id || '',
+          clienteNombre: p.cliente_nombre,
+          proyectoNombre: p.proyecto_nombre,
+          totalCotizado: p.total_cotizado,
+          totalFacturado: p.total_facturado,
+          margenUtilidad: p.margen_utilidad,
+          ivaPorcentaje: p.iva_porcentaje,
+          materiales: p.materiales || [],
+          procesos: p.procesos || [],
+          costosAdicionales: p.costos_adicionales || {},
+          estado: p.estado as EstadoProyecto,
+          numeroFactura: p.numero_factura,
+          fechaVenta: p.fecha_venta ? p.fecha_venta.split('T')[0] : new Date().toISOString().split('T')[0],
+          fechaFabricado: p.fecha_fabricado ? p.fecha_fabricado.split('T')[0] : undefined,
+          fechaEntregado: p.fecha_entregado ? p.fecha_entregado.split('T')[0] : undefined,
+          fechaFacturado: p.fecha_facturado ? p.fecha_facturado.split('T')[0] : undefined,
+          utilidadReal: p.utilidad_real,
+        }));
+        
+        setProyectos(proyectosFormateados);
+        localStorage.setItem(STORAGE_KEY_PROYECTOS, JSON.stringify(proyectosFormateados));
+        console.log('[useProyectosStore] Refrescado desde Supabase:', data.length);
+      }
+      return true;
+    } catch (err) {
+      console.warn('[useProyectosStore] Error refrescando:', err);
+      return false;
+    }
+  }, []);
+
   // Cargar proyectos desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
     const cargarProyectos = () => {
@@ -24,10 +71,12 @@ export const useProyectosStore = () => {
       }
       setLoading(false);
       setCargado(true);
+      // Refrescar en segundo plano desde Supabase
+      refrescarDesdeSupabase();
     };
 
     cargarProyectos();
-  }, []);
+  }, [refrescarDesdeSupabase]);
 
   // Guardar proyectos en localStorage cuando cambien
   useEffect(() => {
@@ -370,5 +419,6 @@ export const useProyectosStore = () => {
     getTotalesPorMes,
     getHorasPorEstado,
     recargarProyectos,
+    refrescarDesdeSupabase,
   };
 };
