@@ -54,6 +54,7 @@ import { ControlDeCodigosView } from '@/components/ControlDeCodigosView';
 import { LoginView } from '@/components/LoginView';
 import { AdminUsuariosView } from '@/components/AdminUsuariosView';
 import { DiagnosticoSupabase } from '@/components/DiagnosticoSupabase';
+import { PantallaCarga } from '@/components/PantallaCarga';
 
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
@@ -134,6 +135,7 @@ function App() {
   const [horasDisponibles, setHorasDisponibles] = useState<Record<string, number>>(HORAS_DEFAULT);
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [datosCargados, setDatosCargados] = useState(false);
   
   // Auth con todos los permisos
   const { 
@@ -244,14 +246,27 @@ function App() {
   // Login handler
   const handleLogin = async (email: string, password: string) => {
     setLoginError(null);
+    setDatosCargados(false);
     try {
       await signIn(email, password);
+      // No redirigimos inmediatamente, esperamos a que carguen los datos
       toast.success('Bienvenido al sistema');
     } catch (error: any) {
       console.error('Login error:', error);
       setLoginError(error.message || 'Error al iniciar sesión');
       toast.error(error.message || 'Error al iniciar sesión');
     }
+  };
+
+  // Handlers para pantalla de carga
+  const handleCargaCompleta = () => {
+    setDatosCargados(true);
+    toast.success('Datos sincronizados correctamente');
+  };
+
+  const handleUsarOffline = () => {
+    setDatosCargados(true);
+    toast.info('Usando datos del dispositivo (modo offline)');
   };
 
   // Logout handler
@@ -519,6 +534,16 @@ function App() {
         onLogin={handleLogin} 
         loading={authLoading}
         error={loginError}
+      />
+    );
+  }
+
+  // Mostrar pantalla de carga después del login hasta que los datos estén cargados
+  if (!datosCargados) {
+    return (
+      <PantallaCarga 
+        onCargaCompleta={handleCargaCompleta}
+        onUsarOffline={handleUsarOffline}
       />
     );
   }
