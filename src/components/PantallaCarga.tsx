@@ -77,11 +77,14 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
 
       setEstado(prev => ({ ...prev, clientes: 'completado', cotizaciones: 'cargando' }));
 
+      // Delay mínimo para mostrar progreso (1 segundo)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // 2. Cargar Cotizaciones
       console.log('[PantallaCarga] Cargando cotizaciones...');
       const { data: cotizacionesData, error: cotizacionesError } = await supabase
         .from('cotizaciones')
-        .select('id, numero, fecha, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
+        .select('id, numero, created_at, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
         .order('created_at', { ascending: false });
 
       if (cotizacionesError) throw cotizacionesError;
@@ -90,7 +93,7 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
         const cotizacionesFormateadas = cotizacionesData.map(c => ({
           id: c.id,
           numero: c.numero,
-          fecha: c.fecha,
+          fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
           clienteNombre: c.cliente_nombre,
           proyectoNombre: c.proyecto_nombre,
           total: c.total,
@@ -103,6 +106,9 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
       }
 
       setEstado(prev => ({ ...prev, cotizaciones: 'completado', proyectos: 'cargando' }));
+
+      // Delay entre pasos para mostrar progreso
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       // 3. Cargar Proyectos
       console.log('[PantallaCarga] Cargando proyectos...');
@@ -144,10 +150,9 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
 
       setEstado(prev => ({ ...prev, proyectos: 'completado' }));
       
-      // Pequeña pausa para mostrar el checkmark
-      setTimeout(() => {
-        onCargaCompleta();
-      }, 500);
+      // Pausa para mostrar el checkmark final (1.5 segundos)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      onCargaCompleta();
 
     } catch (error: any) {
       console.error('[PantallaCarga] Error cargando datos:', error);
