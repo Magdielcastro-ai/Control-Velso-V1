@@ -80,16 +80,17 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
       // Delay mínimo para mostrar progreso (1 segundo)
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 2. Cargar Cotizaciones
+      // 2. Cargar Cotizaciones (datos completos para el dashboard)
       console.log('[PantallaCarga] Cargando cotizaciones...');
       const { data: cotizacionesData, error: cotizacionesError } = await supabase
         .from('cotizaciones')
-        .select('id, numero, created_at, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (cotizacionesError) throw cotizacionesError;
 
       if (cotizacionesData) {
+        // Guardar lista simplificada para la tabla
         const cotizacionesFormateadas = cotizacionesData.map(c => ({
           id: c.id,
           numero: c.numero,
@@ -100,8 +101,28 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
           estado: c.estado,
           usuarioId: c.usuario_id,
         }));
-
         localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
+
+        // Guardar datos completos para el dashboard (con procesos)
+        const cotizacionesCompletas: Record<string, any> = {};
+        cotizacionesData.forEach(c => {
+          cotizacionesCompletas[c.id] = {
+            id: c.id,
+            numero: c.numero,
+            fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            usuario_id: c.usuario_id,
+            datosCliente: c.datos_cliente || {},
+            proyecto: { nombre: c.proyecto_nombre },
+            materiales: c.materiales || [],
+            procesos: c.procesos || [],
+            costosAdicionales: c.costos_adicionales || {},
+            subtotal: c.subtotal,
+            iva: c.iva,
+            total: c.total,
+            margenUtilidad: c.margen_utilidad,
+          };
+        });
+        localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
         console.log('[PantallaCarga] Cotizaciones cargadas:', cotizacionesFormateadas.length);
       }
 
