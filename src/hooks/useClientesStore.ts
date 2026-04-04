@@ -10,37 +10,23 @@ export const useClientesStore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar clientes: primero localStorage (rápido), luego Supabase (sincronización)
+  // Cargar clientes: primero Supabase, localStorage como fallback (modo offline)
   useEffect(() => {
-    // PASO 1: Cargar de localStorage INMEDIATAMENTE (sin esperar)
-    const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
-    if (guardado) {
+    const cargarClientes = async () => {
+      setLoading(true);
+      
       try {
-        const clientesLocal = JSON.parse(guardado);
-        console.log('[useClientesStore] Cargados desde localStorage:', clientesLocal.length);
-        setClientes(clientesLocal);
-      } catch (e) {
-        console.error('[useClientesStore] Error parseando localStorage:', e);
-      }
-    }
-    // Marcar como cargado para que la UI muestre datos inmediatamente
-    setCargado(true);
-    
-    // PASO 2: Sincronizar con Supabase en segundo plano (sin bloquear)
-    const sincronizarConSupabase = async () => {
-      try {
-        console.log('[useClientesStore] Sincronizando con Supabase...');
+        console.log('[useClientesStore] Cargando desde Supabase...');
+        
+        // Cargar clientes de Supabase
         const { data, error: supabaseError } = await supabase
           .from('clientes')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (supabaseError) {
-          console.warn('[useClientesStore] Error cargando de Supabase:', supabaseError);
-          return;
-        }
+        if (supabaseError) throw supabaseError;
         
-        if (data && data.length > 0) {
+        if (data) {
           console.log('[useClientesStore] Clientes de Supabase:', data.length);
           
           // Cargar contactos
@@ -78,21 +64,30 @@ export const useClientesStore = () => {
             };
           });
           
-          // Solo actualizar si hay cambios
-          const clientesActuales = JSON.parse(localStorage.getItem(STORAGE_KEY_CLIENTES) || '[]');
-          if (JSON.stringify(clientesActuales) !== JSON.stringify(clientesFormateados)) {
-            setClientes(clientesFormateados);
-            localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
-            console.log('[useClientesStore] Clientes actualizados desde Supabase');
-          }
+          setClientes(clientesFormateados);
+          localStorage.setItem(STORAGE_KEY_CLIENTES, JSON.stringify(clientesFormateados));
+          console.log('[useClientesStore] Clientes cargados desde Supabase');
         }
       } catch (err: any) {
-        console.error('[useClientesStore] Error sincronizando:', err);
+        console.warn('[useClientesStore] Error de conexión, usando localStorage:', err.message);
+        // MODO OFFLINE: Cargar de localStorage
+        const guardado = localStorage.getItem(STORAGE_KEY_CLIENTES);
+        if (guardado) {
+          try {
+            const clientesLocal = JSON.parse(guardado);
+            console.log('[useClientesStore] Cargados desde localStorage (offline):', clientesLocal.length);
+            setClientes(clientesLocal);
+          } catch (e) {
+            console.error('[useClientesStore] Error parseando localStorage:', e);
+          }
+        }
+      } finally {
+        setLoading(false);
+        setCargado(true);
       }
     };
 
-    // Ejecutar sincronización sin await (no bloquea)
-    sincronizarConSupabase();
+    cargarClientes();
   }, []);
 
   // Guardar clientes en localStorage cuando cambien
