@@ -216,6 +216,7 @@ function App() {
     guardarCotizacion,
     cargarCotizacion,
     nuevaCotizacion,
+    refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
 
   const { catalogo, agregarAlCatalogo, eliminarDelCatalogo } = useCatalogoMateriales();
@@ -225,7 +226,8 @@ function App() {
     agregarCliente, 
     eliminarCliente, 
     agregarUsuario, 
-    eliminarUsuario 
+    eliminarUsuario,
+    refrescarDesdeSupabase: refrescarClientes,
   } = useClientesStore();
   
   const { 
@@ -235,7 +237,8 @@ function App() {
     marcarFabricado,
     marcarEntregado,
     marcarFacturado,
-    guardarDatosReales
+    guardarDatosReales,
+    refrescarDesdeSupabase: refrescarProyectos,
   } = useProyectosStore();
 
   const {
@@ -259,12 +262,20 @@ function App() {
   };
 
   // Handlers para pantalla de carga
-  const handleCargaCompleta = () => {
+  const handleCargaCompleta = async () => {
+    console.log('[App] Carga completada, refrescando datos...');
+    // Refrescar datos desde Supabase después de la pantalla de carga
+    await Promise.all([
+      refrescarClientes(),
+      refrescarCotizaciones(),
+      refrescarProyectos(),
+    ]);
     setDatosCargados(true);
     toast.success('Datos sincronizados correctamente');
   };
 
   const handleUsarOffline = () => {
+    console.log('[App] Usando modo offline');
     setDatosCargados(true);
     toast.info('Usando datos del dispositivo (modo offline)');
   };
