@@ -7,8 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, 
-  TrendingUp, 
-  TrendingDown,
+  TrendingUp,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -19,9 +18,7 @@ import {
   Phone,
   AlertOctagon,
   BarChart3,
-  Users,
   Package,
-  ChevronRight,
   Eye
 } from 'lucide-react';
 import type { Pendiente, Alerta, Cobranza } from '@/types/pendientes';
@@ -90,14 +87,7 @@ export function DashboardEjecutivo({
     })
     .reduce((sum, p) => sum + p.totalCotizado, 0);
 
-  const totalFacturadoMes = proyectos
-    .filter(p => {
-      if (!p.fechaFacturado) return false;
-      const fecha = new Date(p.fechaFacturado);
-      const ahora = new Date();
-      return fecha.getMonth() === ahora.getMonth() && fecha.getFullYear() === ahora.getFullYear();
-    })
-    .reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+  // totalFacturadoMes calculado en totalesCobranza
 
   // Pipeline de ventas (cotizaciones → proyectos)
   const pipelineData = [

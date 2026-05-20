@@ -10,15 +10,12 @@ import {
   DollarSign, 
   AlertTriangle,
   CheckCircle,
-  Clock,
   MessageSquare,
   Phone,
   X,
   Plus,
   TrendingUp,
-  TrendingDown,
-  AlertOctagon,
-  CreditCard
+  AlertOctagon
 } from 'lucide-react';
 import type { Cobranza, PagoRecibido } from '@/types/pendientes';
 

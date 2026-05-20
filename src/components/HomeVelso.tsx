@@ -1,6 +1,5 @@
 // src/components/HomeVelso.tsx
 
-import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -12,12 +11,8 @@ import {
   DollarSign, 
   BarChart3,
   Plus,
-  Wrench,
-  Shield,
   Activity,
   CheckSquare,
-  AlertTriangle,
-  TrendingUp,
   LayoutDashboard,
   ClipboardList
 } from 'lucide-react';
@@ -57,17 +52,8 @@ export function HomeVelso({
   pendientesCount,
   cobranzaVencidaCount,
 }: HomeVelsoProps) {
-  const [mostrarDiagnostico, setMostrarDiagnostico] = useState(false);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'd' && e.ctrlKey) {
-      e.preventDefault();
-      setMostrarDiagnostico(true);
-    }
-  };
-
   return (
-    <div className="space-y-6" onKeyDown={handleKeyDown} tabIndex={0}>
+    <div className="space-y-6">
       {/* Header */}
       <div className="text-center mb-8">
         <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">

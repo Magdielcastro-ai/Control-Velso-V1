@@ -1,7 +1,7 @@
 // src/hooks/usePendientesStore.ts
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Pendiente, TipoPendiente, PrioridadPendiente, Alerta } from '@/types/pendientes';
+import type { Pendiente, Alerta } from '@/types/pendientes';
 import type { ProyectoVenta } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
