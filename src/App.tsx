@@ -19,7 +19,11 @@ import {
   LogOut,
   Shield,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  LayoutDashboard,
+  CheckSquare,
+  AlertTriangle,
+  TrendingUp
 } from 'lucide-react';
 
 // Hooks
@@ -29,6 +33,8 @@ import { useClientesStore } from '@/hooks/useClientesStore';
 import { useProyectosStore } from '@/hooks/useProyectosStore';
 import { useTalleresStore } from '@/hooks/useTalleresStore';
 import { useAuth, type AuthUser } from '@/hooks/useAuth';
+import { usePendientesStore } from '@/hooks/usePendientesStore';
+import { useCobranzaStore } from '@/hooks/useCobranzaStore';
 
 // Componentes de pasos
 import { TallerStep } from '@/components/steps/TallerStep';
@@ -56,6 +62,11 @@ import { AdminUsuariosView } from '@/components/AdminUsuariosView';
 import { DiagnosticoSupabase } from '@/components/DiagnosticoSupabase';
 import { PantallaCarga } from '@/components/PantallaCarga';
 
+// NUEVOS COMPONENTES VELSO OS v2
+import { PendientesView } from '@/components/PendientesView';
+import { CobranzaView } from '@/components/CobranzaView';
+import { DashboardEjecutivo } from '@/components/DashboardEjecutivo';
+
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 import type { ProyectoVenta } from '@/types/ventas';
@@ -73,7 +84,8 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 
 type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' | 
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' | 
-                      'control-codigos' | 'admin-usuarios' | 'diagnostico';
+                      'control-codigos' | 'admin-usuarios' | 'diagnostico' |
+                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo';
 
 // Horas disponibles por defecto
 const HORAS_DEFAULT: Record<string, number> = {
@@ -89,7 +101,12 @@ const HORAS_DEFAULT: Record<string, number> = {
 };
 
 // Header con info de usuario
-function UserHeader({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
+function UserHeader({ user, onLogout, alertasCount, pendientesCount }: { 
+  user: AuthUser; 
+  onLogout: () => void;
+  alertasCount: number;
+  pendientesCount: number;
+}) {
   const getRolColor = (rol: string) => {
     switch (rol) {
       case 'superadmin': return 'bg-red-600';
@@ -121,6 +138,23 @@ function UserHeader({ user, onLogout }: { user: AuthUser; onLogout: () => void }
         <p className="font-medium text-slate-900">{user.nombre}</p>
         <p className="text-xs text-slate-500">{getRolLabel(user.rol)}</p>
       </div>
+
+      {/* Alertas y pendientes */}
+      <div className="flex items-center gap-2">
+        {alertasCount > 0 && (
+          <div className="flex items-center gap-1 px-2 py-1 bg-red-100 rounded-full">
+            <AlertTriangle className="w-3 h-3 text-red-600" />
+            <span className="text-xs font-medium text-red-600">{alertasCount}</span>
+          </div>
+        )}
+        {pendientesCount > 0 && (
+          <div className="flex items-center gap-1 px-2 py-1 bg-orange-100 rounded-full">
+            <CheckSquare className="w-3 h-3 text-orange-600" />
+            <span className="text-xs font-medium text-orange-600">{pendientesCount}</span>
+          </div>
+        )}
+      </div>
+
       <Button variant="outline" size="sm" onClick={onLogout} className="border-slate-300">
         <LogOut className="w-4 h-4 mr-2" />
         Cerrar Sesión
@@ -136,7 +170,7 @@ function App() {
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [datosCargados, setDatosCargados] = useState(false);
-  
+
   // Auth con todos los permisos
   const { 
     user, 
@@ -165,6 +199,31 @@ function App() {
     canDeleteProyectos,
   } = useAuth();
 
+  // NUEVOS STORES VELSO OS v2
+  const {
+    pendientes,
+    alertas,
+    generarPendientesDesdeProyectos,
+    completarPendiente,
+    agregarPendiente,
+    actualizarNotas: actualizarNotasPendiente,
+    marcarAlertaLeida,
+    eliminarAlerta,
+    getPendientesHoy,
+    getAlertasRojas,
+  } = usePendientesStore();
+
+  const {
+    cobranzas,
+    generarDesdeProyectos: generarCobranzas,
+    registrarPago,
+    actualizarNotas: actualizarNotasCobranza,
+    actualizarContacto,
+    marcarIncobrable,
+    getVencidos,
+    getTotales,
+  } = useCobranzaStore();
+
   // Verificar sesión periódicamente para evitar cierres inesperados
   useEffect(() => {
     if (!initialized || authLoading) return;
@@ -181,7 +240,7 @@ function App() {
 
     return () => clearInterval(intervalId);
   }, [initialized, authLoading, user, refreshSession]);
-  
+
   // Cargar horas disponibles del localStorage
   useEffect(() => {
     const guardado = localStorage.getItem('velso_horas_disponibles');
@@ -198,8 +257,8 @@ function App() {
   useEffect(() => {
     localStorage.setItem('velso_horas_disponibles', JSON.stringify(horasDisponibles));
   }, [horasDisponibles]);
-  
-  // Stores
+
+  // Stores existentes
   const {
     cotizacion,
     cotizacionesGuardadas,
@@ -220,7 +279,7 @@ function App() {
   } = useCotizacionStore();
 
   const { catalogo, agregarAlCatalogo, eliminarDelCatalogo } = useCatalogoMateriales();
-  
+
   const { 
     clientes, 
     agregarCliente, 
@@ -229,7 +288,7 @@ function App() {
     eliminarUsuario,
     refrescarDesdeSupabase: refrescarClientes,
   } = useClientesStore();
-  
+
   const { 
     proyectos, 
     convertirAVenta, 
@@ -246,13 +305,20 @@ function App() {
     guardarTallerDesdeCotizacion,
   } = useTalleresStore();
 
+  // NUEVO: Generar pendientes y cobranzas automáticamente cuando cargan los datos
+  useEffect(() => {
+    if (datosCargados && proyectos.length > 0) {
+      generarPendientesDesdeProyectos(proyectos, cotizacionesGuardadas);
+      generarCobranzas(proyectos);
+    }
+  }, [datosCargados, proyectos, cotizacionesGuardadas, generarPendientesDesdeProyectos, generarCobranzas]);
+
   // Login handler
   const handleLogin = async (email: string, password: string) => {
     setLoginError(null);
     setDatosCargados(false);
     try {
       await signIn(email, password);
-      // No redirigimos inmediatamente, esperamos a que carguen los datos
       toast.success('Bienvenido al sistema');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -264,7 +330,6 @@ function App() {
   // Handlers para pantalla de carga
   const handleCargaCompleta = async () => {
     console.log('[App] Carga completada, refrescando datos...');
-    // Refrescar datos desde Supabase después de la pantalla de carga
     await Promise.all([
       refrescarClientes(),
       refrescarCotizaciones(),
@@ -289,7 +354,7 @@ function App() {
 
   // Navegación con permisos
   const irAHome = () => setVistaActual('home');
-  
+
   const irADashboard = () => {
     if (canViewProduccionDashboard()) {
       setVistaActual('produccion-dashboard');
@@ -299,7 +364,7 @@ function App() {
       toast.error('No tienes permiso para ver el dashboard');
     }
   };
-  
+
   const irAClientes = () => {
     if (canManageClientes()) {
       setVistaActual('clientes');
@@ -307,7 +372,7 @@ function App() {
       toast.error('No tienes permiso para ver clientes');
     }
   };
-  
+
   const irAProyectos = () => {
     if (isAdmin() || isVendedor() || isProduccion()) {
       setVistaActual('proyectos');
@@ -315,7 +380,7 @@ function App() {
       toast.error('No tienes permiso para ver proyectos');
     }
   };
-  
+
   const irAMateriales = () => {
     if (canViewMateriales()) {
       setVistaActual('materiales');
@@ -323,7 +388,7 @@ function App() {
       toast.error('No tienes permiso para ver materiales');
     }
   };
-  
+
   const irAProcesos = () => {
     if (canViewProcesos()) {
       setVistaActual('procesos');
@@ -331,7 +396,7 @@ function App() {
       toast.error('No tienes permiso para ver procesos');
     }
   };
-  
+
   const irACotizaciones = () => {
     if (isAdmin() || isVendedor()) {
       setVistaActual('cotizaciones');
@@ -339,7 +404,7 @@ function App() {
       toast.error('No tienes permiso para ver cotizaciones');
     }
   };
-  
+
   const irAAdminUsuarios = () => {
     if (canManageUsers()) {
       setVistaActual('admin-usuarios');
@@ -351,7 +416,12 @@ function App() {
   const irADiagnostico = () => {
     setVistaActual('diagnostico');
   };
-  
+
+  // NUEVAS NAVEGACIONES VELSO OS v2
+  const irAPendientes = () => setVistaActual('pendientes');
+  const irACobranza = () => setVistaActual('cobranza');
+  const irADashboardEjecutivo = () => setVistaActual('dashboard-ejecutivo');
+
   const irANuevaCotizacion = () => {
     if (!canCreateCotizacion()) {
       toast.error('No tienes permiso para crear cotizaciones');
@@ -374,7 +444,7 @@ function App() {
       toast.error('No tienes permiso para convertir cotizaciones');
       return;
     }
-    
+
     await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
       ordenCompra,
@@ -462,12 +532,10 @@ function App() {
   };
 
   const handleGenerarCotizacion = async () => {
-    // Guardar el taller si no existe (solo admin/superadmin)
     if (canManageTalleres() && cotizacion.datosTaller.nombre) {
       guardarTallerDesdeCotizacion(cotizacion.datosTaller);
     }
-    
-    // Guardar el cliente si no existe (todos excepto producción)
+
     if (canManageClientes() && (cotizacion.datosCliente.nombre || cotizacion.datosCliente.empresa)) {
       const clienteData = {
         nombreEmpresa: cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre,
@@ -476,17 +544,16 @@ function App() {
         rfc: cotizacion.datosCliente.rfc || '',
         terminosPago: '50% anticipo, 50% contra entrega',
       };
-      
+
       const existe = clientes.some(c => 
         c.nombreEmpresa.toLowerCase() === clienteData.nombreEmpresa.toLowerCase()
       );
-      
+
       if (!existe && clienteData.nombreEmpresa) {
         agregarCliente(clienteData);
       }
     }
-    
-    // Guardar la cotización
+
     await guardarCotizacion('enviada');
     setVistaActual('cotizacion-final');
     toast.success('¡Cotización generada exitosamente!');
@@ -525,6 +592,10 @@ function App() {
 
   const indicePasoActual = pasos.findIndex(p => p.id === pasoActual);
   const progreso = ((indicePasoActual + 1) / pasos.length) * 100;
+
+  // Métricas para el header
+  const alertasCount = getAlertasRojas().length;
+  const pendientesCount = getPendientesHoy().length;
 
   // Mostrar loading mientras inicializa auth
   if (!initialized || authLoading) {
@@ -565,7 +636,12 @@ function App() {
       case 'home':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout} 
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <HomeVelso
               onDashboard={irADashboard}
               onClientes={irAClientes}
@@ -575,6 +651,13 @@ function App() {
               onCotizaciones={irACotizaciones}
               onNuevaCotizacion={irANuevaCotizacion}
               onDiagnostico={irADiagnostico}
+              // NUEVOS PROPS VELSO OS v2
+              onPendientes={irAPendientes}
+              onCobranza={irACobranza}
+              onDashboardEjecutivo={irADashboardEjecutivo}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+              cobranzaVencidaCount={getVencidos().length}
             />
             {canManageUsers() && (
               <div className="mt-6">
@@ -590,11 +673,84 @@ function App() {
           </>
         );
 
+      // NUEVA VISTA: Dashboard Ejecutivo
+      case 'dashboard-ejecutivo':
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <DashboardEjecutivo
+              onVolver={irAHome}
+              pendientesHoy={getPendientesHoy()}
+              alertasRojas={getAlertasRojas()}
+              proyectos={proyectos}
+              cotizaciones={cotizacionesGuardadas}
+              cobranzas={cobranzas}
+              totalesCobranza={getTotales()}
+              horasDisponibles={horasDisponibles}
+              onIrAPendientes={irAPendientes}
+              onIrACobranza={irACobranza}
+              onIrAProyectos={irAProyectos}
+              onIrACotizaciones={irACotizaciones}
+            />
+          </>
+        );
+
+      // NUEVA VISTA: Pendientes
+      case 'pendientes':
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <PendientesView
+              onVolver={irAHome}
+              pendientes={pendientes}
+              onCompletar={completarPendiente}
+              onAgregar={agregarPendiente}
+              onActualizarNotas={actualizarNotasPendiente}
+            />
+          </>
+        );
+
+      // NUEVA VISTA: Cobranza
+      case 'cobranza':
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <CobranzaView
+              onVolver={irAHome}
+              cobranzas={cobranzas}
+              onRegistrarPago={registrarPago}
+              onActualizarNotas={actualizarNotasCobranza}
+              onActualizarContacto={actualizarContacto}
+              onMarcarIncobrable={marcarIncobrable}
+            />
+          </>
+        );
+
       case 'dashboard':
         const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <DashboardView
               onVolver={irAHome}
               cotizaciones={cotizacionesGuardadas}
@@ -610,7 +766,12 @@ function App() {
       case 'produccion-dashboard':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <ProduccionDashboardView
               onVolver={irAHome}
               proyectos={proyectos}
@@ -621,7 +782,12 @@ function App() {
       case 'clientes':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <ClientesView
               onVolver={irAHome}
               clientes={clientes}
@@ -636,7 +802,12 @@ function App() {
       case 'proyectos':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <ProyectosView
               onVolver={irAHome}
               proyectos={proyectos}
@@ -656,7 +827,12 @@ function App() {
       case 'control-codigos':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             {proyectoSeleccionado ? (
               <ControlDeCodigosView
                 proyecto={proyectoSeleccionado}
@@ -670,7 +846,12 @@ function App() {
       case 'materiales':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <MaterialesCatalogoView
               onVolver={irAHome}
               catalogo={catalogo}
@@ -693,7 +874,12 @@ function App() {
       case 'procesos':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <CatalogoProcesosView
               onVolver={irAHome}
               horasDisponibles={horasDisponibles}
@@ -705,7 +891,12 @@ function App() {
       case 'cotizaciones':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <CotizacionesView
               onVolver={irAHome}
               userRol={user.rol}
@@ -716,7 +907,6 @@ function App() {
         );
 
       case 'admin-usuarios':
-        // Asegurar que el usuario esté cargado antes de renderizar
         if (!user) {
           return (
             <div className="min-h-screen flex items-center justify-center">
@@ -729,7 +919,12 @@ function App() {
         }
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <AdminUsuariosView onVolver={irAHome} userRol={user.rol} />
           </>
         );
@@ -737,7 +932,12 @@ function App() {
       case 'diagnostico':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             <div className="mb-4">
               <Button variant="outline" onClick={irAHome} className="border-slate-300">
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -751,7 +951,12 @@ function App() {
       case 'cotizacion':
         return (
           <>
-            <UserHeader user={user} onLogout={handleLogout} />
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
             {/* Header con progreso */}
             <Card className="mb-6 border-slate-200">
               <CardContent className="p-4">
@@ -775,7 +980,7 @@ function App() {
                     </Button>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs text-slate-500">
                     <span>Progreso</span>
@@ -887,7 +1092,7 @@ function App() {
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Anterior
               </Button>
-              
+
               {pasoActual === 'resumen' ? (
                 <Button onClick={handleGenerarCotizacion} className="bg-green-600 hover:bg-green-700">
                   <FileCheck className="w-4 h-4 mr-2" />
