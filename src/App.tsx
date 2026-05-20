@@ -20,10 +20,8 @@ import {
   Shield,
   Loader2,
   ArrowLeft,
-  LayoutDashboard,
   CheckSquare,
-  AlertTriangle,
-  TrendingUp
+  AlertTriangle
 } from 'lucide-react';
 
 // Hooks
@@ -202,13 +200,10 @@ function App() {
   // NUEVOS STORES VELSO OS v2
   const {
     pendientes,
-    alertas,
     generarPendientesDesdeProyectos,
     completarPendiente,
     agregarPendiente,
     actualizarNotas: actualizarNotasPendiente,
-    marcarAlertaLeida,
-    eliminarAlerta,
     getPendientesHoy,
     getAlertasRojas,
   } = usePendientesStore();
@@ -689,9 +684,7 @@ function App() {
               alertasRojas={getAlertasRojas()}
               proyectos={proyectos}
               cotizaciones={cotizacionesGuardadas}
-              cobranzas={cobranzas}
               totalesCobranza={getTotales()}
-              horasDisponibles={horasDisponibles}
               onIrAPendientes={irAPendientes}
               onIrACobranza={irACobranza}
               onIrAProyectos={irAProyectos}

@@ -31,7 +31,6 @@ interface DashboardEjecutivoProps {
   alertasRojas: Alerta[];
   proyectos: ProyectoVenta[];
   cotizaciones: CotizacionGuardada[];
-  cobranzas: Cobranza[];
   totalesCobranza: {
     totalPorCobrar: number;
     totalVencido: number;
@@ -43,7 +42,6 @@ interface DashboardEjecutivoProps {
     cantidadPagados: number;
     cantidadParciales: number;
   };
-  horasDisponibles: Record<string, number>;
   onIrAPendientes: () => void;
   onIrACobranza: () => void;
   onIrAProyectos: () => void;
@@ -56,9 +54,7 @@ export function DashboardEjecutivo({
   alertasRojas,
   proyectos,
   cotizaciones,
-  cobranzas,
   totalesCobranza,
-  horasDisponibles,
   onIrAPendientes,
   onIrACobranza,
   onIrAProyectos,
