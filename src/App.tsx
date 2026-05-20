@@ -735,7 +735,7 @@ function App() {
         );
 
       case 'dashboard':
-        const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
+
         return (
           <>
             <UserHeader 
@@ -747,7 +747,6 @@ function App() {
             <DashboardView
               onVolver={irAHome}
               cotizaciones={cotizacionesGuardadas}
-              cotizacionesCompletas={Object.values(cotizacionesCompletas)}
               horasDisponibles={horasDisponibles}
               proyectos={proyectos}
               userRol={user.rol}

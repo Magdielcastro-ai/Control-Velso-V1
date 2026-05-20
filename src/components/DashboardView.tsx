@@ -21,7 +21,6 @@ import { GraficaCircular, GraficaComparacion, GraficaBarrasComparacion } from '@
 interface DashboardViewProps {
   onVolver: () => void;
   cotizaciones: CotizacionGuardada[];
-  cotizacionesCompletas: any[];
   horasDisponibles: Record<string, number>;
   proyectos: ProyectoVenta[];
   userRol?: string;
@@ -35,8 +34,7 @@ const MESES = [
 
 export function DashboardView({ 
   onVolver, 
-  cotizaciones, 
-  cotizacionesCompletas,
+  cotizaciones,
   horasDisponibles,
   proyectos,
   userRol = 'vendedor',
@@ -58,9 +56,7 @@ export function DashboardView({
     ? proyectos 
     : proyectos.filter(p => p.usuarioId === userId);
 
-  const cotizacionesCompletasFiltradas = isAdmin 
-    ? cotizacionesCompletas 
-    : cotizacionesCompletas.filter((c: any) => c.usuario_id === userId);
+
 
   // Filtrar datos por mes seleccionado
   const datosMes = useMemo(() => {
@@ -102,11 +98,11 @@ export function DashboardView({
       horasFacturadas[p.id] = 0;
     });
 
-    // Horas cotizadas (de cotizaciones filtradas por usuario)
-    cotizacionesCompletasFiltradas.forEach((cot: any) => {
+    // Horas cotizadas (de cotizaciones filtradas por usuario y mes)
+    cotizacionesFiltradas.forEach((cot) => {
       const fecha = new Date(cot.fecha);
       if (fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado) {
-        cot.procesos?.forEach((p: any) => {
+        cot.procesos?.forEach((p) => {
           const tiempoHoras = (p.tiempoMinutos || 0) / 60;
           if (horasCotizadas[p.tipo] !== undefined) {
             horasCotizadas[p.tipo] += tiempoHoras;
@@ -171,7 +167,7 @@ export function DashboardView({
       horasFacturadas,
       clientesData,
     };
-  }, [cotizacionesFiltradas, proyectosFiltrados, cotizacionesCompletasFiltradas, mesSeleccionado, anioSeleccionado]);
+  }, [cotizacionesFiltradas, proyectosFiltrados, mesSeleccionado, anioSeleccionado]);
 
   // Datos para gráficas
   const datosGraficaMontos = [
