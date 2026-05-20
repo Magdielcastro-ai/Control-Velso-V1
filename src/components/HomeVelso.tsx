@@ -1,16 +1,25 @@
-import { Button } from '@/components/ui/button';
+// src/components/HomeVelso.tsx
+
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
-  LayoutDashboard, 
+  Factory, 
   Users, 
-  FolderKanban, 
-  Package,
-  Settings,
-  FileText,
-  ClipboardList,
+  FileText, 
+  Package, 
+  Settings, 
+  DollarSign, 
+  BarChart3,
+  Plus,
+  Wrench,
+  Shield,
+  Activity,
+  CheckSquare,
+  AlertTriangle,
   TrendingUp,
-  Factory,
-  Activity
+  LayoutDashboard,
+  ClipboardList
 } from 'lucide-react';
 
 interface HomeVelsoProps {
@@ -21,152 +30,257 @@ interface HomeVelsoProps {
   onProcesos: () => void;
   onCotizaciones: () => void;
   onNuevaCotizacion: () => void;
-  onDiagnostico?: () => void;
+  onDiagnostico: () => void;
+  // NUEVOS PROPS VELSO OS v2
+  onPendientes: () => void;
+  onCobranza: () => void;
+  onDashboardEjecutivo: () => void;
+  alertasCount: number;
+  pendientesCount: number;
+  cobranzaVencidaCount: number;
 }
 
-export function HomeVelso({ 
-  onDashboard, 
-  onClientes, 
-  onProyectos, 
+export function HomeVelso({
+  onDashboard,
+  onClientes,
+  onProyectos,
   onMateriales,
   onProcesos,
   onCotizaciones,
   onNuevaCotizacion,
-  onDiagnostico
+  onDiagnostico,
+  // NUEVOS
+  onPendientes,
+  onCobranza,
+  onDashboardEjecutivo,
+  alertasCount,
+  pendientesCount,
+  cobranzaVencidaCount,
 }: HomeVelsoProps) {
-  const funcionalidades = [
-    { 
-      id: 'dashboard',
-      titulo: 'Dashboard', 
-      desc: 'Métricas de ventas, horas cotizadas y cumplimiento de objetivos',
-      icon: LayoutDashboard,
-      color: 'bg-blue-600',
-      onClick: onDashboard
-    },
-    { 
-      id: 'clientes',
-      titulo: 'Clientes', 
-      desc: 'Catálogo de clientes y usuarios de contacto',
-      icon: Users,
-      color: 'bg-green-600',
-      onClick: onClientes
-    },
-    { 
-      id: 'proyectos',
-      titulo: 'Proyectos', 
-      desc: 'Cotizaciones convertidas en ventas con órdenes de compra',
-      icon: FolderKanban,
-      color: 'bg-purple-600',
-      onClick: onProyectos
-    },
-    { 
-      id: 'materiales',
-      titulo: 'Materiales', 
-      desc: 'Catálogo de materiales con precios y dimensiones',
-      icon: Package,
-      color: 'bg-orange-600',
-      onClick: onMateriales
-    },
-    { 
-      id: 'procesos',
-      titulo: 'Catálogo de Procesos', 
-      desc: 'Procesos CNC con precios y horas disponibles por mes',
-      icon: Settings,
-      color: 'bg-cyan-600',
-      onClick: onProcesos
-    },
-    { 
-      id: 'cotizaciones',
-      titulo: 'Cotizaciones', 
-      desc: 'Ver, editar y convertir cotizaciones en ventas',
-      icon: ClipboardList,
-      color: 'bg-rose-600',
-      onClick: onCotizaciones
-    },
-  ];
+  const [mostrarDiagnostico, setMostrarDiagnostico] = useState(false);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'd' && e.ctrlKey) {
+      e.preventDefault();
+      setMostrarDiagnostico(true);
+    }
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6" onKeyDown={handleKeyDown} tabIndex={0}>
       {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-lg">
+      <div className="text-center mb-8">
+        <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <Factory className="w-10 h-10 text-white" />
         </div>
-        <h1 className="text-4xl font-bold text-slate-900">
-          Sistema de Control de Ventas <span className="text-blue-600">Velso</span>
-        </h1>
-        <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-          Gestión integral de cotizaciones, clientes, proyectos y materiales para tu taller CNC
-        </p>
-        <Button 
-          size="lg" 
-          onClick={onNuevaCotizacion}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 mt-4"
-        >
-          <FileText className="w-5 h-5 mr-2" />
-          Nueva Cotización
-        </Button>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">VELSO OS</h1>
+        <p className="text-slate-500">Sistema Integral de Control</p>
+        <p className="text-xs text-slate-400 mt-1">v2.0 - Dashboard Ejecutivo</p>
       </div>
 
-      {/* Botones de funcionalidades */}
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900 mb-4 text-center">
-          ¿Qué quieres hacer?
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {funcionalidades.map((item) => (
-            <button
-              key={item.id}
-              onClick={item.onClick}
-              className="group text-left"
-            >
-              <Card className="border-slate-200 hover:border-blue-400 hover:shadow-lg transition-all duration-200 h-full">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className={`${item.color} p-3 rounded-xl shadow-md group-hover:scale-110 transition-transform`}>
-                      <item.icon className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        {item.titulo}
-                      </h3>
-                      <p className="text-slate-500 mt-1">{item.desc}</p>
-                    </div>
-                    <TrendingUp className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
-                  </div>
-                </CardContent>
-              </Card>
-            </button>
-          ))}
+      {/* Botón principal: Nueva Cotización */}
+      <button
+        onClick={onNuevaCotizacion}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 flex items-center gap-4 transition-all hover:shadow-lg group"
+      >
+        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+          <Plus className="w-6 h-6" />
         </div>
-
-        {/* Botón de diagnóstico (solo para debug) */}
-        {onDiagnostico && (
-          <div className="mt-8 pt-8 border-t border-slate-200">
-            <button
-              onClick={onDiagnostico}
-              className="w-full text-left"
-            >
-              <Card className="border-slate-300 hover:border-amber-400 hover:shadow-lg transition-all duration-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-amber-600 p-2 rounded-lg">
-                      <Activity className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-slate-900">
-                        Diagnóstico de Conexión
-                      </h3>
-                      <p className="text-sm text-slate-500">
-                        Verificar estado de conexión con Supabase
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </button>
+        <div className="text-left">
+          <h3 className="font-semibold text-lg">Nueva Cotización</h3>
+          <p className="text-blue-100 text-sm">Iniciar proceso de cotización completo</p>
+        </div>
+        <div className="ml-auto">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
+            <Plus className="w-4 h-4" />
           </div>
-        )}
+        </div>
+      </button>
+
+      {/* NUEVO: Dashboard Ejecutivo - Principal */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card 
+          className="border-blue-200 hover:shadow-lg transition-all cursor-pointer bg-blue-50/50"
+          onClick={onDashboardEjecutivo}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                  <LayoutDashboard className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Dashboard Ejecutivo</h3>
+                  <p className="text-sm text-slate-500">Pipeline, alertas, utilidades, cobranza</p>
+                </div>
+              </div>
+              {alertasCount > 0 && (
+                <Badge className="bg-red-600 text-white animate-pulse">
+                  {alertasCount} alertas
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pendientes */}
+        <Card 
+          className="border-orange-200 hover:shadow-lg transition-all cursor-pointer"
+          onClick={onPendientes}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                  <CheckSquare className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Mis Pendientes</h3>
+                  <p className="text-sm text-slate-500">Tareas del día y seguimientos</p>
+                </div>
+              </div>
+              {pendientesCount > 0 && (
+                <Badge className="bg-orange-600 text-white">
+                  {pendientesCount} hoy
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cobranza */}
+        <Card 
+          className="border-green-200 hover:shadow-lg transition-all cursor-pointer"
+          onClick={onCobranza}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Cobranza</h3>
+                  <p className="text-sm text-slate-500">Facturas por cobrar y vencidas</p>
+                </div>
+              </div>
+              {cobranzaVencidaCount > 0 && (
+                <Badge className="bg-red-600 text-white animate-pulse">
+                  {cobranzaVencidaCount} vencidas
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Dashboard Ventas */}
+        <Card 
+          className="border-slate-200 hover:shadow-lg transition-all cursor-pointer"
+          onClick={onDashboard}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900">Dashboard Ventas</h3>
+                <p className="text-sm text-slate-500">Horas cotizadas vs meta mensual</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Grid de módulos secundarios */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onClientes}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <Users className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Clientes</h3>
+              <p className="text-xs text-slate-500">Catálogo y contactos</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onProyectos}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <ClipboardList className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Proyectos</h3>
+              <p className="text-xs text-slate-500">Ventas y producción</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onCotizaciones}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <FileText className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Cotizaciones</h3>
+              <p className="text-xs text-slate-500">Historial y estados</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onMateriales}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <Package className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Materiales</h3>
+              <p className="text-xs text-slate-500">Catálogo de insumos</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onProcesos}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <Settings className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Procesos</h3>
+              <p className="text-xs text-slate-500">Catálogo y costos</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onDiagnostico}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <Activity className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Diagnóstico</h3>
+              <p className="text-xs text-slate-500">Estado de Supabase</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Footer */}
+      <div className="text-center pt-4 border-t border-slate-200">
+        <p className="text-xs text-slate-400">
+          VELSO Soluciones de Maquinado CNC • {new Date().getFullYear()}
+        </p>
+        <p className="text-xs text-slate-400 mt-1">
+          Sistema VELSO OS v2.0
+        </p>
       </div>
     </div>
   );
