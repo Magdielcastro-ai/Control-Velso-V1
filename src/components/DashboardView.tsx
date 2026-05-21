@@ -102,12 +102,17 @@ export function DashboardView({
     cotizacionesFiltradas.forEach((cot) => {
       const fecha = new Date(cot.fecha);
       if (fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado) {
-        cot.procesos?.forEach((p) => {
-          const tiempoHoras = (p.tiempoMinutos || 0) / 60;
-          if (horasCotizadas[p.tipo] !== undefined) {
-            horasCotizadas[p.tipo] += tiempoHoras;
-          }
-        });
+        // Verificar si la cotización tiene procesos (puede no tenerlos si se guardó sin completar)
+        const procesosCotizacion = (cot as any).procesos;
+        if (procesosCotizacion && Array.isArray(procesosCotizacion)) {
+          procesosCotizacion.forEach((p: any) => {
+            const tiempoHoras = (p?.tiempoMinutos || 0) / 60;
+            const tipo = p?.tipo;
+            if (tipo && horasCotizadas[tipo] !== undefined) {
+              horasCotizadas[tipo] += tiempoHoras;
+            }
+          });
+        }
       }
     });
 

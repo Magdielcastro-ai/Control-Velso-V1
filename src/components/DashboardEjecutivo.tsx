@@ -21,7 +21,7 @@ import {
   Package,
   Eye
 } from 'lucide-react';
-import type { Pendiente, Alerta, Cobranza } from '@/types/pendientes';
+import type { Pendiente, Alerta } from '@/types/pendientes';
 import type { ProyectoVenta } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
