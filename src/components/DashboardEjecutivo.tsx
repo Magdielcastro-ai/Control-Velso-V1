@@ -81,10 +81,9 @@ export function DashboardEjecutivo({
 }: DashboardEjecutivoProps) {
   const [vistaActiva, setVistaActiva] = useState<'resumen' | 'pipeline' | 'alertas' | 'catalogos'>('resumen');
   const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null); // null = todos los meses
-  const [anioSeleccionado, setAnioSeleccionado] = useState(2026);
+  const [anioSeleccionado] = useState(2026);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
-  const hoy = new Date();
 
   // ============================================
   // CÁLCULOS HISTÓRICOS (todos los datos)
@@ -211,8 +210,6 @@ export function DashboardEjecutivo({
   // DETECCIÓN DE ESTADO
   // ============================================
   const hayDatos = cotizaciones.length > 0 || proyectos.length > 0;
-  const estaCargando = !hayDatos && (cotizaciones.length === 0 && proyectos.length === 0);
-
   // ============================================
   // RENDER
   // ============================================
