@@ -137,7 +137,6 @@ function UserHeader({ user, onLogout, alertasCount, pendientesCount }: {
         <p className="text-xs text-slate-500">{getRolLabel(user.rol)}</p>
       </div>
 
-      {/* Alertas y pendientes */}
       <div className="flex items-center gap-2">
         {alertasCount > 0 && (
           <div className="flex items-center gap-1 px-2 py-1 bg-red-100 rounded-full">
@@ -646,7 +645,6 @@ function App() {
               onCotizaciones={irACotizaciones}
               onNuevaCotizacion={irANuevaCotizacion}
               onDiagnostico={irADiagnostico}
-              // NUEVOS PROPS VELSO OS v2
               onPendientes={irAPendientes}
               onCobranza={irACobranza}
               onDashboardEjecutivo={irADashboardEjecutivo}
@@ -668,7 +666,6 @@ function App() {
           </>
         );
 
-      // NUEVA VISTA: Dashboard Ejecutivo
       case 'dashboard-ejecutivo':
         return (
           <>
@@ -697,7 +694,6 @@ function App() {
           </>
         );
 
-      // NUEVA VISTA: Pendientes
       case 'pendientes':
         return (
           <>
@@ -717,7 +713,6 @@ function App() {
           </>
         );
 
-      // NUEVA VISTA: Cobranza
       case 'cobranza':
         return (
           <>
@@ -739,7 +734,6 @@ function App() {
         );
 
       case 'dashboard':
-
         return (
           <>
             <UserHeader 
@@ -953,7 +947,6 @@ function App() {
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
             />
-            {/* Header con progreso */}
             <Card className="mb-6 border-slate-200">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
@@ -1010,7 +1003,6 @@ function App() {
               </CardContent>
             </Card>
 
-            {/* Contenido del paso */}
             <Card className="border-slate-200 mb-6">
               <CardContent className="p-6">
                 {pasoActual === 'taller' && (
@@ -1082,7 +1074,6 @@ function App() {
               </CardContent>
             </Card>
 
-            {/* Navegación */}
             <div className="flex justify-between">
               <Button variant="outline" onClick={handleAnterior} className="border-slate-300">
                 <ChevronLeft className="w-4 h-4 mr-2" />
