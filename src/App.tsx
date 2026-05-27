@@ -689,6 +689,10 @@ function App() {
               onIrACobranza={irACobranza}
               onIrAProyectos={irAProyectos}
               onIrACotizaciones={irACotizaciones}
+              talleresCount={talleres.length}
+              clientesCount={clientes.length}
+              materialesCount={catalogo.length}
+              procesosCount={Object.keys(horasDisponibles).length}
             />
           </>
         );
