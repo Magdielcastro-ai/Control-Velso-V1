@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import type { ProyectoVenta } from '@/types/ventas';
 
 export const useProyectosStore = () => {
@@ -259,15 +260,20 @@ export const useProyectosStore = () => {
 
   // Guardar datos reales (control de códigos)
   const guardarDatosReales = useCallback(async (id: string, datos: {
-    procesos: any[];
+    procesos?: any[];
+    procesosReales?: any[];
+    materialesReales?: any[];
+    costosReales?: any;
     utilidadReal: number;
   }) => {
     console.log('[useProyectosStore] Guardando datos reales:', id, datos);
     try {
+      const procesos = datos.procesosReales || datos.procesos || [];
+
       const { error } = await supabase
         .from('proyectos')
         .update({ 
-          procesos: datos.procesos,
+          procesos: procesos,
           utilidad_real: datos.utilidadReal
         })
         .eq('id', id);
@@ -278,7 +284,7 @@ export const useProyectosStore = () => {
       }
 
       setProyectos(prev => prev.map(p => 
-        p.id === id ? { ...p, procesos: datos.procesos, utilidadReal: datos.utilidadReal } : p
+        p.id === id ? { ...p, procesos: procesos, utilidadReal: datos.utilidadReal } : p
       ));
     } catch (e) {
       console.error('[useProyectosStore] Error:', e);
