@@ -1,48 +1,29 @@
-// src/hooks/useProyectosStore.ts - Corregido para cargar desde Supabase y localStorage
+// src/hooks/useProyectosStore.ts - 100% Supabase, sin localStorage
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta } from '@/types/ventas';
-
-const STORAGE_KEY = 'velso_proyectos';
 
 export const useProyectosStore = () => {
   const [proyectos, setProyectos] = useState<ProyectoVenta[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cargar desde localStorage al inicializar (inmediato)
-  useEffect(() => {
-    const guardado = localStorage.getItem(STORAGE_KEY);
-    if (guardado) {
-      try {
-        const parsed = JSON.parse(guardado);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProyectos(parsed);
-          console.log('[useProyectosStore] Cargados desde localStorage:', parsed.length);
-        }
-      } catch (e) {
-        console.error('Error cargando proyectos de localStorage:', e);
-      }
-    }
-  }, []);
-
-  // Guardar en localStorage cuando cambian
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(proyectos));
-  }, [proyectos]);
-
-  // Refrescar desde Supabase
-  const refrescarDesdeSupabase = useCallback(async () => {
+  // Cargar proyectos desde Supabase al inicializar
+  const cargarProyectos = useCallback(async () => {
+    console.log('[useProyectosStore] Iniciando carga desde Supabase...');
     try {
       setCargando(true);
       setError(null);
 
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        console.warn('[useProyectosStore] No hay usuario autenticado');
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        console.error('[useProyectosStore] Error de autenticación:', userError);
+        setError('No autenticado');
         return;
       }
+
+      console.log('[useProyectosStore] Usuario:', userData.user.id);
 
       const { data, error: supabaseError } = await supabase
         .from('proyectos')
@@ -54,6 +35,8 @@ export const useProyectosStore = () => {
         setError(supabaseError.message);
         return;
       }
+
+      console.log('[useProyectosStore] Datos crudos de Supabase:', data);
 
       if (data && data.length > 0) {
         const proyectosMapeados: ProyectoVenta[] = data.map(p => ({
@@ -87,17 +70,23 @@ export const useProyectosStore = () => {
         }));
 
         setProyectos(proyectosMapeados);
-        console.log('[useProyectosStore] Cargados desde Supabase:', proyectosMapeados.length);
+        console.log('[useProyectosStore] Proyectos cargados:', proyectosMapeados.length);
       } else {
         console.log('[useProyectosStore] No hay proyectos en Supabase');
+        setProyectos([]);
       }
     } catch (e: any) {
-      console.error('[useProyectosStore] Error:', e);
+      console.error('[useProyectosStore] Error general:', e);
       setError(e.message);
     } finally {
       setCargando(false);
     }
   }, []);
+
+  // Cargar al montar el componente
+  useEffect(() => {
+    cargarProyectos();
+  }, [cargarProyectos]);
 
   // Convertir cotización a venta
   const convertirAVenta = useCallback(async (datos: {
@@ -113,10 +102,11 @@ export const useProyectosStore = () => {
     procesos: any[];
     costosAdicionales: any;
   }) => {
+    console.log('[useProyectosStore] Convirtiendo a venta:', datos);
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        console.error('No hay usuario autenticado');
+        console.error('[useProyectosStore] No hay usuario autenticado');
         return false;
       }
 
@@ -137,6 +127,8 @@ export const useProyectosStore = () => {
         costos_adicionales: datos.costosAdicionales,
       };
 
+      console.log('[useProyectosStore] Insertando en Supabase:', proyectoData);
+
       const { data, error } = await supabase
         .from('proyectos')
         .insert([proyectoData])
@@ -144,18 +136,12 @@ export const useProyectosStore = () => {
         .single();
 
       if (error) {
-        console.error('Error creando proyecto:', error);
-        // Fallback: guardar localmente
-        const nuevoProyecto: ProyectoVenta = {
-          id: crypto.randomUUID(),
-          ...datos,
-          estado: 'en_fabricacion',
-          fechaVenta: new Date().toISOString(),
-          usuarioId: userData.user.id,
-        };
-        setProyectos(prev => [nuevoProyecto, ...prev]);
-        return true;
+        console.error('[useProyectosStore] Error insertando:', error);
+        toast.error('Error guardando venta: ' + error.message);
+        return false;
       }
+
+      console.log('[useProyectosStore] Proyecto creado:', data);
 
       if (data) {
         const nuevoProyecto: ProyectoVenta = {
@@ -180,15 +166,16 @@ export const useProyectosStore = () => {
 
       return true;
     } catch (e) {
-      console.error('Error en convertirAVenta:', e);
+      console.error('[useProyectosStore] Error en convertirAVenta:', e);
       return false;
     }
   }, []);
 
   // Marcar como fabricado
   const marcarFabricado = useCallback(async (id: string) => {
+    console.log('[useProyectosStore] Marcando fabricado:', id);
     try {
-      await supabase
+      const { error } = await supabase
         .from('proyectos')
         .update({ 
           estado: 'fabricado',
@@ -196,18 +183,25 @@ export const useProyectosStore = () => {
         })
         .eq('id', id);
 
+      if (error) {
+        console.error('[useProyectosStore] Error:', error);
+        return;
+      }
+
       setProyectos(prev => prev.map(p => 
         p.id === id ? { ...p, estado: 'fabricado', fechaFabricado: new Date().toISOString() } : p
       ));
+      console.log('[useProyectosStore] Fabricado OK');
     } catch (e) {
-      console.error('Error marcando fabricado:', e);
+      console.error('[useProyectosStore] Error:', e);
     }
   }, []);
 
   // Marcar como entregado
   const marcarEntregado = useCallback(async (id: string) => {
+    console.log('[useProyectosStore] Marcando entregado:', id);
     try {
-      await supabase
+      const { error } = await supabase
         .from('proyectos')
         .update({ 
           estado: 'entregado',
@@ -215,18 +209,25 @@ export const useProyectosStore = () => {
         })
         .eq('id', id);
 
+      if (error) {
+        console.error('[useProyectosStore] Error:', error);
+        return;
+      }
+
       setProyectos(prev => prev.map(p => 
         p.id === id ? { ...p, estado: 'entregado', fechaEntregado: new Date().toISOString() } : p
       ));
+      console.log('[useProyectosStore] Entregado OK');
     } catch (e) {
-      console.error('Error marcando entregado:', e);
+      console.error('[useProyectosStore] Error:', e);
     }
   }, []);
 
   // Marcar como facturado
   const marcarFacturado = useCallback(async (id: string, numeroFactura: string, totalFacturado: number) => {
+    console.log('[useProyectosStore] Marcando facturado:', id, numeroFactura, totalFacturado);
     try {
-      await supabase
+      const { error } = await supabase
         .from('proyectos')
         .update({ 
           estado: 'facturado',
@@ -235,6 +236,11 @@ export const useProyectosStore = () => {
           total_facturado: totalFacturado
         })
         .eq('id', id);
+
+      if (error) {
+        console.error('[useProyectosStore] Error:', error);
+        return;
+      }
 
       setProyectos(prev => prev.map(p => 
         p.id === id ? { 
@@ -245,8 +251,9 @@ export const useProyectosStore = () => {
           totalFacturado
         } : p
       ));
+      console.log('[useProyectosStore] Facturado OK');
     } catch (e) {
-      console.error('Error marcando facturado:', e);
+      console.error('[useProyectosStore] Error:', e);
     }
   }, []);
 
@@ -255,8 +262,9 @@ export const useProyectosStore = () => {
     procesos: any[];
     utilidadReal: number;
   }) => {
+    console.log('[useProyectosStore] Guardando datos reales:', id, datos);
     try {
-      await supabase
+      const { error } = await supabase
         .from('proyectos')
         .update({ 
           procesos: datos.procesos,
@@ -264,23 +272,39 @@ export const useProyectosStore = () => {
         })
         .eq('id', id);
 
+      if (error) {
+        console.error('[useProyectosStore] Error:', error);
+        return;
+      }
+
       setProyectos(prev => prev.map(p => 
         p.id === id ? { ...p, procesos: datos.procesos, utilidadReal: datos.utilidadReal } : p
       ));
     } catch (e) {
-      console.error('Error guardando datos reales:', e);
+      console.error('[useProyectosStore] Error:', e);
     }
   }, []);
 
   // Eliminar proyecto
   const eliminarProyecto = useCallback(async (id: string) => {
+    console.log('[useProyectosStore] Eliminando:', id);
     try {
-      await supabase.from('proyectos').delete().eq('id', id);
+      const { error } = await supabase.from('proyectos').delete().eq('id', id);
+      if (error) {
+        console.error('[useProyectosStore] Error:', error);
+        return;
+      }
       setProyectos(prev => prev.filter(p => p.id !== id));
     } catch (e) {
-      console.error('Error eliminando proyecto:', e);
+      console.error('[useProyectosStore] Error:', e);
     }
   }, []);
+
+  // Refrescar desde Supabase (para usar después de login)
+  const refrescarDesdeSupabase = useCallback(async () => {
+    console.log('[useProyectosStore] Refrescando desde Supabase...');
+    await cargarProyectos();
+  }, [cargarProyectos]);
 
   return {
     proyectos,
@@ -293,5 +317,6 @@ export const useProyectosStore = () => {
     marcarFacturado,
     guardarDatosReales,
     refrescarDesdeSupabase,
+    cargarProyectos,
   };
 };
