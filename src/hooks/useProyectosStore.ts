@@ -1,4 +1,4 @@
-// src/hooks/useProyectosStore.ts - Debug version
+// src/hooks/useProyectosStore.ts - Sin cliente_id para evitar error schema cache
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -25,17 +25,6 @@ export const useProyectosStore = () => {
 
       console.log('[useProyectosStore] Usuario ID:', userData.user.id);
 
-      // Primero verificar que la tabla existe consultando información del schema
-      const { data: schemaData, error: schemaError } = await supabase
-        .rpc('get_schema_info', { table_name: 'proyectos' })
-        .maybeSingle();
-
-      if (schemaError) {
-        console.log('[useProyectosStore] Schema RPC no disponible, continuando...');
-      } else {
-        console.log('[useProyectosStore] Schema info:', schemaData);
-      }
-
       const { data, error: supabaseError } = await supabase
         .from('proyectos')
         .select('*')
@@ -54,7 +43,7 @@ export const useProyectosStore = () => {
           id: p.id,
           numeroCotizacion: p.numero_cotizacion || '',
           ordenCompra: p.orden_compra || '',
-          clienteId: p.cliente_id || '',
+          clienteId: p.cliente_id || p.clienteid || '',
           clienteNombre: p.cliente_nombre || '',
           proyectoNombre: p.proyecto_nombre || '',
           totalCotizado: Number(p.total_cotizado) || 0,
@@ -98,7 +87,7 @@ export const useProyectosStore = () => {
     cargarProyectos();
   }, [cargarProyectos]);
 
-  // Convertir cotización a venta - CON LOGGING DETALLADO
+  // Convertir cotización a venta - SIN cliente_id para evitar error schema cache
   const convertirAVenta = useCallback(async (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
@@ -123,12 +112,11 @@ export const useProyectosStore = () => {
         return false;
       }
 
-      // SANITIZAR DATOS - asegurar que no hay nulls/undefineds
-      const proyectoData = {
+      // Datos SIN cliente_id para evitar error schema cache
+      const proyectoData: any = {
         usuario_id: userData.user.id,
         numero_cotizacion: datos.numeroCotizacion || '',
         orden_compra: datos.ordenCompra || '',
-        cliente_id: datos.clienteId || '',  // Asegurar string, no null
         cliente_nombre: datos.clienteNombre || '',
         proyecto_nombre: datos.proyectoNombre || '',
         total_cotizado: Number(datos.totalCotizado) || 0,
@@ -141,9 +129,10 @@ export const useProyectosStore = () => {
         costos_adicionales: datos.costosAdicionales || {},
       };
 
-      console.log('[useProyectosStore] Datos sanitizados para Supabase:', JSON.stringify(proyectoData, null, 2));
+      // Solo agregar cliente_id si existe en la tabla
+      // Por ahora lo omitimos para evitar el error PGRST204
+      console.log('[useProyectosStore] Datos para Supabase (sin cliente_id):', JSON.stringify(proyectoData, null, 2));
 
-      // INTENTAR INSERT CON SELECT
       console.log('[useProyectosStore] Enviando INSERT a Supabase...');
       const { data, error } = await supabase
         .from('proyectos')
@@ -155,7 +144,6 @@ export const useProyectosStore = () => {
         console.error('[useProyectosStore] ERROR INSERT:', error);
         console.error('[useProyectosStore] Error code:', error.code);
         console.error('[useProyectosStore] Error message:', error.message);
-        console.error('[useProyectosStore] Error details:', error.details);
 
         toast.error('Error guardando venta: ' + error.message);
         return false;
@@ -168,7 +156,7 @@ export const useProyectosStore = () => {
           id: data.id,
           numeroCotizacion: data.numero_cotizacion || '',
           ordenCompra: data.orden_compra || '',
-          clienteId: data.cliente_id || '',
+          clienteId: '', // No se guardó cliente_id
           clienteNombre: data.cliente_nombre || '',
           proyectoNombre: data.proyecto_nombre || '',
           totalCotizado: Number(data.total_cotizado) || 0,
@@ -196,22 +184,69 @@ export const useProyectosStore = () => {
 
   const marcarFabricado = useCallback(async (id: string) => {
     try {
-      await supabase.from('proyectos').update({ estado: 'fabricado', fecha_fabricado: new Date().toISOString() }).eq('id', id);
-      setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'fabricado', fechaFabricado: new Date().toISOString() } : p));
+      const fechaHoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const { error } = await supabase
+        .from('proyectos')
+        .update({ estado: 'fabricado', fecha_fabricado: fechaHoy })
+        .eq('id', id);
+
+      if (error) {
+        console.error('[useProyectosStore] Error fabricado:', error);
+        toast.error('Error: ' + error.message);
+        return;
+      }
+
+      setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'fabricado', fechaFabricado: fechaHoy } : p));
+      toast.success('Proyecto marcado como fabricado');
     } catch (e) { console.error(e); }
   }, []);
 
   const marcarEntregado = useCallback(async (id: string) => {
     try {
-      await supabase.from('proyectos').update({ estado: 'entregado', fecha_entregado: new Date().toISOString() }).eq('id', id);
-      setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'entregado', fechaEntregado: new Date().toISOString() } : p));
+      const fechaHoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const { error } = await supabase
+        .from('proyectos')
+        .update({ estado: 'entregado', fecha_entregado: fechaHoy })
+        .eq('id', id);
+
+      if (error) {
+        console.error('[useProyectosStore] Error entregado:', error);
+        toast.error('Error: ' + error.message);
+        return;
+      }
+
+      setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'entregado', fechaEntregado: fechaHoy } : p));
+      toast.success('Proyecto marcado como entregado');
     } catch (e) { console.error(e); }
   }, []);
 
   const marcarFacturado = useCallback(async (id: string, numeroFactura: string, totalFacturado: number) => {
     try {
-      await supabase.from('proyectos').update({ estado: 'facturado', fecha_facturado: new Date().toISOString(), numero_factura: numeroFactura, total_facturado: totalFacturado }).eq('id', id);
-      setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'facturado', fechaFacturado: new Date().toISOString(), numeroFactura, totalFacturado } : p));
+      const fechaHoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const { error } = await supabase
+        .from('proyectos')
+        .update({ 
+          estado: 'facturado', 
+          fecha_facturado: fechaHoy, 
+          numero_factura: numeroFactura, 
+          total_facturado: totalFacturado 
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('[useProyectosStore] Error facturado:', error);
+        toast.error('Error: ' + error.message);
+        return;
+      }
+
+      setProyectos(prev => prev.map(p => p.id === id ? { 
+        ...p, 
+        estado: 'facturado', 
+        fechaFacturado: fechaHoy, 
+        numeroFactura, 
+        totalFacturado 
+      } : p));
+      toast.success('Proyecto facturado');
     } catch (e) { console.error(e); }
   }, []);
 
