@@ -1,91 +1,105 @@
+// src/hooks/useProyectosStore.ts - Corregido para cargar desde Supabase y localStorage
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { ProyectoVenta, EstadoProyecto, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
+import type { ProyectoVenta } from '@/types/ventas';
 
-const STORAGE_KEY_PROYECTOS = 'velso_proyectos';
+const STORAGE_KEY = 'velso_proyectos';
 
 export const useProyectosStore = () => {
   const [proyectos, setProyectos] = useState<ProyectoVenta[]>([]);
-  const [cargado, setCargado] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Función para refrescar datos desde Supabase
-  const refrescarDesdeSupabase = useCallback(async () => {
-    try {
-      console.log('[useProyectosStore] Refrescando desde Supabase...');
-      const { data, error } = await supabase
-        .from('proyectos')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        const proyectosFormateados: ProyectoVenta[] = data.map(p => ({
-          id: p.id,
-          numeroCotizacion: p.numero_cotizacion,
-          ordenCompra: p.orden_compra,
-          usuarioId: p.usuario_id,
-          clienteId: p.cliente_id || '',
-          clienteNombre: p.cliente_nombre,
-          proyectoNombre: p.proyecto_nombre,
-          totalCotizado: p.total_cotizado,
-          totalFacturado: p.total_facturado,
-          margenUtilidad: p.margen_utilidad,
-          ivaPorcentaje: p.iva_porcentaje,
-          materiales: p.materiales || [],
-          procesos: p.procesos || [],
-          costosAdicionales: p.costos_adicionales || {},
-          estado: p.estado as EstadoProyecto,
-          numeroFactura: p.numero_factura,
-          fechaVenta: p.fecha_venta ? p.fecha_venta.split('T')[0] : new Date().toISOString().split('T')[0],
-          fechaFabricado: p.fecha_fabricado ? p.fecha_fabricado.split('T')[0] : undefined,
-          fechaEntregado: p.fecha_entregado ? p.fecha_entregado.split('T')[0] : undefined,
-          fechaFacturado: p.fecha_facturado ? p.fecha_facturado.split('T')[0] : undefined,
-          utilidadReal: p.utilidad_real,
-        }));
-        
-        setProyectos(proyectosFormateados);
-        localStorage.setItem(STORAGE_KEY_PROYECTOS, JSON.stringify(proyectosFormateados));
-        console.log('[useProyectosStore] Refrescado desde Supabase:', data.length);
+  // Cargar desde localStorage al inicializar (inmediato)
+  useEffect(() => {
+    const guardado = localStorage.getItem(STORAGE_KEY);
+    if (guardado) {
+      try {
+        const parsed = JSON.parse(guardado);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProyectos(parsed);
+          console.log('[useProyectosStore] Cargados desde localStorage:', parsed.length);
+        }
+      } catch (e) {
+        console.error('Error cargando proyectos de localStorage:', e);
       }
-      return true;
-    } catch (err) {
-      console.warn('[useProyectosStore] Error refrescando:', err);
-      return false;
     }
   }, []);
 
-  // Cargar proyectos desde localStorage (la pantalla de carga ya sincronizó con Supabase)
+  // Guardar en localStorage cuando cambian
   useEffect(() => {
-    const cargarProyectos = () => {
-      const guardado = localStorage.getItem(STORAGE_KEY_PROYECTOS);
-      if (guardado) {
-        try {
-          setProyectos(JSON.parse(guardado));
-          console.log('[useProyectosStore] Cargados desde localStorage:', JSON.parse(guardado).length);
-        } catch (e) {
-          console.error('[useProyectosStore] Error parseando localStorage:', e);
-        }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(proyectos));
+  }, [proyectos]);
+
+  // Refrescar desde Supabase
+  const refrescarDesdeSupabase = useCallback(async () => {
+    try {
+      setCargando(true);
+      setError(null);
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        console.warn('[useProyectosStore] No hay usuario autenticado');
+        return;
       }
-      setLoading(false);
-      setCargado(true);
-      // Refrescar en segundo plano desde Supabase
-      refrescarDesdeSupabase();
-    };
 
-    cargarProyectos();
-  }, [refrescarDesdeSupabase]);
+      const { data, error: supabaseError } = await supabase
+        .from('proyectos')
+        .select('*')
+        .order('fecha_venta', { ascending: false });
 
-  // Guardar proyectos en localStorage cuando cambien
-  useEffect(() => {
-    if (cargado) {
-      localStorage.setItem(STORAGE_KEY_PROYECTOS, JSON.stringify(proyectos));
+      if (supabaseError) {
+        console.error('[useProyectosStore] Error Supabase:', supabaseError);
+        setError(supabaseError.message);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const proyectosMapeados: ProyectoVenta[] = data.map(p => ({
+          id: p.id,
+          numeroCotizacion: p.numero_cotizacion || '',
+          ordenCompra: p.orden_compra || '',
+          clienteId: p.cliente_id || '',
+          clienteNombre: p.cliente_nombre || '',
+          proyectoNombre: p.proyecto_nombre || '',
+          totalCotizado: Number(p.total_cotizado) || 0,
+          margenUtilidad: Number(p.margen_utilidad) || 30,
+          ivaPorcentaje: Number(p.iva_porcentaje) || 16,
+          estado: p.estado || 'en_fabricacion',
+          fechaVenta: p.fecha_venta || new Date().toISOString(),
+          fechaFabricado: p.fecha_fabricado,
+          fechaEntregado: p.fecha_entregado,
+          fechaFacturado: p.fecha_facturado,
+          numeroFactura: p.numero_factura,
+          totalFacturado: p.total_facturado ? Number(p.total_facturado) : undefined,
+          utilidadReal: p.utilidad_real ? Number(p.utilidad_real) : undefined,
+          materiales: p.materiales || [],
+          procesos: p.procesos || [],
+          costosAdicionales: p.costos_adicionales || {
+            disenoCAD: 0,
+            programacionCNC: 0,
+            setup: 0,
+            transporte: 0,
+            otro: 0,
+          },
+          usuarioId: p.usuario_id,
+        }));
+
+        setProyectos(proyectosMapeados);
+        console.log('[useProyectosStore] Cargados desde Supabase:', proyectosMapeados.length);
+      } else {
+        console.log('[useProyectosStore] No hay proyectos en Supabase');
+      }
+    } catch (e: any) {
+      console.error('[useProyectosStore] Error:', e);
+      setError(e.message);
+    } finally {
+      setCargando(false);
     }
-  }, [proyectos, cargado]);
+  }, []);
 
-  // Convertir cotización a proyecto/venta (Supabase + local)
+  // Convertir cotización a venta
   const convertirAVenta = useCallback(async (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
@@ -95,330 +109,189 @@ export const useProyectosStore = () => {
     totalCotizado: number;
     margenUtilidad: number;
     ivaPorcentaje: number;
-    materiales: MaterialProyecto[];
-    procesos: ProcesoProyecto[];
-    costosAdicionales: CostosAdicionalesProyecto;
+    materiales: any[];
+    procesos: any[];
+    costosAdicionales: any;
   }) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const nuevo: ProyectoVenta = {
-      ...datos,
-      id: crypto.randomUUID(),
-      fechaVenta: new Date().toISOString().split('T')[0],
-      estado: 'en_fabricacion',
-      totalFacturado: undefined,
-      numeroFactura: undefined,
-      usuarioId: user?.id,
-    };
-    
-    // Guardar en Supabase
     try {
-      const { error } = await supabase
-        .from('proyectos')
-        .insert([{
-          id: nuevo.id,
-          numero_cotizacion: nuevo.numeroCotizacion,
-          orden_compra: nuevo.ordenCompra,
-          usuario_id: user?.id,
-          cliente_id: nuevo.clienteId || null,
-          cliente_nombre: nuevo.clienteNombre,
-          proyecto_nombre: nuevo.proyectoNombre,
-          total_cotizado: nuevo.totalCotizado,
-          margen_utilidad: nuevo.margenUtilidad,
-          iva_porcentaje: nuevo.ivaPorcentaje,
-          materiales: nuevo.materiales,
-          procesos: nuevo.procesos,
-          costos_adicionales: nuevo.costosAdicionales,
-          estado: nuevo.estado,
-          fecha_venta: nuevo.fechaVenta,
-        }]);
-      
-      if (error) {
-        console.error('[useProyectosStore] Error guardando en Supabase:', error);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        console.error('No hay usuario autenticado');
+        return false;
       }
-    } catch (err) {
-      console.error('[useProyectosStore] Error:', err);
+
+      const proyectoData = {
+        usuario_id: userData.user.id,
+        numero_cotizacion: datos.numeroCotizacion,
+        orden_compra: datos.ordenCompra,
+        cliente_id: datos.clienteId,
+        cliente_nombre: datos.clienteNombre,
+        proyecto_nombre: datos.proyectoNombre,
+        total_cotizado: datos.totalCotizado,
+        margen_utilidad: datos.margenUtilidad,
+        iva_porcentaje: datos.ivaPorcentaje,
+        estado: 'en_fabricacion',
+        fecha_venta: new Date().toISOString(),
+        materiales: datos.materiales,
+        procesos: datos.procesos,
+        costos_adicionales: datos.costosAdicionales,
+      };
+
+      const { data, error } = await supabase
+        .from('proyectos')
+        .insert([proyectoData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creando proyecto:', error);
+        // Fallback: guardar localmente
+        const nuevoProyecto: ProyectoVenta = {
+          id: crypto.randomUUID(),
+          ...datos,
+          estado: 'en_fabricacion',
+          fechaVenta: new Date().toISOString(),
+          usuarioId: userData.user.id,
+        };
+        setProyectos(prev => [nuevoProyecto, ...prev]);
+        return true;
+      }
+
+      if (data) {
+        const nuevoProyecto: ProyectoVenta = {
+          id: data.id,
+          numeroCotizacion: data.numero_cotizacion,
+          ordenCompra: data.orden_compra,
+          clienteId: data.cliente_id || '',
+          clienteNombre: data.cliente_nombre,
+          proyectoNombre: data.proyecto_nombre,
+          totalCotizado: Number(data.total_cotizado),
+          margenUtilidad: Number(data.margen_utilidad),
+          ivaPorcentaje: Number(data.iva_porcentaje),
+          estado: data.estado,
+          fechaVenta: data.fecha_venta,
+          materiales: data.materiales || [],
+          procesos: data.procesos || [],
+          costosAdicionales: data.costos_adicionales || {},
+          usuarioId: data.usuario_id,
+        };
+        setProyectos(prev => [nuevoProyecto, ...prev]);
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Error en convertirAVenta:', e);
+      return false;
     }
-    
-    setProyectos(prev => [nuevo, ...prev]);
-    return nuevo;
   }, []);
 
-  // Cambiar estado a fabricado
+  // Marcar como fabricado
   const marcarFabricado = useCallback(async (id: string) => {
-    const fechaFabricado = new Date().toISOString().split('T')[0];
-    
-    // Actualizar en Supabase
     try {
-      const { error } = await supabase
+      await supabase
         .from('proyectos')
         .update({ 
-          estado: 'fabricado', 
-          fecha_fabricado: fechaFabricado 
+          estado: 'fabricado',
+          fecha_fabricado: new Date().toISOString()
         })
         .eq('id', id);
-      
-      if (error) {
-        console.error('[useProyectosStore] Error actualizando en Supabase:', error);
-      }
-    } catch (err) {
-      console.error('[useProyectosStore] Error:', err);
+
+      setProyectos(prev => prev.map(p => 
+        p.id === id ? { ...p, estado: 'fabricado', fechaFabricado: new Date().toISOString() } : p
+      ));
+    } catch (e) {
+      console.error('Error marcando fabricado:', e);
     }
-    
-    setProyectos(prev => prev.map(p => 
-      p.id === id 
-        ? { ...p, estado: 'fabricado', fechaFabricado } 
-        : p
-    ));
   }, []);
 
-  // Cambiar estado a entregado
+  // Marcar como entregado
   const marcarEntregado = useCallback(async (id: string) => {
-    const fechaEntregado = new Date().toISOString().split('T')[0];
-    
-    // Actualizar en Supabase
     try {
-      const { error } = await supabase
+      await supabase
         .from('proyectos')
         .update({ 
-          estado: 'entregado', 
-          fecha_entregado: fechaEntregado 
+          estado: 'entregado',
+          fecha_entregado: new Date().toISOString()
         })
         .eq('id', id);
-      
-      if (error) {
-        console.error('[useProyectosStore] Error actualizando en Supabase:', error);
-      }
-    } catch (err) {
-      console.error('[useProyectosStore] Error:', err);
+
+      setProyectos(prev => prev.map(p => 
+        p.id === id ? { ...p, estado: 'entregado', fechaEntregado: new Date().toISOString() } : p
+      ));
+    } catch (e) {
+      console.error('Error marcando entregado:', e);
     }
-    
-    setProyectos(prev => prev.map(p => 
-      p.id === id 
-        ? { ...p, estado: 'entregado', fechaEntregado } 
-        : p
-    ));
   }, []);
 
-  // Cambiar estado a facturado
+  // Marcar como facturado
   const marcarFacturado = useCallback(async (id: string, numeroFactura: string, totalFacturado: number) => {
-    const fechaFacturado = new Date().toISOString().split('T')[0];
-    
-    // Actualizar en Supabase
     try {
-      const { error } = await supabase
+      await supabase
         .from('proyectos')
         .update({ 
-          estado: 'facturado', 
-          fecha_facturado: fechaFacturado,
+          estado: 'facturado',
+          fecha_facturado: new Date().toISOString(),
           numero_factura: numeroFactura,
-          total_facturado: totalFacturado,
+          total_facturado: totalFacturado
         })
         .eq('id', id);
-      
-      if (error) {
-        console.error('[useProyectosStore] Error actualizando en Supabase:', error);
-      }
-    } catch (err) {
-      console.error('[useProyectosStore] Error:', err);
+
+      setProyectos(prev => prev.map(p => 
+        p.id === id ? { 
+          ...p, 
+          estado: 'facturado', 
+          fechaFacturado: new Date().toISOString(),
+          numeroFactura,
+          totalFacturado
+        } : p
+      ));
+    } catch (e) {
+      console.error('Error marcando facturado:', e);
     }
-    
-    setProyectos(prev => prev.map(p => 
-      p.id === id 
-        ? { 
-            ...p, 
-            estado: 'facturado', 
-            fechaFacturado,
-            numeroFactura,
-            totalFacturado
-          } 
-        : p
-    ));
   }, []);
 
-  // Guardar datos reales del proyecto (control de códigos)
+  // Guardar datos reales (control de códigos)
   const guardarDatosReales = useCallback(async (id: string, datos: {
-    materialesReales: MaterialProyecto[];
-    procesosReales: ProcesoProyecto[];
-    costosAdicionalesReales: CostosAdicionalesProyecto;
-    costoTotalReal: number;
+    procesos: any[];
     utilidadReal: number;
-    porcentajeUtilidadReal: number;
   }) => {
-    // Actualizar en Supabase
     try {
-      const { error } = await supabase
+      await supabase
         .from('proyectos')
         .update({ 
-          materiales: datos.materialesReales,
-          procesos: datos.procesosReales,
-          costos_adicionales: datos.costosAdicionalesReales,
-          utilidad_real: datos.utilidadReal,
+          procesos: datos.procesos,
+          utilidad_real: datos.utilidadReal
         })
         .eq('id', id);
-      
-      if (error) {
-        console.error('[useProyectosStore] Error actualizando en Supabase:', error);
-      }
-    } catch (err) {
-      console.error('[useProyectosStore] Error:', err);
+
+      setProyectos(prev => prev.map(p => 
+        p.id === id ? { ...p, procesos: datos.procesos, utilidadReal: datos.utilidadReal } : p
+      ));
+    } catch (e) {
+      console.error('Error guardando datos reales:', e);
     }
-    
-    setProyectos(prev => prev.map(p => 
-      p.id === id 
-        ? { ...p, ...datos } 
-        : p
-    ));
   }, []);
 
   // Eliminar proyecto
   const eliminarProyecto = useCallback(async (id: string) => {
-    // Eliminar de Supabase
     try {
-      const { error } = await supabase
-        .from('proyectos')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        console.error('[useProyectosStore] Error eliminando de Supabase:', error);
-      }
-    } catch (err) {
-      console.error('[useProyectosStore] Error:', err);
-    }
-    
-    setProyectos(prev => prev.filter(p => p.id !== id));
-  }, []);
-
-  // Obtener proyectos por estado
-  const getProyectosPorEstado = useCallback((estado: EstadoProyecto) => {
-    return proyectos.filter(p => p.estado === estado);
-  }, [proyectos]);
-
-  // Obtener proyectos por mes
-  const getProyectosPorMes = useCallback((mes: number, anio: number) => {
-    return proyectos.filter(p => {
-      const fecha = new Date(p.fechaVenta);
-      return fecha.getMonth() === mes && fecha.getFullYear() === anio;
-    });
-  }, [proyectos]);
-
-  // Obtener proyectos facturados por mes
-  const getProyectosFacturadosPorMes = useCallback((mes: number, anio: number) => {
-    return proyectos.filter(p => {
-      if (p.estado !== 'facturado' || !p.fechaFacturado) return false;
-      const fecha = new Date(p.fechaFacturado);
-      return fecha.getMonth() === mes && fecha.getFullYear() === anio;
-    });
-  }, [proyectos]);
-
-  // Calcular totales por mes
-  const getTotalesPorMes = useCallback((mes: number, anio: number) => {
-    const proyectosMes = getProyectosPorMes(mes, anio);
-    const facturadosMes = getProyectosFacturadosPorMes(mes, anio);
-    
-    return {
-      totalVendido: proyectosMes.reduce((sum, p) => sum + p.totalCotizado, 0),
-      totalFacturado: facturadosMes.reduce((sum, p) => sum + (p.totalFacturado || 0), 0),
-      totalUtilidad: facturadosMes.reduce((sum, p) => sum + (p.utilidadReal || 0), 0),
-      cantidadVendidos: proyectosMes.length,
-      cantidadFacturados: facturadosMes.length,
-    };
-  }, [getProyectosPorMes, getProyectosFacturadosPorMes]);
-
-  // Calcular horas por estado
-  const getHorasPorEstado = useCallback((mes: number, anio: number) => {
-    const proyectosMes = getProyectosPorMes(mes, anio);
-    
-    const horas: Record<string, { vendidas: number; fabricadas: number; facturadas: number }> = {};
-    
-    proyectosMes.forEach(p => {
-      p.procesos.forEach(proc => {
-        const tiempoHoras = (proc.tiempoMinutosCotizado || 0) / 60;
-        const tiempoRealHoras = (proc.tiempoMinutosReal || proc.tiempoMinutosCotizado || 0) / 60;
-        
-        if (!horas[proc.tipo]) {
-          horas[proc.tipo] = { vendidas: 0, fabricadas: 0, facturadas: 0 };
-        }
-        
-        horas[proc.tipo].vendidas += tiempoHoras;
-        
-        if (p.estado === 'fabricado' || p.estado === 'entregado' || p.estado === 'facturado') {
-          horas[proc.tipo].fabricadas += tiempoRealHoras;
-        }
-        
-        if (p.estado === 'facturado') {
-          horas[proc.tipo].facturadas += tiempoRealHoras;
-        }
-      });
-    });
-    
-    return horas;
-  }, [getProyectosPorMes]);
-
-  // Recargar proyectos desde Supabase
-  const recargarProyectos = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('proyectos')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      if (data) {
-        const proyectosFormateados: ProyectoVenta[] = data.map(p => ({
-          id: p.id,
-          numeroCotizacion: p.numero_cotizacion,
-          ordenCompra: p.orden_compra,
-          usuarioId: p.usuario_id,
-          clienteId: p.cliente_id || '',
-          clienteNombre: p.cliente_nombre,
-          proyectoNombre: p.proyecto_nombre,
-          totalCotizado: p.total_cotizado,
-          totalFacturado: p.total_facturado,
-          margenUtilidad: p.margen_utilidad,
-          ivaPorcentaje: p.iva_porcentaje,
-          materiales: p.materiales || [],
-          procesos: p.procesos || [],
-          costosAdicionales: p.costos_adicionales || {},
-          estado: p.estado as EstadoProyecto,
-          numeroFactura: p.numero_factura,
-          fechaVenta: p.fecha_venta ? p.fecha_venta.split('T')[0] : new Date().toISOString().split('T')[0],
-          fechaFabricado: p.fecha_fabricado ? p.fecha_fabricado.split('T')[0] : undefined,
-          fechaEntregado: p.fecha_entregado ? p.fecha_entregado.split('T')[0] : undefined,
-          fechaFacturado: p.fecha_facturado ? p.fecha_facturado.split('T')[0] : undefined,
-          utilidadReal: p.utilidad_real,
-        }));
-        setProyectos(proyectosFormateados);
-        localStorage.setItem(STORAGE_KEY_PROYECTOS, JSON.stringify(proyectosFormateados));
-      }
-    } catch (err: any) {
-      console.error('[useProyectosStore] Error recargando:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      await supabase.from('proyectos').delete().eq('id', id);
+      setProyectos(prev => prev.filter(p => p.id !== id));
+    } catch (e) {
+      console.error('Error eliminando proyecto:', e);
     }
   }, []);
 
   return {
     proyectos,
-    cargado,
-    loading,
+    cargando,
     error,
     convertirAVenta,
+    eliminarProyecto,
     marcarFabricado,
     marcarEntregado,
     marcarFacturado,
     guardarDatosReales,
-    eliminarProyecto,
-    getProyectosPorEstado,
-    getProyectosPorMes,
-    getProyectosFacturadosPorMes,
-    getTotalesPorMes,
-    getHorasPorEstado,
-    recargarProyectos,
     refrescarDesdeSupabase,
   };
 };
