@@ -44,6 +44,7 @@ import { CostosStep } from '@/components/steps/CostosStep';
 import { CondicionesStep } from '@/components/steps/CondicionesStep';
 import { ResumenStep } from '@/components/steps/ResumenStep';
 import { CotizacionFinalStep } from '@/components/steps/CotizacionFinalStep';
+import { PiezasStep } from '@/components/steps/PiezasStep';
 
 // Vistas principales
 import { HomeVelso } from '@/components/HomeVelso';
@@ -73,6 +74,7 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
   { id: 'taller', label: 'Taller', icon: Factory },
   { id: 'cliente', label: 'Cliente', icon: User },
   { id: 'proyecto', label: 'Proyecto', icon: FileText },
+  { id: 'piezas', label: 'Piezas', icon: Package },
   { id: 'materiales', label: 'Materiales', icon: Package },
   { id: 'procesos', label: 'Procesos', icon: Settings },
   { id: 'costos', label: 'Costos', icon: DollarSign },
@@ -235,8 +237,22 @@ function App() {
     return () => clearInterval(intervalId);
   }, [initialized, authLoading, user, refreshSession]);
 
-  // NOTA: Las horas disponibles se manejan solo en estado React.
-  // Si deseas persistirlas en Supabase, crea una tabla 'configuracion'.
+  // Cargar horas disponibles del localStorage
+  useEffect(() => {
+    const guardado = localStorage.getItem('velso_horas_disponibles');
+    if (guardado) {
+      try {
+        setHorasDisponibles(JSON.parse(guardado));
+      } catch (e) {
+        console.error('Error al cargar horas:', e);
+      }
+    }
+  }, []);
+
+  // Guardar horas disponibles
+  useEffect(() => {
+    localStorage.setItem('velso_horas_disponibles', JSON.stringify(horasDisponibles));
+  }, [horasDisponibles]);
 
   // Stores existentes
   const {
@@ -245,10 +261,19 @@ function App() {
     actualizarDatosTaller,
     actualizarDatosCliente,
     actualizarProyecto,
-    agregarMaterial,
-    eliminarMaterial,
-    agregarProceso,
-    eliminarProceso,
+    // Piezas
+    agregarPieza,
+    eliminarPieza,
+    actualizarPieza,
+    cambiarTipoCotizacion,
+    // Materiales por pieza
+    agregarMaterialAPieza,
+    eliminarMaterialDePieza,
+    // Procesos por pieza
+    agregarProcesoAPieza,
+    eliminarProcesoDePieza,
+    // Costos
+    actualizarCostosAdicionalesPieza,
     actualizarCostosAdicionales,
     actualizarCondiciones,
     actualizarMargenUtilidad,
@@ -551,8 +576,9 @@ function App() {
   };
 
   const handleNuevaCotizacion = () => {
-    nuevaCotizacion();
-    setVistaActual('home');
+    nuevaCotizacion('pieza_unica');
+    setVistaActual('cotizacion');
+    setPasoActual('taller');
     toast.success('Nueva cotización iniciada');
   };
 
@@ -565,6 +591,12 @@ function App() {
         return !!cotizacion.datosCliente.nombre;
       case 'proyecto':
         return !!cotizacion.proyecto.nombre;
+      case 'piezas':
+        return cotizacion.piezas.length > 0 && cotizacion.piezas.every(p => p.nombre.trim() !== '');
+      case 'materiales':
+        return cotizacion.piezas.some(p => p.materiales.length > 0);
+      case 'procesos':
+        return cotizacion.piezas.some(p => p.procesos.length > 0);
       default:
         return true;
     }
@@ -1024,27 +1056,38 @@ function App() {
                 {pasoActual === 'proyecto' && (
                   <ProyectoStep datos={cotizacion.proyecto} onChange={actualizarProyecto} />
                 )}
+                {pasoActual === 'piezas' && (
+                  <PiezasStep
+                    piezas={cotizacion.piezas}
+                    tipo={cotizacion.tipo}
+                    onAgregarPieza={agregarPieza}
+                    onEliminarPieza={eliminarPieza}
+                    onActualizarPieza={actualizarPieza}
+                    onCambiarTipo={cambiarTipoCotizacion}
+                  />
+                )}
                 {pasoActual === 'materiales' && (
-                  <MaterialesStep 
-                    materiales={cotizacion.materiales}
-                    onAgregar={agregarMaterial}
-                    onEliminar={eliminarMaterial}
+                  <MaterialesStep
+                    piezas={cotizacion.piezas}
+                    catalogo={catalogo}
+                    onAgregarMaterial={agregarMaterialAPieza}
+                    onEliminarMaterial={eliminarMaterialDePieza}
                   />
                 )}
                 {pasoActual === 'procesos' && (
-                  <ProcesosStep 
-                    procesos={cotizacion.procesos}
-                    onAgregar={agregarProceso}
-                    onEliminar={eliminarProceso}
+                  <ProcesosStep
+                    piezas={cotizacion.piezas}
+                    onAgregarProceso={agregarProcesoAPieza}
+                    onEliminarProceso={eliminarProcesoDePieza}
                   />
                 )}
                 {pasoActual === 'costos' && (
-                  <CostosStep 
-                    costos={cotizacion.costosAdicionales}
+                  <CostosStep
+                    piezas={cotizacion.piezas}
+                    costosGenerales={cotizacion.costosAdicionales}
                     margenUtilidad={cotizacion.margenUtilidad}
-                    costoMateriales={cotizacion.materiales.reduce((sum, m) => sum + m.costoTotal, 0)}
-                    costoProcesos={cotizacion.procesos.reduce((sum, p) => sum + p.costoTotal, 0)}
-                    onChangeCostos={actualizarCostosAdicionales}
+                    onChangeCostosPieza={actualizarCostosAdicionalesPieza}
+                    onChangeCostosGenerales={actualizarCostosAdicionales}
                     onChangeMargen={actualizarMargenUtilidad}
                   />
                 )}

@@ -10,7 +10,9 @@ import type {
   CostosAdicionales,
   CondicionesComerciales,
   CotizacionGuardada,
-  TipoProcesoVelso
+  TipoProcesoVelso,
+  PiezaCotizacion,
+  TipoCotizacion
 } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO, COSTOS_MANO_OBRA } from '@/types/cotizacion';
 import { toast } from 'sonner';
@@ -36,10 +38,29 @@ const calcularCostoProceso = (proceso: Proceso): number => {
   return costoMaquina + costoManoObra;
 };
 
-const cotizacionVacia: Cotizacion = {
+const piezaVacia = (): PiezaCotizacion => ({
+  id: crypto.randomUUID(),
+  nombre: 'Pieza',
+  cantidad: 1,
+  materiales: [],
+  procesos: [],
+  costosAdicionales: {
+    disenoCAD: 0,
+    programacionCNC: 0,
+    setup: 0,
+    transporte: 0,
+    otro: 0,
+  },
+  subtotalPieza: 0,
+  ivaPieza: 0,
+  totalPieza: 0,
+});
+
+const cotizacionVacia = (tipo: TipoCotizacion = 'pieza_unica'): Cotizacion => ({
   id: '',
   numero: generarNumeroCotizacion(),
   fecha: new Date().toISOString().split('T')[0],
+  tipo,
   datosTaller: {
     nombre: '',
     direccion: '',
@@ -58,6 +79,7 @@ const cotizacionVacia: Cotizacion = {
     descripcion: '',
     cantidad: 1,
   },
+  piezas: [piezaVacia()],
   materiales: [],
   procesos: [],
   costosAdicionales: {
@@ -79,10 +101,10 @@ const cotizacionVacia: Cotizacion = {
   iva: 0,
   total: 0,
   margenUtilidad: 30,
-};
+});
 
 export const useCotizacionStore = () => {
-  const [cotizacion, setCotizacion] = useState<Cotizacion>(cotizacionVacia);
+  const [cotizacion, setCotizacion] = useState<Cotizacion>(cotizacionVacia());
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
   const [cargado, setCargado] = useState(false);
 
@@ -91,7 +113,7 @@ export const useCotizacionStore = () => {
       console.log('[useCotizacionStore] Refrescando desde Supabase...');
       const { data, error } = await supabase
         .from('cotizaciones')
-        .select('id, numero, created_at, cliente_nombre, proyecto_nombre, total, estado, usuario_id')
+        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, total, estado, usuario_id, piezas')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -101,11 +123,13 @@ export const useCotizacionStore = () => {
           id: c.id,
           numero: c.numero,
           fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          tipo: c.tipo || 'pieza_unica',
           clienteNombre: c.cliente_nombre,
           proyectoNombre: c.proyecto_nombre,
           total: c.total,
           estado: c.estado,
           usuarioId: c.usuario_id,
+          cantidadPiezas: c.piezas ? JSON.parse(c.piezas).length : 1,
         }));
 
         setCotizacionesGuardadas(cotizacionesFormateadas);
@@ -122,87 +146,81 @@ export const useCotizacionStore = () => {
     refrescarDesdeSupabase().then(() => setCargado(true));
   }, [refrescarDesdeSupabase]);
 
-  const recalcularTotales = useCallback((c: Cotizacion): Cotizacion => {
-    const costoMateriales = c.materiales.reduce((sum, m) => sum + m.costoTotal, 0);
-    const costoProcesos = c.procesos.reduce((sum, p) => sum + p.costoTotal, 0);
-    const costosAdicionales = Object.values(c.costosAdicionales).reduce((sum, v) => sum + v, 0);
+  // ========== PIEZAS ==========
 
-    const costoDirecto = costoMateriales + costoProcesos + costosAdicionales;
-    const factorMargen = 1 + (c.margenUtilidad / 100);
-    const subtotal = costoDirecto * factorMargen;
-    const iva = subtotal * (c.ivaPorcentaje / 100);
-    const total = subtotal + iva;
+  const agregarPieza = useCallback((nombre: string, cantidad: number = 1) => {
+    const nuevaPieza = piezaVacia();
+    nuevaPieza.nombre = nombre;
+    nuevaPieza.cantidad = cantidad;
 
-    return {
-      ...c,
-      subtotal,
-      iva,
-      total,
-    };
+    setCotizacion(prev => {
+      const nuevasPiezas = [...prev.piezas, nuevaPieza];
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
+    });
   }, []);
 
-  const actualizarDatosTaller = useCallback((datos: Partial<DatosTaller>) => {
-    setCotizacion(prev => ({
-      ...prev,
-      datosTaller: { ...prev.datosTaller, ...datos },
-    }));
+  const eliminarPieza = useCallback((piezaId: string) => {
+    setCotizacion(prev => {
+      if (prev.piezas.length <= 1) {
+        toast.error('Debe haber al menos una pieza');
+        return prev;
+      }
+      const nuevasPiezas = prev.piezas.filter(p => p.id !== piezaId);
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
+    });
   }, []);
 
-  const actualizarDatosCliente = useCallback((datos: Partial<DatosCliente>) => {
-    setCotizacion(prev => ({
-      ...prev,
-      datosCliente: { ...prev.datosCliente, ...datos },
-    }));
+  const actualizarPieza = useCallback((piezaId: string, datos: Partial<PiezaCotizacion>) => {
+    setCotizacion(prev => {
+      const nuevasPiezas = prev.piezas.map(p => 
+        p.id === piezaId ? { ...p, ...datos } : p
+      );
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
+    });
   }, []);
 
-  const actualizarProyecto = useCallback((datos: Partial<EspecificacionesProyecto>) => {
-    setCotizacion(prev => ({
-      ...prev,
-      proyecto: { ...prev.proyecto, ...datos },
-    }));
+  const setPiezaActiva = useCallback((piezaId: string) => {
+    // No hay estado de "pieza activa", los pasos de materiales/procesos
+    // reciben el piezaId como parámetro
   }, []);
 
-  const agregarMaterial = useCallback((material: Omit<Material, 'id' | 'costoTotal'>) => {
+  // ========== MATERIALES POR PIEZA ==========
+
+  const agregarMaterialAPieza = useCallback((piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => {
     const nuevoMaterial: Material = {
       ...material,
       id: crypto.randomUUID(),
       costoTotal: calcularCostoMaterial({ ...material, id: '', costoTotal: 0 }),
     };
-    setCotizacion(prev => {
-      const nueva = {
-        ...prev,
-        materiales: [...prev.materiales, nuevoMaterial],
-      };
-      return recalcularTotales(nueva);
-    });
-  }, [recalcularTotales]);
 
-  const eliminarMaterial = useCallback((id: string) => {
     setCotizacion(prev => {
-      const nueva = {
-        ...prev,
-        materiales: prev.materiales.filter(m => m.id !== id),
-      };
-      return recalcularTotales(nueva);
+      const nuevasPiezas = prev.piezas.map(p => {
+        if (p.id !== piezaId) return p;
+        return { ...p, materiales: [...p.materiales, nuevoMaterial] };
+      });
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
-  }, [recalcularTotales]);
+  }, []);
 
-  const actualizarMaterial = useCallback((id: string, datos: Partial<Material>) => {
+  const eliminarMaterialDePieza = useCallback((piezaId: string, materialId: string) => {
     setCotizacion(prev => {
-      const nueva = {
-        ...prev,
-        materiales: prev.materiales.map(m => {
-          if (m.id !== id) return m;
-          const actualizado = { ...m, ...datos };
-          actualizado.costoTotal = calcularCostoMaterial(actualizado);
-          return actualizado;
-        }),
-      };
-      return recalcularTotales(nueva);
+      const nuevasPiezas = prev.piezas.map(p => {
+        if (p.id !== piezaId) return p;
+        return { ...p, materiales: p.materiales.filter(m => m.id !== materialId) };
+      });
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
-  }, [recalcularTotales]);
+  }, []);
 
-  const agregarProceso = useCallback((tipoProceso: TipoProcesoVelso, tiempoMinutos: number, descripcion?: string, tipoManoObra?: 'mo_s' | 'mo_e') => {
+  // ========== PROCESOS POR PIEZA ==========
+
+  const agregarProcesoAPieza = useCallback((
+    piezaId: string,
+    tipoProceso: TipoProcesoVelso,
+    tiempoMinutos: number,
+    descripcion?: string,
+    tipoManoObra?: 'mo_s' | 'mo_e'
+  ) => {
     const catalogoItem = CATALOGO_PROCESOS_VELSO.find(p => p.id === tipoProceso);
     if (!catalogoItem) return;
 
@@ -240,38 +258,37 @@ export const useCotizacionStore = () => {
     nuevoProceso.costoTotal = calcularCostoProceso(nuevoProceso);
 
     setCotizacion(prev => {
-      const nueva = {
-        ...prev,
-        procesos: [...prev.procesos, nuevoProceso],
-      };
-      return recalcularTotales(nueva);
+      const nuevasPiezas = prev.piezas.map(p => {
+        if (p.id !== piezaId) return p;
+        return { ...p, procesos: [...p.procesos, nuevoProceso] };
+      });
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
-  }, [recalcularTotales]);
+  }, []);
 
-  const eliminarProceso = useCallback((id: string) => {
+  const eliminarProcesoDePieza = useCallback((piezaId: string, procesoId: string) => {
     setCotizacion(prev => {
-      const nueva = {
-        ...prev,
-        procesos: prev.procesos.filter(p => p.id !== id),
-      };
-      return recalcularTotales(nueva);
+      const nuevasPiezas = prev.piezas.map(p => {
+        if (p.id !== piezaId) return p;
+        return { ...p, procesos: p.procesos.filter(pr => pr.id !== procesoId) };
+      });
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
-  }, [recalcularTotales]);
+  }, []);
 
-  const actualizarProceso = useCallback((id: string, datos: Partial<Proceso>) => {
+  // ========== COSTOS ADICIONALES POR PIEZA ==========
+
+  const actualizarCostosAdicionalesPieza = useCallback((piezaId: string, datos: Partial<CostosAdicionales>) => {
     setCotizacion(prev => {
-      const nueva = {
-        ...prev,
-        procesos: prev.procesos.map(p => {
-          if (p.id !== id) return p;
-          const actualizado = { ...p, ...datos };
-          actualizado.costoTotal = calcularCostoProceso(actualizado);
-          return actualizado;
-        }),
-      };
-      return recalcularTotales(nueva);
+      const nuevasPiezas = prev.piezas.map(p => {
+        if (p.id !== piezaId) return p;
+        return { ...p, costosAdicionales: { ...p.costosAdicionales, ...datos } };
+      });
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
-  }, [recalcularTotales]);
+  }, []);
+
+  // ========== COSTOS ADICIONALES GENERALES ==========
 
   const actualizarCostosAdicionales = useCallback((datos: Partial<CostosAdicionales>) => {
     setCotizacion(prev => {
@@ -281,13 +298,64 @@ export const useCotizacionStore = () => {
       };
       return recalcularTotales(nueva);
     });
-  }, [recalcularTotales]);
+  }, []);
+
+  // ========== CÁLCULOS ==========
+
+  const recalcularTotales = (c: Cotizacion): Cotizacion => {
+    // Recalcular cada pieza
+    const piezasRecalculadas = c.piezas.map(pieza => {
+      const costoMateriales = pieza.materiales.reduce((sum, m) => sum + m.costoTotal, 0);
+      const costoProcesos = pieza.procesos.reduce((sum, p) => sum + p.costoTotal, 0);
+      const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum, v) => sum + v, 0);
+
+      const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
+      const factorMargen = 1 + (c.margenUtilidad / 100);
+      const subtotalPieza = costoDirectoPieza * factorMargen;
+      const ivaPieza = subtotalPieza * (c.ivaPorcentaje / 100);
+      const totalPieza = subtotalPieza + ivaPieza;
+
+      return {
+        ...pieza,
+        subtotalPieza,
+        ivaPieza,
+        totalPieza,
+      };
+    });
+
+    // Costos generales del proyecto
+    const costosGenerales = Object.values(c.costosAdicionales).reduce((sum, v) => sum + v, 0);
+
+    // Total del proyecto
+    const subtotal = piezasRecalculadas.reduce((sum, p) => sum + p.subtotalPieza, 0) + costosGenerales;
+    const iva = subtotal * (c.ivaPorcentaje / 100);
+    const total = subtotal + iva;
+
+    return {
+      ...c,
+      piezas: piezasRecalculadas,
+      subtotal,
+      iva,
+      total,
+    };
+  };
+
+  // ========== DATOS GENERALES ==========
+
+  const actualizarDatosTaller = useCallback((datos: Partial<DatosTaller>) => {
+    setCotizacion(prev => ({ ...prev, datosTaller: { ...prev.datosTaller, ...datos } }));
+  }, []);
+
+  const actualizarDatosCliente = useCallback((datos: Partial<DatosCliente>) => {
+    setCotizacion(prev => ({ ...prev, datosCliente: { ...prev.datosCliente, ...datos } }));
+  }, []);
+
+  const actualizarProyecto = useCallback((datos: Partial<EspecificacionesProyecto>) => {
+    setCotizacion(prev => ({ ...prev, proyecto: { ...prev.proyecto, ...datos } }));
+  }, []);
 
   const actualizarCondiciones = useCallback((datos: Partial<CondicionesComerciales>) => {
-    setCotizacion(prev => ({
-      ...prev,
-      condiciones: { ...prev.condiciones, ...datos },
-    }));
+    setCotizacion(prev => ({ ...prev, condiciones: { ...prev.condiciones, ...datos } }));
   }, []);
 
   const actualizarMargenUtilidad = useCallback((margen: number) => {
@@ -295,7 +363,28 @@ export const useCotizacionStore = () => {
       const nueva = { ...prev, margenUtilidad: margen };
       return recalcularTotales(nueva);
     });
-  }, [recalcularTotales]);
+  }, []);
+
+  const cambiarTipoCotizacion = useCallback((tipo: TipoCotizacion) => {
+    setCotizacion(prev => {
+      if (tipo === 'pieza_unica' && prev.piezas.length > 1) {
+        // Si cambia a pieza única, consolidar todo en 1 pieza
+        const todasMateriales = prev.piezas.flatMap(p => p.materiales);
+        const todosProcesos = prev.piezas.flatMap(p => p.procesos);
+        const piezaUnica: PiezaCotizacion = {
+          ...piezaVacia(),
+          nombre: prev.proyecto.nombre || 'Pieza Única',
+          cantidad: prev.proyecto.cantidad || 1,
+          materiales: todasMateriales,
+          procesos: todosProcesos,
+        };
+        return recalcularTotales({ ...prev, tipo, piezas: [piezaUnica] });
+      }
+      return recalcularTotales({ ...prev, tipo });
+    });
+  }, []);
+
+  // ========== GUARDAR / CARGAR ==========
 
   const guardarCotizacion = useCallback(async (estado: CotizacionGuardada['estado'] = 'borrador') => {
     const id = cotizacion.id || crypto.randomUUID();
@@ -309,11 +398,13 @@ export const useCotizacionStore = () => {
       id,
       numero: nuevaCotizacion.numero,
       fecha: nuevaCotizacion.fecha,
+      tipo: nuevaCotizacion.tipo,
       clienteNombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
       proyectoNombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
       total: nuevaCotizacion.total,
       estado,
       usuarioId: user?.id,
+      cantidadPiezas: nuevaCotizacion.piezas.length,
     };
 
     setCotizacionesGuardadas(prev => {
@@ -331,12 +422,14 @@ export const useCotizacionStore = () => {
         const cotizacionDB = {
           id,
           numero: nuevaCotizacion.numero,
+          tipo: nuevaCotizacion.tipo,
           usuario_id: user.id,
           cliente_id: nuevaCotizacion.datosCliente.clienteId || null,
           cliente_nombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
           proyecto_nombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
           datos_taller: nuevaCotizacion.datosTaller,
           datos_cliente: nuevaCotizacion.datosCliente,
+          piezas: nuevaCotizacion.piezas,
           materiales: nuevaCotizacion.materiales,
           procesos: nuevaCotizacion.procesos,
           costos_adicionales: nuevaCotizacion.costosAdicionales,
@@ -401,7 +494,7 @@ export const useCotizacionStore = () => {
           }
         }
 
-        const datosCliente = data.datos_cliente || cotizacionVacia.datosCliente;
+        const datosCliente = data.datos_cliente || cotizacionVacia().datosCliente;
 
         if (contactosCliente.length > 0) {
           datosCliente.contactos = contactosCliente.map(c => ({
@@ -415,21 +508,59 @@ export const useCotizacionStore = () => {
           }));
         }
 
+        // Parsear piezas (pueden venir como string o JSON)
+        let piezas: PiezaCotizacion[] = [];
+        if (data.piezas) {
+          try {
+            piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
+          } catch (e) {
+            console.warn('[cargarCotizacion] Error parseando piezas:', e);
+          }
+        }
+
+        // Fallback: si no hay piezas, crear una desde materiales/procesos antiguos
+        if (piezas.length === 0 && (data.materiales?.length > 0 || data.procesos?.length > 0)) {
+          piezas = [{
+            id: crypto.randomUUID(),
+            nombre: data.proyecto_nombre || 'Pieza',
+            cantidad: 1,
+            materiales: data.materiales || [],
+            procesos: data.procesos || [],
+            costosAdicionales: data.costos_adicionales || {
+              disenoCAD: 0,
+              programacionCNC: 0,
+              setup: 0,
+              transporte: 0,
+              otro: 0,
+            },
+            subtotalPieza: 0,
+            ivaPieza: 0,
+            totalPieza: 0,
+          }];
+        }
+
+        // Si aún no hay piezas, crear una vacía
+        if (piezas.length === 0) {
+          piezas = [piezaVacia()];
+        }
+
         const cotizacionCargada: Cotizacion = {
           id: data.id,
           numero: data.numero,
           fecha: data.fecha || new Date().toISOString().split('T')[0],
-          datosTaller: data.datos_taller || cotizacionVacia.datosTaller,
+          tipo: data.tipo || 'pieza_unica',
+          datosTaller: data.datos_taller || cotizacionVacia().datosTaller,
           datosCliente: datosCliente,
           proyecto: {
             nombre: data.proyecto_nombre || '',
             descripcion: '',
             cantidad: 1,
           },
+          piezas,
           materiales: data.materiales || [],
           procesos: data.procesos || [],
-          costosAdicionales: data.costos_adicionales || cotizacionVacia.costosAdicionales,
-          condiciones: cotizacionVacia.condiciones,
+          costosAdicionales: data.costos_adicionales || cotizacionVacia().costosAdicionales,
+          condiciones: cotizacionVacia().condiciones,
           subtotal: data.subtotal || 0,
           ivaPorcentaje: data.iva_porcentaje || 16,
           iva: (data.subtotal || 0) * (data.iva_porcentaje || 16) / 100,
@@ -464,30 +595,34 @@ export const useCotizacionStore = () => {
     }
   }, []);
 
-  const nuevaCotizacion = useCallback(() => {
-    setCotizacion({
-      ...cotizacionVacia,
-      numero: generarNumeroCotizacion(),
-      fecha: new Date().toISOString().split('T')[0],
-    });
+  const nuevaCotizacion = useCallback((tipo: TipoCotizacion = 'pieza_unica') => {
+    setCotizacion(cotizacionVacia(tipo));
   }, []);
 
   return {
     cotizacion,
     cotizacionesGuardadas,
     cargado,
+    // Piezas
+    agregarPieza,
+    eliminarPieza,
+    actualizarPieza,
+    // Materiales por pieza
+    agregarMaterialAPieza,
+    eliminarMaterialDePieza,
+    // Procesos por pieza
+    agregarProcesoAPieza,
+    eliminarProcesoDePieza,
+    // Costos por pieza
+    actualizarCostosAdicionalesPieza,
+    // Generales
     actualizarDatosTaller,
     actualizarDatosCliente,
     actualizarProyecto,
-    agregarMaterial,
-    eliminarMaterial,
-    actualizarMaterial,
-    agregarProceso,
-    eliminarProceso,
-    actualizarProceso,
     actualizarCostosAdicionales,
     actualizarCondiciones,
     actualizarMargenUtilidad,
+    cambiarTipoCotizacion,
     guardarCotizacion,
     cargarCotizacion,
     eliminarCotizacionGuardada,
