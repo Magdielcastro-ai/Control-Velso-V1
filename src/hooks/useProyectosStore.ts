@@ -103,6 +103,48 @@ export const useProyectosStore = () => {
     cargarProyectos();
   }, [cargarProyectos]);
 
+  // Helper para hacer update con fallback
+  const updateProyectoSeguro = useCallback(async (
+    id: string,
+    datosCompletos: any,
+    datosMinimos: any,
+    nombreAccion: string
+  ) => {
+    try {
+      // Intento 1: update completo
+      let { error } = await supabase
+        .from('proyectos')
+        .update(datosCompletos)
+        .eq('id', id);
+
+      if (error) {
+        console.warn(`[useProyectosStore] ${nombreAccion} error completo:`, error.message);
+
+        // Intento 2: update mínimo (solo estado)
+        const { error: errorMinimo } = await supabase
+          .from('proyectos')
+          .update(datosMinimos)
+          .eq('id', id);
+
+        if (errorMinimo) {
+          console.error(`[useProyectosStore] ${nombreAccion} error mínimo:`, errorMinimo.message);
+          toast.error(`${nombreAccion} falló: ${errorMinimo.message}`);
+          return false;
+        }
+
+        console.log(`[useProyectosStore] ${nombreAccion} exitoso (mínimo)`);
+        return true;
+      }
+
+      console.log(`[useProyectosStore] ${nombreAccion} exitoso (completo)`);
+      return true;
+    } catch (e: any) {
+      console.error(`[useProyectosStore] ${nombreAccion} excepción:`, e.message);
+      toast.error(`${nombreAccion} falló: ${e.message}`);
+      return false;
+    }
+  }, []);
+
   const convertirAVenta = useCallback(async (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
@@ -226,59 +268,50 @@ export const useProyectosStore = () => {
   }, []);
 
   const marcarFabricado = useCallback(async (id: string) => {
-    try {
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      const { error } = await supabase
-        .from('proyectos')
-        .update({ estado: 'fabricado', fecha_fabricado: fechaHoy })
-        .eq('id', id);
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    const exitoso = await updateProyectoSeguro(
+      id,
+      { estado: 'fabricado', fecha_fabricado: fechaHoy },
+      { estado: 'fabricado' },
+      'Marcar fabricado'
+    );
 
-      if (error) {
-        toast.error('Error: ' + error.message);
-        return;
-      }
-
+    if (exitoso) {
       setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'fabricado', fechaFabricado: fechaHoy } : p));
       toast.success('Proyecto marcado como fabricado');
-    } catch (e) { console.error(e); }
-  }, []);
+    }
+  }, [updateProyectoSeguro]);
 
   const marcarEntregado = useCallback(async (id: string) => {
-    try {
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      const { error } = await supabase
-        .from('proyectos')
-        .update({ estado: 'entregado', fecha_entregado: fechaHoy })
-        .eq('id', id);
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    const exitoso = await updateProyectoSeguro(
+      id,
+      { estado: 'entregado', fecha_entregado: fechaHoy },
+      { estado: 'entregado' },
+      'Marcar entregado'
+    );
 
-      if (error) {
-        toast.error('Error: ' + error.message);
-        return;
-      }
-
+    if (exitoso) {
       setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'entregado', fechaEntregado: fechaHoy } : p));
       toast.success('Proyecto marcado como entregado');
-    } catch (e) { console.error(e); }
-  }, []);
+    }
+  }, [updateProyectoSeguro]);
 
   const marcarFacturado = useCallback(async (id: string, numeroFactura: string, totalFacturado: number) => {
-    try {
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      const { error } = await supabase
-        .from('proyectos')
-        .update({
-          estado: 'facturado',
-          fecha_facturado: fechaHoy,
-          numero_factura: numeroFactura,
-          total_facturado: totalFacturado
-        })
-        .eq('id', id);
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    const exitoso = await updateProyectoSeguro(
+      id,
+      {
+        estado: 'facturado',
+        fecha_facturado: fechaHoy,
+        numero_factura: numeroFactura,
+        total_facturado: totalFacturado
+      },
+      { estado: 'facturado' },
+      'Marcar facturado'
+    );
 
-      if (error) {
-        toast.error('Error: ' + error.message);
-        return;
-      }
-
+    if (exitoso) {
       setProyectos(prev => prev.map(p => p.id === id ? {
         ...p,
         estado: 'facturado',
@@ -287,16 +320,32 @@ export const useProyectosStore = () => {
         totalFacturado
       } : p));
       toast.success('Proyecto facturado');
-    } catch (e) { console.error(e); }
-  }, []);
+    }
+  }, [updateProyectoSeguro]);
 
   const guardarDatosReales = useCallback(async (id: string, datos: any) => {
-    try {
-      const procesos = datos.procesosReales || datos.procesos || [];
-      await supabase.from('proyectos').update({ procesos, utilidad_real: datos.utilidadReal }).eq('id', id);
-      setProyectos(prev => prev.map(p => p.id === id ? { ...p, procesos, utilidadReal: datos.utilidadReal } : p));
-    } catch (e) { console.error(e); }
-  }, []);
+    const procesos = datos.procesosReales || datos.procesos || [];
+    const utilidadReal = datos.utilidadReal;
+
+    const updateData: any = {};
+    if (procesos.length > 0) updateData.procesos = procesos;
+    if (utilidadReal !== undefined && utilidadReal !== null) updateData.utilidad_real = utilidadReal;
+
+    const exitoso = await updateProyectoSeguro(
+      id,
+      updateData,
+      {},
+      'Guardar datos reales'
+    );
+
+    if (exitoso) {
+      setProyectos(prev => prev.map(p => p.id === id ? {
+        ...p,
+        procesos: procesos.length > 0 ? procesos : p.procesos,
+        utilidadReal: utilidadReal !== undefined ? utilidadReal : p.utilidadReal
+      } : p));
+    }
+  }, [updateProyectoSeguro]);
 
   const eliminarProyecto = useCallback(async (id: string) => {
     try {
