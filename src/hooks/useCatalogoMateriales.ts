@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import type { CatalogoMaterial, FormaMaterial } from '@/types/cotizacion';
 
 export const useCatalogoMateriales = () => {
@@ -34,7 +35,6 @@ export const useCatalogoMateriales = () => {
           espesor: m.espesor,
           costoUnitario: Number(m.costo_unitario) || 0,
           unidadCosto: m.unidad || 'kg',
-          margenPorcentaje: Number(m.margen_porcentaje) || 0,
         }));
         setCatalogo(materialesFormateados);
       }
@@ -71,7 +71,6 @@ export const useCatalogoMateriales = () => {
           ancho: nuevo.ancho,
           espesor: nuevo.espesor,
           costo_unitario: nuevo.costoUnitario,
-          margen_porcentaje: nuevo.margenPorcentaje || 0,
           usuario_id: user?.id,
         }]);
 

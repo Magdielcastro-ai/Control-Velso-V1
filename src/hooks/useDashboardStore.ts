@@ -16,7 +16,7 @@ const HORAS_DEFAULT: HorasDisponiblesMensuales = {
 
 export const useDashboardStore = () => {
   const [horasDisponibles, setHorasDisponibles] = useState<HorasDisponiblesMensuales>(HORAS_DEFAULT);
-  const [cargado, setCargado] = useState(true);
+  const cargado = true;
 
   const actualizarHorasDisponibles = useCallback((horas: Partial<HorasDisponiblesMensuales>) => {
     setHorasDisponibles(prev => ({ ...prev, ...horas }));
