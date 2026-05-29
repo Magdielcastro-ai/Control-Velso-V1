@@ -235,22 +235,8 @@ function App() {
     return () => clearInterval(intervalId);
   }, [initialized, authLoading, user, refreshSession]);
 
-  // Cargar horas disponibles del localStorage
-  useEffect(() => {
-    const guardado = localStorage.getItem('velso_horas_disponibles');
-    if (guardado) {
-      try {
-        setHorasDisponibles(JSON.parse(guardado));
-      } catch (e) {
-        console.error('Error al cargar horas:', e);
-      }
-    }
-  }, []);
-
-  // Guardar horas disponibles
-  useEffect(() => {
-    localStorage.setItem('velso_horas_disponibles', JSON.stringify(horasDisponibles));
-  }, [horasDisponibles]);
+  // NOTA: Las horas disponibles se manejan solo en estado React.
+  // Si deseas persistirlas en Supabase, crea una tabla 'configuracion'.
 
   // Stores existentes
   const {

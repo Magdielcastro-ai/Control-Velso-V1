@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Estas variables se configurarán en Netlify como variables de entorno
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
@@ -8,9 +7,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // Deshabilitar para evitar conflictos con hash URLs
+    detectSessionInUrl: false,
     storage: localStorage,
-    storageKey: 'velso-auth-token', // Key específica para evitar conflictos
+    storageKey: 'velso-auth-token',
   },
   global: {
     headers: {
@@ -19,7 +18,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Tipos para los datos
+// ========== CACHÉ EN MEMORIA (NO localStorage) ==========
+const perfilCache = new Map<string, { data: PerfilUsuario | null; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 segundos
+
 type UserRole = 'admin' | 'vendedor' | 'produccion';
 
 export interface PerfilUsuario {
@@ -103,7 +105,6 @@ export interface MaterialDB {
   created_at: string;
 }
 
-// Funciones de autenticación
 export async function signUp(email: string, password: string, nombre: string, rol: UserRole = 'vendedor') {
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
@@ -113,13 +114,13 @@ export async function signUp(email: string, password: string, nombre: string, ro
   if (authError) throw authError;
   if (!authData.user) throw new Error('No se pudo crear el usuario');
 
-  // Crear perfil del usuario
   const { error: perfilError } = await supabase
     .from('perfiles')
     .insert([{ id: authData.user.id, nombre, rol }]);
 
   if (perfilError) throw perfilError;
 
+  perfilCache.delete(authData.user.id);
   return authData.user;
 }
 
@@ -136,34 +137,35 @@ export async function signIn(email: string, password: string) {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  perfilCache.clear();
 }
 
 export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | null> {
+  const cached = perfilCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log('[getPerfilUsuario] Cache hit:', userId);
+    return cached.data;
+  }
+
   console.log('[getPerfilUsuario] Buscando ID:', userId);
-  
+
   try {
-    // Crear promesa con timeout de 5 segundos
-    const queryPromise = supabase
+    const { data, error } = await supabase
       .from('perfiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    
-    const timeoutPromise = new Promise<{data: null, error: Error}>((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout consultando perfiles')), 5000)
-    );
-    
-    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
     if (error) {
       console.error('[getPerfilUsuario] Error:', error);
       return null;
     }
-    
+
+    perfilCache.set(userId, { data, timestamp: Date.now() });
     console.log('[getPerfilUsuario] Resultado:', data);
     return data;
   } catch (err: any) {
-    console.error('[getPerfilUsuario] Excepción/Timeout:', err.message);
+    console.error('[getPerfilUsuario] Excepción:', err.message);
     return null;
   }
 }
@@ -171,27 +173,23 @@ export async function getPerfilUsuario(userId: string): Promise<PerfilUsuario | 
 export async function getCurrentUser() {
   try {
     console.log('[getCurrentUser] Iniciando...');
-    
-    // Primero obtener la sesión (recupera de localStorage)
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError) {
       console.error('[getCurrentUser] Error de sesión:', sessionError);
       return null;
     }
-    
+
     if (!session) {
       console.log('[getCurrentUser] No hay sesión activa');
       return null;
     }
-    
+
     console.log('[getCurrentUser] Sesión encontrada:', session.user.id);
-    
-    // Usar el usuario de la sesión
     const user = session.user;
     const perfil = await getPerfilUsuario(user.id);
     console.log('[getCurrentUser] Perfil:', perfil);
-    
+
     return { ...user, perfil };
   } catch (error: any) {
     console.error('[getCurrentUser] Error:', error.message);
@@ -199,7 +197,6 @@ export async function getCurrentUser() {
   }
 }
 
-// Funciones para cotizaciones
 export async function getCotizaciones(): Promise<CotizacionDB[]> {
   const { data, error } = await supabase
     .from('cotizaciones')
@@ -233,7 +230,6 @@ export async function deleteCotizacion(id: string) {
   if (error) throw error;
 }
 
-// Funciones para proyectos
 export async function getProyectos(): Promise<ProyectoDB[]> {
   const { data, error } = await supabase
     .from('proyectos')
@@ -259,16 +255,16 @@ export async function saveProyecto(proyecto: Partial<ProyectoDB>) {
 }
 
 export async function updateProyectoEstado(
-  id: string, 
-  estado: ProyectoDB['estado'], 
+  id: string,
+  estado: ProyectoDB['estado'],
   datosAdicionales?: Partial<ProyectoDB>
 ) {
   const updates: Partial<ProyectoDB> = { estado };
-  
+
   if (estado === 'fabricado') updates.fecha_fabricado = new Date().toISOString().split('T')[0];
   if (estado === 'entregado') updates.fecha_entregado = new Date().toISOString().split('T')[0];
   if (estado === 'facturado') updates.fecha_facturado = new Date().toISOString().split('T')[0];
-  
+
   const { data, error } = await supabase
     .from('proyectos')
     .update({ ...updates, ...datosAdicionales })
@@ -280,7 +276,6 @@ export async function updateProyectoEstado(
   return data;
 }
 
-// Funciones para clientes
 export async function getClientes(): Promise<ClienteDB[]> {
   const { data, error } = await supabase
     .from('clientes')
@@ -314,7 +309,6 @@ export async function deleteCliente(id: string) {
   if (error) throw error;
 }
 
-// Funciones para materiales
 export async function getMateriales(): Promise<MaterialDB[]> {
   const { data, error } = await supabase
     .from('catalogo_materiales')
@@ -348,7 +342,6 @@ export async function deleteMaterial(id: string) {
   if (error) throw error;
 }
 
-// Funciones de administración (solo admin)
 export async function getAllUsers(): Promise<PerfilUsuario[]> {
   const { data, error } = await supabase
     .from('perfiles')
@@ -359,10 +352,9 @@ export async function getAllUsers(): Promise<PerfilUsuario[]> {
 }
 
 export async function createUser(email: string, password: string, nombre: string, rol: UserRole) {
-  // Solo admin puede crear usuarios
   const { data: { user: currentUser } } = await supabase.auth.getUser();
   if (!currentUser) throw new Error('No autenticado');
-  
+
   const perfil = await getPerfilUsuario(currentUser.id);
   if (perfil?.rol !== 'admin') throw new Error('Solo administradores pueden crear usuarios');
 
@@ -376,6 +368,7 @@ export async function updateUserRol(userId: string, rol: UserRole) {
     .eq('id', userId);
 
   if (error) throw error;
+  perfilCache.delete(userId);
 }
 
 export async function deactivateUser(userId: string) {
@@ -385,4 +378,5 @@ export async function deactivateUser(userId: string) {
     .eq('id', userId);
 
   if (error) throw error;
+  perfilCache.delete(userId);
 }

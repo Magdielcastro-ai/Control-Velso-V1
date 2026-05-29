@@ -86,7 +86,6 @@ export const useCotizacionStore = () => {
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
   const [cargado, setCargado] = useState(false);
 
-  // Función para refrescar datos desde Supabase
   const refrescarDesdeSupabase = useCallback(async () => {
     try {
       console.log('[useCotizacionStore] Refrescando desde Supabase...');
@@ -108,9 +107,8 @@ export const useCotizacionStore = () => {
           estado: c.estado,
           usuarioId: c.usuario_id,
         }));
-        
+
         setCotizacionesGuardadas(cotizacionesFormateadas);
-        localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
         console.log('[useCotizacionStore] Refrescado desde Supabase:', data.length);
       }
       return true;
@@ -120,36 +118,15 @@ export const useCotizacionStore = () => {
     }
   }, []);
 
-  // Cargar cotizaciones desde localStorage (la pantalla de carga ya sincronizó con Supabase)
   useEffect(() => {
-    const cargarCotizaciones = () => {
-      const guardadas = localStorage.getItem('cotizaciones_cnc');
-      if (guardadas) {
-        try {
-          setCotizacionesGuardadas(JSON.parse(guardadas));
-          console.log('[useCotizacionStore] Cargadas desde localStorage:', JSON.parse(guardadas).length);
-        } catch (e) {
-          console.error('Error al cargar cotizaciones del localStorage:', e);
-        }
-      }
-      setCargado(true);
-      // Refrescar en segundo plano desde Supabase
-      refrescarDesdeSupabase();
-    };
-
-    cargarCotizaciones();
+    refrescarDesdeSupabase().then(() => setCargado(true));
   }, [refrescarDesdeSupabase]);
-
-  // Guardar cotizaciones en localStorage
-  useEffect(() => {
-    localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesGuardadas));
-  }, [cotizacionesGuardadas]);
 
   const recalcularTotales = useCallback((c: Cotizacion): Cotizacion => {
     const costoMateriales = c.materiales.reduce((sum, m) => sum + m.costoTotal, 0);
     const costoProcesos = c.procesos.reduce((sum, p) => sum + p.costoTotal, 0);
     const costosAdicionales = Object.values(c.costosAdicionales).reduce((sum, v) => sum + v, 0);
-    
+
     const costoDirecto = costoMateriales + costoProcesos + costosAdicionales;
     const factorMargen = 1 + (c.margenUtilidad / 100);
     const subtotal = costoDirecto * factorMargen;
@@ -232,7 +209,7 @@ export const useCotizacionStore = () => {
     let costoManoObra = 0;
     let incluyeManoObra = false;
     let tipoManoObraSeleccionada: 'mo_s' | 'mo_e' | undefined = undefined;
-    
+
     if (catalogoItem.categoria === 'maquina' && tipoManoObra) {
       costoManoObra = COSTOS_MANO_OBRA[tipoManoObra];
       incluyeManoObra = true;
@@ -323,12 +300,11 @@ export const useCotizacionStore = () => {
   const guardarCotizacion = useCallback(async (estado: CotizacionGuardada['estado'] = 'borrador') => {
     const id = cotizacion.id || crypto.randomUUID();
     const nuevaCotizacion = { ...cotizacion, id };
-    
+
     setCotizacion(nuevaCotizacion);
-    
-    // Obtener el usuario actual
+
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     const guardada: CotizacionGuardada = {
       id,
       numero: nuevaCotizacion.numero,
@@ -350,12 +326,6 @@ export const useCotizacionStore = () => {
       return [guardada, ...prev];
     });
 
-    // Guardar la cotización completa en localStorage (backup local)
-    const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
-    cotizacionesCompletas[id] = { ...nuevaCotizacion, usuarioId: user?.id };
-    localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
-
-    // Guardar en Supabase
     if (user) {
       try {
         const cotizacionDB = {
@@ -386,8 +356,6 @@ export const useCotizacionStore = () => {
 
         if (error) {
           console.error('[guardarCotizacion] Error al guardar en Supabase:', error);
-          console.error('[guardarCotizacion] Error code:', error.code);
-          console.error('[guardarCotizacion] Error details:', error.details);
           toast.error('Error al sincronizar con la nube: ' + error.message);
         } else {
           console.log('[guardarCotizacion] Cotización guardada exitosamente:', data);
@@ -398,14 +366,13 @@ export const useCotizacionStore = () => {
         toast.error('Error de conexión: ' + err.message);
       }
     } else {
-      toast.warning('No hay sesión activa. La cotización se guardó solo localmente.');
+      toast.warning('No hay sesión activa. La cotización se guardó solo en memoria.');
     }
 
     return id;
   }, [cotizacion]);
 
   const cargarCotizacion = useCallback(async (id: string): Promise<boolean> => {
-    // Primero intentar cargar desde Supabase
     try {
       console.log('[cargarCotizacion] Intentando cargar desde Supabase:', id);
       const { data, error } = await supabase
@@ -416,30 +383,26 @@ export const useCotizacionStore = () => {
 
       if (error) {
         console.warn('[cargarCotizacion] Error cargando de Supabase:', error);
-      } else if (data) {
+        return false;
+      }
+
+      if (data) {
         console.log('[cargarCotizacion] Cotización cargada de Supabase:', data);
-        
-        // Si hay cliente_id, cargar los contactos del cliente
+
         let contactosCliente: any[] = [];
         if (data.cliente_id) {
-          console.log('[cargarCotizacion] Cargando contactos del cliente:', data.cliente_id);
           const { data: contactosData, error: contactosError } = await supabase
             .from('contactos')
             .select('*')
             .eq('cliente_id', data.cliente_id);
-          
-          if (contactosError) {
-            console.warn('[cargarCotizacion] Error cargando contactos:', contactosError);
-          } else if (contactosData) {
+
+          if (!contactosError && contactosData) {
             contactosCliente = contactosData;
-            console.log('[cargarCotizacion] Contactos cargados:', contactosData.length);
           }
         }
-        
-        // Transformar datos de Supabase al formato de la app
+
         const datosCliente = data.datos_cliente || cotizacionVacia.datosCliente;
-        
-        // Agregar contactos al datosCliente si se cargaron
+
         if (contactosCliente.length > 0) {
           datosCliente.contactos = contactosCliente.map(c => ({
             id: c.id,
@@ -451,7 +414,7 @@ export const useCotizacionStore = () => {
             esPrincipal: c.es_principal,
           }));
         }
-        
+
         const cotizacionCargada: Cotizacion = {
           id: data.id,
           numero: data.numero,
@@ -473,39 +436,20 @@ export const useCotizacionStore = () => {
           total: data.total || 0,
           margenUtilidad: data.margen_utilidad || 30,
         };
-        
+
         setCotizacion(cotizacionCargada);
-        
-        // También guardar en localStorage para offline
-        const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
-        cotizacionesCompletas[id] = cotizacionCargada;
-        localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
-        
         return true;
       }
     } catch (err) {
       console.warn('[cargarCotizacion] Error de conexión con Supabase:', err);
     }
 
-    // Fallback a localStorage
-    console.log('[cargarCotizacion] Intentando cargar desde localStorage:', id);
-    const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
-    const cotizacionGuardada = cotizacionesCompletas[id];
-    if (cotizacionGuardada) {
-      setCotizacion(cotizacionGuardada);
-      return true;
-    }
     return false;
   }, []);
 
   const eliminarCotizacionGuardada = useCallback(async (id: string) => {
-    // Eliminar de localStorage
     setCotizacionesGuardadas(prev => prev.filter(c => c.id !== id));
-    const cotizacionesCompletas = JSON.parse(localStorage.getItem('cotizaciones_completas') || '{}');
-    delete cotizacionesCompletas[id];
-    localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
 
-    // Eliminar de Supabase
     try {
       const { error } = await supabase
         .from('cotizaciones')

@@ -1,10 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { HorasDisponiblesMensuales } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
-const STORAGE_KEY_HORAS = 'velso_horas_disponibles';
-
-// Horas disponibles por defecto (según el catálogo Velso)
 const HORAS_DEFAULT: HorasDisponiblesMensuales = {
   codigo_07: 742.69,
   mo_s: 268.88,
@@ -19,49 +16,24 @@ const HORAS_DEFAULT: HorasDisponiblesMensuales = {
 
 export const useDashboardStore = () => {
   const [horasDisponibles, setHorasDisponibles] = useState<HorasDisponiblesMensuales>(HORAS_DEFAULT);
-  const [cargado, setCargado] = useState(false);
+  const [cargado, setCargado] = useState(true);
 
-  // Cargar configuración de horas
-  useEffect(() => {
-    const guardado = localStorage.getItem(STORAGE_KEY_HORAS);
-    if (guardado) {
-      try {
-        setHorasDisponibles(JSON.parse(guardado));
-      } catch (e) {
-        console.error('Error al cargar horas:', e);
-      }
-    }
-    setCargado(true);
-  }, []);
-
-  // Guardar configuración de horas
-  useEffect(() => {
-    if (cargado) {
-      localStorage.setItem(STORAGE_KEY_HORAS, JSON.stringify(horasDisponibles));
-    }
-  }, [horasDisponibles, cargado]);
-
-  // Actualizar horas disponibles
   const actualizarHorasDisponibles = useCallback((horas: Partial<HorasDisponiblesMensuales>) => {
     setHorasDisponibles(prev => ({ ...prev, ...horas }));
   }, []);
 
-  // Calcular métricas del mes actual
   const calcularMetricasMes = useCallback((cotizaciones: CotizacionGuardada[]) => {
     const ahora = new Date();
     const mesActual = ahora.getMonth();
     const anioActual = ahora.getFullYear();
 
-    // Filtrar cotizaciones del mes actual
     const cotizacionesMes = cotizaciones.filter(c => {
       const fecha = new Date(c.fecha);
       return fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual;
     });
 
-    // Total cotizado en el mes
     const totalCotizado = cotizacionesMes.reduce((sum, c) => sum + c.total, 0);
 
-    // Agrupar por cliente
     const porCliente: Record<string, { nombre: string; cantidad: number; total: number }> = {};
     cotizacionesMes.forEach(c => {
       if (!porCliente[c.clienteNombre]) {
@@ -71,7 +43,6 @@ export const useDashboardStore = () => {
       porCliente[c.clienteNombre].total += c.total;
     });
 
-    // Calcular porcentajes
     const totalCotizaciones = cotizacionesMes.length;
     const cotizacionesPorCliente = Object.values(porCliente).map(c => ({
       clienteId: c.nombre,
@@ -90,7 +61,6 @@ export const useDashboardStore = () => {
     };
   }, []);
 
-  // Calcular horas cotizadas por proceso (esto requiere las cotizaciones completas)
   const calcularHorasPorProceso = useCallback((cotizacionesCompletas: any[]) => {
     const ahora = new Date();
     const mesActual = ahora.getMonth();
@@ -123,7 +93,6 @@ export const useDashboardStore = () => {
     return horas as unknown as HorasDisponiblesMensuales;
   }, []);
 
-  // Calcular porcentaje de cumplimiento para Código 07 (el más importante)
   const calcularCumplimientoCodigo07 = useCallback((horasCotizadas: number) => {
     const objetivo = horasDisponibles.codigo_07;
     if (objetivo === 0) return 0;

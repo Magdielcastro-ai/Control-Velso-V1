@@ -1,6 +1,4 @@
-// src/hooks/useProyectosStore.ts - Sin cliente_id para evitar error schema cache
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import type { ProyectoVenta } from '@/types/ventas';
@@ -9,9 +7,25 @@ export const useProyectosStore = () => {
   const [proyectos, setProyectos] = useState<ProyectoVenta[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isLoadingRef = useRef(false);
+  const lastLoadTime = useRef(0);
+  const LOAD_DEBOUNCE = 2000;
 
   const cargarProyectos = useCallback(async () => {
+    if (isLoadingRef.current) {
+      console.log('[useProyectosStore] Carga ya en progreso, saltando...');
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastLoadTime.current < LOAD_DEBOUNCE && proyectos.length > 0) {
+      console.log('[useProyectosStore] Datos recientes, saltando recarga');
+      return;
+    }
+
     console.log('[useProyectosStore] === INICIANDO CARGA ===');
+    isLoadingRef.current = true;
+
     try {
       setCargando(true);
       setError(null);
@@ -70,6 +84,7 @@ export const useProyectosStore = () => {
         }));
 
         setProyectos(proyectosMapeados);
+        lastLoadTime.current = Date.now();
         console.log('[useProyectosStore] === CARGADOS:', proyectosMapeados.length, 'proyectos ===');
       } else {
         console.log('[useProyectosStore] === NO HAY PROYECTOS ===');
@@ -80,14 +95,14 @@ export const useProyectosStore = () => {
       setError(e.message);
     } finally {
       setCargando(false);
+      isLoadingRef.current = false;
     }
-  }, []);
+  }, [proyectos.length]);
 
   useEffect(() => {
     cargarProyectos();
   }, [cargarProyectos]);
 
-  // Convertir cotización a venta - SIN cliente_id para evitar error schema cache
   const convertirAVenta = useCallback(async (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
@@ -102,17 +117,14 @@ export const useProyectosStore = () => {
     costosAdicionales: any;
   }) => {
     console.log('[useProyectosStore] === CONVERTIR A VENTA ===');
-    console.log('[useProyectosStore] Datos recibidos:', JSON.stringify(datos, null, 2));
 
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        console.error('[useProyectosStore] NO HAY USUARIO AUTENTICADO');
         toast.error('Error: No estás autenticado');
         return false;
       }
 
-      // Datos SIN cliente_id para evitar error schema cache
       const proyectoData: any = {
         usuario_id: userData.user.id,
         numero_cotizacion: datos.numeroCotizacion || '',
@@ -129,11 +141,10 @@ export const useProyectosStore = () => {
         costos_adicionales: datos.costosAdicionales || {},
       };
 
-      // Solo agregar cliente_id si existe en la tabla
-      // Por ahora lo omitimos para evitar el error PGRST204
-      console.log('[useProyectosStore] Datos para Supabase (sin cliente_id):', JSON.stringify(proyectoData, null, 2));
+      if (datos.clienteId && datos.clienteId.trim() !== '') {
+        proyectoData.cliente_id = datos.clienteId;
+      }
 
-      console.log('[useProyectosStore] Enviando INSERT a Supabase...');
       const { data, error } = await supabase
         .from('proyectos')
         .insert([proyectoData])
@@ -142,21 +153,55 @@ export const useProyectosStore = () => {
 
       if (error) {
         console.error('[useProyectosStore] ERROR INSERT:', error);
-        console.error('[useProyectosStore] Error code:', error.code);
-        console.error('[useProyectosStore] Error message:', error.message);
+
+        if (error.message?.includes('cliente_id') || error.code === 'PGRST204') {
+          console.log('[useProyectosStore] Reintentando sin cliente_id...');
+          delete proyectoData.cliente_id;
+
+          const { data: retryData, error: retryError } = await supabase
+            .from('proyectos')
+            .insert([proyectoData])
+            .select()
+            .single();
+
+          if (retryError) {
+            toast.error('Error guardando venta: ' + retryError.message);
+            return false;
+          }
+
+          if (retryData) {
+            const nuevoProyecto: ProyectoVenta = {
+              id: retryData.id,
+              numeroCotizacion: retryData.numero_cotizacion || '',
+              ordenCompra: retryData.orden_compra || '',
+              clienteId: '',
+              clienteNombre: retryData.cliente_nombre || '',
+              proyectoNombre: retryData.proyecto_nombre || '',
+              totalCotizado: Number(retryData.total_cotizado) || 0,
+              margenUtilidad: Number(retryData.margen_utilidad) || 30,
+              ivaPorcentaje: Number(retryData.iva_porcentaje) || 16,
+              estado: retryData.estado || 'en_fabricacion',
+              fechaVenta: retryData.fecha_venta || new Date().toISOString(),
+              materiales: retryData.materiales || [],
+              procesos: retryData.procesos || [],
+              costosAdicionales: retryData.costos_adicionales || {},
+              usuarioId: retryData.usuario_id,
+            };
+            setProyectos(prev => [nuevoProyecto, ...prev]);
+            return true;
+          }
+        }
 
         toast.error('Error guardando venta: ' + error.message);
         return false;
       }
-
-      console.log('[useProyectosStore] INSERT EXITOSO, data:', data);
 
       if (data) {
         const nuevoProyecto: ProyectoVenta = {
           id: data.id,
           numeroCotizacion: data.numero_cotizacion || '',
           ordenCompra: data.orden_compra || '',
-          clienteId: '', // No se guardó cliente_id
+          clienteId: data.cliente_id || '',
           clienteNombre: data.cliente_nombre || '',
           proyectoNombre: data.proyecto_nombre || '',
           totalCotizado: Number(data.total_cotizado) || 0,
@@ -170,13 +215,11 @@ export const useProyectosStore = () => {
           usuarioId: data.usuario_id,
         };
         setProyectos(prev => [nuevoProyecto, ...prev]);
-        console.log('[useProyectosStore] Proyecto agregado al estado local');
       }
 
       return true;
     } catch (e: any) {
       console.error('[useProyectosStore] ERROR EN CONVERTIR A VENTA:', e);
-      console.error('[useProyectosStore] Stack:', e.stack);
       toast.error('Error inesperado: ' + e.message);
       return false;
     }
@@ -184,14 +227,13 @@ export const useProyectosStore = () => {
 
   const marcarFabricado = useCallback(async (id: string) => {
     try {
-      const fechaHoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const fechaHoy = new Date().toISOString().split('T')[0];
       const { error } = await supabase
         .from('proyectos')
         .update({ estado: 'fabricado', fecha_fabricado: fechaHoy })
         .eq('id', id);
 
       if (error) {
-        console.error('[useProyectosStore] Error fabricado:', error);
         toast.error('Error: ' + error.message);
         return;
       }
@@ -203,14 +245,13 @@ export const useProyectosStore = () => {
 
   const marcarEntregado = useCallback(async (id: string) => {
     try {
-      const fechaHoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const fechaHoy = new Date().toISOString().split('T')[0];
       const { error } = await supabase
         .from('proyectos')
         .update({ estado: 'entregado', fecha_entregado: fechaHoy })
         .eq('id', id);
 
       if (error) {
-        console.error('[useProyectosStore] Error entregado:', error);
         toast.error('Error: ' + error.message);
         return;
       }
@@ -222,29 +263,28 @@ export const useProyectosStore = () => {
 
   const marcarFacturado = useCallback(async (id: string, numeroFactura: string, totalFacturado: number) => {
     try {
-      const fechaHoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const fechaHoy = new Date().toISOString().split('T')[0];
       const { error } = await supabase
         .from('proyectos')
-        .update({ 
-          estado: 'facturado', 
-          fecha_facturado: fechaHoy, 
-          numero_factura: numeroFactura, 
-          total_facturado: totalFacturado 
+        .update({
+          estado: 'facturado',
+          fecha_facturado: fechaHoy,
+          numero_factura: numeroFactura,
+          total_facturado: totalFacturado
         })
         .eq('id', id);
 
       if (error) {
-        console.error('[useProyectosStore] Error facturado:', error);
         toast.error('Error: ' + error.message);
         return;
       }
 
-      setProyectos(prev => prev.map(p => p.id === id ? { 
-        ...p, 
-        estado: 'facturado', 
-        fechaFacturado: fechaHoy, 
-        numeroFactura, 
-        totalFacturado 
+      setProyectos(prev => prev.map(p => p.id === id ? {
+        ...p,
+        estado: 'facturado',
+        fechaFacturado: fechaHoy,
+        numeroFactura,
+        totalFacturado
       } : p));
       toast.success('Proyecto facturado');
     } catch (e) { console.error(e); }
