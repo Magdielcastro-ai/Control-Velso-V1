@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, Package, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Package } from 'lucide-react';
 import type { PiezaCotizacion } from '@/types/cotizacion';
 
 interface PiezasStepProps {

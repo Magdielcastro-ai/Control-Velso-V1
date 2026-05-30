@@ -58,7 +58,7 @@ export function MaterialesStep({
                 {/* Lista de materiales de esta pieza */}
                 {pieza.materiales.length > 0 && (
                   <div className="space-y-2">
-                    {pieza.materiales.map((mat) => (
+                    {pieza.materiales.map((mat: Material) => (
                       <div
                         key={mat.id}
                         className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"

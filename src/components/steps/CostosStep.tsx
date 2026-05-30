@@ -68,7 +68,7 @@ export function CostosStep({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500">
-                    ${Object.values(pieza.costosAdicionales).reduce((a, b) => a + b, 0).toFixed(2)}
+                    ${Object.values(pieza.costosAdicionales).reduce((a: number, b: number) => a + b, 0).toFixed(2)}
                   </span>
                   {piezaExpandida === pieza.id ? (
                     <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -87,7 +87,7 @@ export function CostosStep({
                         type="number"
                         min={0}
                         step={0.01}
-                        value={pieza.costosAdicionales[key] || 0}
+                        value={(pieza.costosAdicionales as any)[key] || 0}
                         onChange={(e) =>
                           onChangeCostosPieza(pieza.id, { [key]: parseFloat(e.target.value) || 0 })
                         }

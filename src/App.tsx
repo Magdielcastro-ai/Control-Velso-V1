@@ -579,11 +579,11 @@ function App() {
       case 'proyecto':
         return !!cotizacion.proyecto.nombre;
       case 'piezas':
-        return cotizacion.piezas.length > 0 && cotizacion.piezas.every(p => p.nombre.trim() !== '');
+        return cotizacion.piezas.length > 0 && cotizacion.piezas.every((p: PiezaCotizacion) => p.nombre.trim() !== '');
       case 'materiales':
-        return cotizacion.piezas.some(p => p.materiales.length > 0);
+        return cotizacion.piezas.some((p: PiezaCotizacion) => p.materiales.length > 0);
       case 'procesos':
-        return cotizacion.piezas.some(p => p.procesos.length > 0);
+        return cotizacion.piezas.some((p: PiezaCotizacion) => p.procesos.length > 0);
       default:
         return true;
     }

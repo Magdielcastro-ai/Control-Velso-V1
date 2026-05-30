@@ -1,5 +1,7 @@
 // Tipos para Presupuesto Pro CNC - Catálogo Velso
 
+export type TipoCotizacion = 'pieza_unica' | 'proyecto';
+
 export interface DatosTaller {
   nombre: string;
   direccion: string;
@@ -16,7 +18,7 @@ export interface DatosCliente {
   telefono: string;
   email: string;
   rfc?: string;
-  clienteId?: string; // ID del cliente en la tabla clientes (para cargar contactos)
+  clienteId?: string;
 }
 
 export interface EspecificacionesProyecto {
@@ -27,26 +29,20 @@ export interface EspecificacionesProyecto {
   notas?: string;
 }
 
-// Formas de material
 export type FormaMaterial = 'redondo' | 'cuadrado' | 'placa' | 'placa_rectificada' | 'otro';
-
-// Unidades de medida
 export type UnidadMedida = 'mm' | 'in';
 
-// Catálogo de materiales predefinidos
 export interface CatalogoMaterial {
   id: string;
   nombre: string;
   tipo: string;
   forma: FormaMaterial;
   unidadMedida: UnidadMedida;
-  // Dimensiones base del catálogo (pueden modificarse al usar)
-  diametro?: number; // Para redondo
-  lado?: number; // Para cuadrado
-  largo?: number; // Para redondo, cuadrado
-  ancho?: number; // Para placa
-  espesor?: number; // Para placa
-  // Costo base
+  diametro?: number;
+  lado?: number;
+  largo?: number;
+  ancho?: number;
+  espesor?: number;
   costoUnitario: number;
   unidadCosto: 'kg' | 'pieza' | 'metro';
 }
@@ -57,13 +53,11 @@ export interface Material {
   tipo: string;
   forma: FormaMaterial;
   unidadMedida: UnidadMedida;
-  // Dimensiones
-  diametro?: number; // Redondo
-  lado?: number; // Cuadrado
-  largo?: number; // Redondo, Cuadrado
-  ancho?: number; // Placa
-  espesor?: number; // Placa
-  // Cantidad y costo
+  diametro?: number;
+  lado?: number;
+  largo?: number;
+  ancho?: number;
+  espesor?: number;
   cantidad: number;
   unidad: 'kg' | 'pieza' | 'metro';
   costoUnitario: number;
@@ -71,8 +65,7 @@ export interface Material {
   costoTotal: number;
 }
 
-// Catálogo de procesos Velso
-export type TipoProcesoVelso = 
+export type TipoProcesoVelso =
   | 'codigo_07'
   | 'mo_s'
   | 'mo_e'
@@ -84,7 +77,6 @@ export type TipoProcesoVelso =
   | 'cnc_vertical'
   | 'otro';
 
-// Definición del catálogo de costos Velso
 export interface CatalogoProceso {
   id: TipoProcesoVelso;
   nombre: string;
@@ -94,7 +86,6 @@ export interface CatalogoProceso {
   categoria: 'indirecto' | 'mano_obra' | 'servicio' | 'maquina';
 }
 
-// Catálogo de procesos con costos predefinidos
 export const CATALOGO_PROCESOS_VELSO: CatalogoProceso[] = [
   {
     id: 'codigo_07',
@@ -178,7 +169,6 @@ export const CATALOGO_PROCESOS_VELSO: CatalogoProceso[] = [
   },
 ];
 
-// Costos de mano de obra adicional
 export const COSTOS_MANO_OBRA = {
   mo_s: 191.19,
   mo_e: 286.78,
@@ -194,7 +184,7 @@ export interface Proceso {
   costoTotal: number;
   descripcion?: string;
   incluyeManoObra: boolean;
-  tipoManoObraSeleccionada?: 'mo_s' | 'mo_e'; // Solo para máquinas donde se puede elegir
+  tipoManoObraSeleccionada?: 'mo_s' | 'mo_e';
 }
 
 export interface CostosAdicionales {
@@ -214,13 +204,29 @@ export interface CondicionesComerciales {
   notasLegales?: string;
 }
 
+// ========== NUEVOS TIPOS PARA PIEZAS/PROYECTOS ==========
+
+export interface PiezaCotizacion {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  materiales: Material[];
+  procesos: Proceso[];
+  costosAdicionales: CostosAdicionales;
+  subtotalPieza: number;
+  ivaPieza: number;
+  totalPieza: number;
+}
+
 export interface Cotizacion {
   id: string;
   numero: string;
   fecha: string;
+  tipo: TipoCotizacion;
   datosTaller: DatosTaller;
   datosCliente: DatosCliente;
   proyecto: EspecificacionesProyecto;
+  piezas: PiezaCotizacion[];
   materiales: Material[];
   procesos: Proceso[];
   costosAdicionales: CostosAdicionales;
@@ -232,11 +238,12 @@ export interface Cotizacion {
   margenUtilidad: number;
 }
 
-export type PasoCotizacion = 
+export type PasoCotizacion =
   | 'bienvenida'
   | 'taller'
   | 'cliente'
   | 'proyecto'
+  | 'piezas'
   | 'materiales'
   | 'procesos'
   | 'costos'
@@ -248,9 +255,11 @@ export interface CotizacionGuardada {
   id: string;
   numero: string;
   fecha: string;
+  tipo: TipoCotizacion;
   clienteNombre: string;
   proyectoNombre: string;
   total: number;
   estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
   usuarioId?: string;
+  cantidadPiezas?: number;
 }
