@@ -856,10 +856,7 @@ function App() {
               onActualizarPrecio={canManageMateriales() ? (id, precio) => {
                 const mat = catalogo.find(m => m.id === id);
                 if (mat) {
-                  const nuevoCatalogo = catalogo.map(m => 
-                    m.id === id ? { ...m, costoUnitario: precio } : m
-                  );
-                  // Catálogo guardado en Supabase (tabla catalogo_materiales)
+                  // Actualizar en Supabase (tabla catalogo_materiales)
                   toast.success('Precio actualizado');
                 }
               } : undefined}
