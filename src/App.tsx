@@ -1036,6 +1036,7 @@ function App() {
                       const nuevo = await agregarAlCatalogo(material);
                       return nuevo;
                     }}
+                    onRecargarCatalogo={recargarCatalogo}
                   />
                 )}
 
