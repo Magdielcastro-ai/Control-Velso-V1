@@ -46,7 +46,6 @@ export function PiezasStep({
 
   return (
     <div className="space-y-6">
-      {/* Lista de piezas */}
       <div className="space-y-4">
         {piezas.map((pieza) => (
           <PiezaCard
@@ -69,7 +68,6 @@ export function PiezasStep({
         ))}
       </div>
 
-      {/* Agregar nueva pieza */}
       <div className="flex gap-2">
         <Input
           value={nuevaPiezaNombre}
@@ -90,14 +88,12 @@ export function PiezasStep({
         </Button>
       </div>
 
-      {/* Resumen */}
       <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
         <p className="text-sm text-slate-600">
           <strong>{piezas.length}</strong> {piezas.length === 1 ? 'pieza' : 'piezas'} en total
         </p>
       </div>
 
-      {/* Modal para agregar material nuevo */}
       <ModalNuevoMaterial
         abierto={modalMaterialAbierto}
         onCerrar={() => setModalMaterialAbierto(false)}
@@ -145,8 +141,8 @@ function PiezaCard({
   const [costoExterno, setCostoExterno] = useState(0);
   const [margenExterno, setMargenExterno] = useState(30);
   const [editandoMaterial, setEditandoMaterial] = useState<string | null>(null);
+  const [editandoProceso, setEditandoProceso] = useState<string | null>(null);
 
-  // Calcular costo por pieza a partir del costo total
   const calcularCostoMaterial = () => {
     if (costoTotalMaterial <= 0 || pieza.cantidad <= 0) return 0;
     const costoPorPieza = costoTotalMaterial / pieza.cantidad;
@@ -229,14 +225,13 @@ function PiezaCard({
     setTiempoProceso(0);
   };
 
-  // Función para actualizar proceso (reservada para futuro uso)
-  // const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
-  //   const procs = pieza.procesos.map((p) => {
-  //     if (p.id !== procesoId) return p;
-  //     return { ...p, [campo]: valor };
-  //   });
-  //   onActualizar(pieza.id, { procesos: procs });
-  // };
+  const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
+    const procs = pieza.procesos.map((p) => {
+      if (p.id !== procesoId) return p;
+      return { ...p, [campo]: valor };
+    });
+    onActualizar(pieza.id, { procesos: procs });
+  };
 
   const eliminarProceso = (procesoId: string) => {
     onActualizar(pieza.id, {
@@ -269,7 +264,6 @@ function PiezaCard({
   return (
     <Card className="border-slate-200">
       <CardContent className="p-4">
-        {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3 flex-1">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -313,10 +307,8 @@ function PiezaCard({
           </div>
         </div>
 
-        {/* Contenido expandido */}
         {expandida && (
           <div className="space-y-4 pt-2 border-t border-slate-100">
-            {/* Materiales */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-slate-900 flex items-center gap-1">
@@ -335,7 +327,6 @@ function PiezaCard({
                 )}
               </div>
 
-              {/* Lista de materiales agregados */}
               {pieza.materiales.length > 0 && (
                 <div className="space-y-2 mb-3">
                   {pieza.materiales.map((mat) => (
@@ -384,7 +375,6 @@ function PiezaCard({
                 </div>
               )}
 
-              {/* Agregar material */}
               <div className="space-y-2">
                 <div className="flex gap-2 items-end">
                   <div className="flex-1 min-w-[150px]">
@@ -401,7 +391,7 @@ function PiezaCard({
                       <SelectContent>
                         {catalogoMateriales.map((mat) => (
                           <SelectItem key={mat.id} value={mat.id} className="text-xs">
-                            {mat.nombre} - ${mat.costoUnitario}/{mat.unidadMedida}
+                            {mat.nombre} - {mat.forma} - {mat.tipo}
                           </SelectItem>
                         ))}
                         {catalogoMateriales.length === 0 && (
@@ -412,40 +402,42 @@ function PiezaCard({
                   </div>
                 </div>
                 {materialSeleccionado && (
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1">
-                      <label className="text-xs text-slate-500">Costo TOTAL para {pieza.cantidad} piezas</label>
-                      <Input
-                        type="number"
-                        min={0.01}
-                        step={0.01}
-                        value={costoTotalMaterial}
-                        onChange={(e) => setCostoTotalMaterial(parseFloat(e.target.value) || 0)}
-                        placeholder="Costo total del material"
-                        className="h-8 text-xs"
-                      />
+                  <div className="space-y-2">
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="text-xs text-slate-500">Costo TOTAL para {pieza.cantidad} piezas</label>
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={costoTotalMaterial}
+                          onChange={(e) => setCostoTotalMaterial(parseFloat(e.target.value) || 0)}
+                          placeholder="Costo total del material"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-500">Margen %</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={margenMaterial}
+                          onChange={(e) => setMargenMaterial(parseFloat(e.target.value) || 0)}
+                          className="w-16 h-8 text-xs"
+                        />
+                      </div>
+                      <div className="pb-1">
+                        <Button onClick={agregarMaterial} disabled={costoTotalMaterial <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs text-slate-500">Margen %</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={margenMaterial}
-                        onChange={(e) => setMargenMaterial(parseFloat(e.target.value) || 0)}
-                        className="w-16 h-8 text-xs"
-                      />
-                    </div>
-                    <div className="pb-1">
-                      <Button onClick={agregarMaterial} disabled={costoTotalMaterial <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    {costoTotalMaterial > 0 && (
+                      <p className="text-xs text-slate-500">
+                        Costo por pieza: ${(costoTotalMaterial / pieza.cantidad).toFixed(2)} + {margenMaterial}% = ${calcularCostoMaterial().toFixed(2)}
+                      </p>
+                    )}
                   </div>
-                )}
-                {costoTotalMaterial > 0 && (
-                  <p className="text-xs text-slate-500">
-                    Costo por pieza: ${(costoTotalMaterial / pieza.cantidad).toFixed(2)} + {margenMaterial}% = ${calcularCostoMaterial().toFixed(2)}
-                  </p>
                 )}
               </div>
               {catalogoMateriales.length === 0 && onAbrirModalMaterial && (
@@ -458,7 +450,6 @@ function PiezaCard({
               )}
             </div>
 
-            {/* Procesos de manufactura */}
             <div>
               <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
                 <Settings className="w-3 h-3" /> Procesos de Manufactura
@@ -466,14 +457,35 @@ function PiezaCard({
               {pieza.procesos.filter(p => p.tipo !== 'otro').length > 0 && (
                 <div className="space-y-1 mb-2">
                   {pieza.procesos.filter(p => p.tipo !== 'otro').map((proc) => (
-                    <div key={proc.id} className="flex justify-between p-1.5 bg-slate-50 rounded text-sm">
-                      <span>{proc.nombre} ({proc.descripcion || proc.tiempoMinutos + ' min'})</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-600">${proc.costoTotal.toFixed(2)}</span>
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
+                    <div key={proc.id} className="p-2 bg-slate-50 rounded-lg">
+                      {editandoProceso === proc.id ? (
+                        <div className="flex gap-2 items-center">
+                          <span className="text-sm flex-1">{proc.nombre}</span>
+                          <Input
+                            type="number"
+                            value={proc.tiempoMinutos}
+                            onChange={(e) => actualizarProceso(proc.id, 'tiempoMinutos', parseFloat(e.target.value) || 0)}
+                            className="w-20 h-7 text-xs"
+                          />
+                          <span className="text-xs">min</span>
+                          <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditandoProceso(null)}>
+                            <Check className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">{proc.nombre} ({proc.descripcion || proc.tiempoMinutos + ' min'})</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)}</span>
+                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setEditandoProceso(proc.id)}>
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -546,7 +558,6 @@ function PiezaCard({
               </div>
             </div>
 
-            {/* Procesos externos */}
             <div>
               <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
                 <ExternalLink className="w-3 h-3" /> Procesos Externos
@@ -623,75 +634,122 @@ function ModalNuevoMaterial({
 }) {
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState('acero');
-  const [costo, setCosto] = useState(0);
-  const [unidad, setUnidad] = useState('kg');
+  const [forma, setForma] = useState('redondo');
+  const [diametro, setDiametro] = useState('');
+  const [largo, setLargo] = useState('');
+  const [ancho, setAncho] = useState('');
+  const [espesor, setEspesor] = useState('');
+  const [unidad, setUnidad] = useState('mm');
+
+  const formas = ['redondo', 'cuadrado', 'placa', 'barra_hueca', 'barra_cromada'];
 
   const handleGuardar = async () => {
-    if (!nombre.trim() || costo <= 0) {
-      toast.error('Completa todos los campos');
+    if (!nombre.trim()) {
+      toast.error('Ingresa un nombre para el material');
       return;
     }
     await onGuardar({
       nombre: nombre.trim(),
       tipo,
-      forma: 'redondo',
-      unidadMedida: 'mm',
-      costoUnitario: costo,
-      unidadCosto: unidad as 'kg' | 'pieza' | 'metro',
+      forma: forma as any,
+      unidadMedida: unidad as 'mm' | 'in',
+      diametro: diametro ? parseFloat(diametro) : undefined,
+      largo: largo ? parseFloat(largo) : undefined,
+      ancho: ancho ? parseFloat(ancho) : undefined,
+      espesor: espesor ? parseFloat(espesor) : undefined,
+      costoUnitario: 0, // Sin precio, se cotiza al momento
+      unidadCosto: 'kg',
     });
     setNombre('');
-    setCosto(0);
+    setDiametro('');
+    setLargo('');
+    setAncho('');
+    setEspesor('');
   };
 
   return (
     <Dialog open={abierto} onOpenChange={onCerrar}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Agregar Material Nuevo</DialogTitle>
+          <DialogTitle>Agregar Material al Catálogo</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
             <label className="text-sm font-medium">Nombre</label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Acero inoxidable 304" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Tipo</label>
-            <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="acero">Acero</SelectItem>
-                <SelectItem value="aluminio">Aluminio</SelectItem>
-                <SelectItem value="bronce">Bronce</SelectItem>
-                <SelectItem value="plastico">Plástico</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
+            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Bronce SAE 660" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-sm font-medium">Costo Unitario</label>
-              <Input type="number" min={0.01} step={0.01} value={costo} onChange={(e) => setCosto(parseFloat(e.target.value) || 0)} />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Unidad</label>
-              <Select value={unidad} onValueChange={setUnidad}>
+              <label className="text-sm font-medium">Tipo</label>
+              <Select value={tipo} onValueChange={setTipo}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="kg">kg</SelectItem>
-                  <SelectItem value="pieza">pieza</SelectItem>
-                  <SelectItem value="metro">metro</SelectItem>
+                  <SelectItem value="acero">Acero</SelectItem>
+                  <SelectItem value="aluminio">Aluminio</SelectItem>
+                  <SelectItem value="bronce">Bronce</SelectItem>
+                  <SelectItem value="plastico">Plástico</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Forma</label>
+              <Select value={forma} onValueChange={setForma}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {formas.map((f) => (
+                    <SelectItem key={f} value={f}>{f.replace('_', ' ')}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+          <div>
+            <label className="text-sm font-medium">Dimensiones</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(forma === 'redondo' || forma === 'barra_hueca' || forma === 'barra_cromada') && (
+                <Input
+                  value={diametro}
+                  onChange={(e) => setDiametro(e.target.value)}
+                  placeholder="Diámetro (mm)"
+                  type="number"
+                  step="0.1"
+                />
+              )}
+              {(forma === 'cuadrado' || forma === 'placa') && (
+                <>
+                  <Input value={largo} onChange={(e) => setLargo(e.target.value)} placeholder="Largo (mm)" type="number" step="0.1" />
+                  <Input value={ancho} onChange={(e) => setAncho(e.target.value)} placeholder="Ancho (mm)" type="number" step="0.1" />
+                </>
+              )}
+              {forma === 'placa' && (
+                <Input value={espesor} onChange={(e) => setEspesor(e.target.value)} placeholder="Espesor (mm)" type="number" step="0.1" />
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Unidad de Medida</label>
+            <Select value={unidad} onValueChange={setUnidad}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mm">mm</SelectItem>
+                <SelectItem value="in">in (pulgadas)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-slate-500">
+            El precio se ingresará al momento de cotizar. Aquí solo guardamos las características del material.
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onCerrar}>Cancelar</Button>
-          <Button onClick={handleGuardar} className="bg-blue-600 hover:bg-blue-700">Guardar</Button>
+          <Button onClick={handleGuardar} className="bg-blue-600 hover:bg-blue-700">Guardar al Catálogo</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

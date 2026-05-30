@@ -39,7 +39,7 @@ export const useCatalogoMateriales = () => {
           largo: m.largo,
           ancho: m.ancho,
           espesor: m.espesor,
-          costoUnitario: Number(m.costo_unitario) || 0,
+          costoUnitario: m.costo_unitario ? Number(m.costo_unitario) : 0,
           unidadCosto: m.unidad || 'kg',
         }));
         console.log('[useCatalogoMateriales] Formateados:', materialesFormateados);
