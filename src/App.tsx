@@ -245,19 +245,9 @@ function App() {
     actualizarDatosTaller,
     actualizarDatosCliente,
     actualizarProyecto,
-    // Piezas
     agregarPieza,
     eliminarPieza,
     actualizarPieza,
-    cambiarTipoCotizacion,
-    // Materiales por pieza
-    agregarMaterialAPieza,
-    eliminarMaterialDePieza,
-    // Procesos por pieza
-    agregarProcesoAPieza,
-    eliminarProcesoDePieza,
-    // Costos
-    actualizarCostosAdicionalesPieza,
     actualizarCostosAdicionales,
     actualizarCondiciones,
     actualizarMargenUtilidad,
@@ -267,7 +257,7 @@ function App() {
     refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
 
-  const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
+  const { catalogo, agregarAlCatalogo, eliminarDelCatalogo } = useCatalogoMateriales();
 
   const { 
     clientes, 
@@ -1039,7 +1029,7 @@ function App() {
                   <PiezasStep
                     piezas={cotizacion.piezas}
                     catalogoMateriales={catalogo}
-                    catalogoProcesos={CATALOGO_PROCESOS_VELSO}
+
                     onAgregarPieza={agregarPieza}
                     onEliminarPieza={eliminarPieza}
                     onActualizarPieza={actualizarPieza}

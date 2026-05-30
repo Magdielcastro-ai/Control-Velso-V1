@@ -6,13 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PiezaCotizacion, Material, Proceso, CatalogoMaterial, CatalogoProceso } from '@/types/cotizacion';
+import type { PiezaCotizacion, Material, Proceso, CatalogoMaterial } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 
 interface PiezasStepProps {
   piezas: PiezaCotizacion[];
   catalogoMateriales: CatalogoMaterial[];
-  catalogoProcesos: CatalogoProceso[];
   onAgregarPieza: (nombre: string, cantidad: number) => void;
   onEliminarPieza: (id: string) => void;
   onActualizarPieza: (id: string, datos: Partial<PiezaCotizacion>) => void;
@@ -22,7 +21,6 @@ interface PiezasStepProps {
 export function PiezasStep({
   piezas,
   catalogoMateriales,
-  catalogoProcesos,
   onAgregarPieza,
   onEliminarPieza,
   onActualizarPieza,
