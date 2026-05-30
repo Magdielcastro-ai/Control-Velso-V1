@@ -26,6 +26,7 @@ import {
 
 // Hooks
 import { useCotizacionStore } from '@/hooks/useCotizacionStore';
+import type { PiezaCotizacion } from '@/types/cotizacion';
 import { useCatalogoMateriales } from '@/hooks/useCatalogoMateriales';
 import { useClientesStore } from '@/hooks/useClientesStore';
 import { useProyectosStore } from '@/hooks/useProyectosStore';

@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import type { Cotizacion } from '@/types/cotizacion';
+import type { Cotizacion, PiezaCotizacion, Material, Proceso } from '@/types/cotizacion';
 
 interface ResumenStepProps {
   cotizacion: Cotizacion;

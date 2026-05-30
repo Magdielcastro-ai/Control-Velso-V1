@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
-import type { PiezaCotizacion, TipoProcesoVelso } from '@/types/cotizacion';
+import type { PiezaCotizacion, Proceso, TipoProcesoVelso } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 
 interface ProcesosStepProps {

@@ -119,6 +119,7 @@ function AgregarMaterialForm({
       cantidad,
       costoUnitario: materialSeleccionado.costoUnitario,
       unidadMedida: materialSeleccionado.unidadMedida,
+        unidad: materialSeleccionado.unidadCosto,
       margenPorcentaje: margen,
     });
     setMaterialSeleccionado(null);
