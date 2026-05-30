@@ -11,17 +11,23 @@ export const useCatalogoMateriales = () => {
   const cargarDesdeSupabase = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('[useCatalogoMateriales] Cargando desde Supabase...');
+
       const { data, error } = await supabase
         .from('catalogo_materiales')
         .select('*')
         .order('nombre');
 
+      console.log('[useCatalogoMateriales] Respuesta:', { data, error });
+
       if (error) {
         console.error('[useCatalogoMateriales] Error cargando:', error);
+        toast.error('Error cargando catálogo: ' + error.message);
         return;
       }
 
       if (data && data.length > 0) {
+        console.log('[useCatalogoMateriales] Datos recibidos:', data.length, 'materiales');
         const materialesFormateados: CatalogoMaterial[] = data.map(m => ({
           id: m.id,
           nombre: m.nombre,
@@ -36,10 +42,14 @@ export const useCatalogoMateriales = () => {
           costoUnitario: Number(m.costo_unitario) || 0,
           unidadCosto: m.unidad || 'kg',
         }));
+        console.log('[useCatalogoMateriales] Formateados:', materialesFormateados);
         setCatalogo(materialesFormateados);
+      } else {
+        console.log('[useCatalogoMateriales] No hay datos en la tabla');
       }
     } catch (e) {
       console.error('[useCatalogoMateriales] Error:', e);
+      toast.error('Error de conexión con catálogo');
     } finally {
       setLoading(false);
     }
