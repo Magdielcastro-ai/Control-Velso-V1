@@ -271,7 +271,7 @@ function App() {
     refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
 
-  const { catalogo, agregarAlCatalogo, eliminarDelCatalogo } = useCatalogoMateriales();
+  const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
 
   const { 
     clientes, 
@@ -1059,6 +1059,7 @@ function App() {
                     catalogo={catalogo}
                     onAgregarMaterial={agregarMaterialAPieza}
                     onEliminarMaterial={eliminarMaterialDePieza}
+                    onRecargarCatalogo={recargarCatalogo}
                   />
                 )}
                 {pasoActual === 'procesos' && (

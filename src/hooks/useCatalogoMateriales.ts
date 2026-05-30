@@ -133,6 +133,10 @@ export const useCatalogoMateriales = () => {
     return Array.from(tipos);
   }, [catalogo]);
 
+  const recargarCatalogo = useCallback(async () => {
+    await cargarDesdeSupabase();
+  }, [cargarDesdeSupabase]);
+
   return {
     catalogo,
     cargado,
@@ -144,5 +148,6 @@ export const useCatalogoMateriales = () => {
     getMaterialesPorTipo,
     getFormasDisponibles,
     getTiposDisponibles,
+    recargarCatalogo,
   };
 };
