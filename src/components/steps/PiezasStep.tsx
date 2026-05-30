@@ -58,8 +58,7 @@ export function PiezasStep({
             }}
             onActualizar={onActualizarPieza}
             catalogoMateriales={catalogoMateriales}
-            catalogoProcesos={catalogoProcesos}
-            onAbrirModalMaterial={(piezaId) => {
+                        onAbrirModalMaterial={(piezaId) => {
               setPiezaParaMaterial(piezaId);
               setModalMaterialAbierto(true);
             }}
@@ -121,7 +120,6 @@ function PiezaCard({
   onEliminar,
   onActualizar,
   catalogoMateriales,
-  catalogoProcesos,
   onAbrirModalMaterial,
 }: {
   pieza: PiezaCotizacion;
@@ -130,13 +128,12 @@ function PiezaCard({
   onEliminar: () => void;
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
   catalogoMateriales: CatalogoMaterial[];
-  catalogoProcesos: CatalogoProceso[];
   onAbrirModalMaterial: (piezaId: string) => void;
 }) {
   const [materialSeleccionado, setMaterialSeleccionado] = useState<CatalogoMaterial | null>(null);
   const [cantidadMaterial, setCantidadMaterial] = useState(1);
   const [margenMaterial, setMargenMaterial] = useState(0);
-  const [procesoSeleccionado, setProcesoSeleccionado] = useState<CatalogoProceso | null>(null);
+  const [procesoSeleccionado, setProcesoSeleccionado] = useState<any>(null);
   const [tiempoProceso, setTiempoProceso] = useState(0);
   const [tipoMO, setTipoMO] = useState<'mo_s' | 'mo_e'>('mo_s');
   const [nombreExterno, setNombreExterno] = useState('');

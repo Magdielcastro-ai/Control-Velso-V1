@@ -11,7 +11,6 @@ import {
   User,
   FileText,
   Package,
-  Settings,
   DollarSign,
   Calendar,
   CheckCircle,
@@ -1045,8 +1044,7 @@ function App() {
                     piezas={cotizacion.piezas}
                     costosGenerales={cotizacion.costosAdicionales}
                     margenUtilidad={cotizacion.margenUtilidad}
-                    onChangeCostosPieza={actualizarCostosAdicionalesPieza}
-                    onChangeCostosGenerales={actualizarCostosAdicionales}
+                                        onChangeCostosGenerales={actualizarCostosAdicionales}
                     onChangeMargen={actualizarMargenUtilidad}
                   />
                 )}
