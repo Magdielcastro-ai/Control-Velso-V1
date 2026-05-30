@@ -145,7 +145,6 @@ function PiezaCard({
   const [costoExterno, setCostoExterno] = useState(0);
   const [margenExterno, setMargenExterno] = useState(30);
   const [editandoMaterial, setEditandoMaterial] = useState<string | null>(null);
-  const [editandoProceso, setEditandoProceso] = useState<string | null>(null);
 
   // Calcular costo por pieza a partir del costo total
   const calcularCostoMaterial = () => {
@@ -230,13 +229,14 @@ function PiezaCard({
     setTiempoProceso(0);
   };
 
-  const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
-    const procs = pieza.procesos.map((p) => {
-      if (p.id !== procesoId) return p;
-      return { ...p, [campo]: valor };
-    });
-    onActualizar(pieza.id, { procesos: procs });
-  };
+  // Función para actualizar proceso (reservada para futuro uso)
+  // const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
+  //   const procs = pieza.procesos.map((p) => {
+  //     if (p.id !== procesoId) return p;
+  //     return { ...p, [campo]: valor };
+  //   });
+  //   onActualizar(pieza.id, { procesos: procs });
+  // };
 
   const eliminarProceso = (procesoId: string) => {
     onActualizar(pieza.id, {
