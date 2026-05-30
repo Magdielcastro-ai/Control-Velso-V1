@@ -256,7 +256,7 @@ function App() {
     refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
 
-  const { catalogo, agregarAlCatalogo, eliminarDelCatalogo } = useCatalogoMateriales();
+  const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
 
   const { 
     clientes, 
