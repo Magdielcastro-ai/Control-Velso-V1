@@ -296,6 +296,7 @@ function App() {
   const {
     talleres,
     guardarTallerDesdeCotizacion,
+    recargarTalleres,
   } = useTalleresStore();
 
   // NUEVO: Generar pendientes y cobranzas automáticamente cuando cargan los datos
@@ -327,6 +328,7 @@ function App() {
       refrescarClientes(),
       refrescarCotizaciones(),
       refrescarProyectos(),
+      recargarTalleres(),
     ]);
     setDatosCargados(true);
     toast.success('Datos sincronizados correctamente');
@@ -854,7 +856,7 @@ function App() {
               onAgregar={canManageMateriales() ? agregarAlCatalogo : undefined}
               onEliminar={canManageMateriales() ? eliminarDelCatalogo : undefined}
               onActualizarPrecio={canManageMateriales() ? (id, precio) => {
-                void precio; // Se usará para actualizar en Supabase
+                // precio se usará para actualizar en Supabase
                 const mat = catalogo.find(m => m.id === id);
                 if (mat) {
                   toast.success('Precio actualizado: $' + precio.toFixed(2));

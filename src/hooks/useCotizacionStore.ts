@@ -119,18 +119,31 @@ export const useCotizacionStore = () => {
       if (error) throw error;
 
       if (data) {
-        const cotizacionesFormateadas: CotizacionGuardada[] = data.map(c => ({
-          id: c.id,
-          numero: c.numero,
-          fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-          tipo: c.tipo || 'pieza_unica',
-          clienteNombre: c.cliente_nombre,
-          proyectoNombre: c.proyecto_nombre,
-          total: c.total,
-          estado: c.estado,
-          usuarioId: c.usuario_id,
-          cantidadPiezas: c.piezas ? JSON.parse(c.piezas).length : 1,
-        }));
+        const cotizacionesFormateadas: CotizacionGuardada[] = data.map(c => {
+          // Manejar piezas que pueden venir como string JSON o como objeto
+          let cantidadPiezas = 1;
+          if (c.piezas) {
+            try {
+              const piezas = typeof c.piezas === 'string' ? JSON.parse(c.piezas) : c.piezas;
+              cantidadPiezas = Array.isArray(piezas) ? piezas.length : 1;
+            } catch (e) {
+              cantidadPiezas = 1;
+            }
+          }
+
+          return {
+            id: c.id,
+            numero: c.numero,
+            fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            tipo: c.tipo || 'pieza_unica',
+            clienteNombre: c.cliente_nombre || 'Sin cliente',
+            proyectoNombre: c.proyecto_nombre || 'Sin nombre',
+            total: Number(c.total) || 0,
+            estado: c.estado || 'borrador',
+            usuarioId: c.usuario_id,
+            cantidadPiezas,
+          };
+        });
 
         setCotizacionesGuardadas(cotizacionesFormateadas);
         console.log('[useCotizacionStore] Refrescado desde Supabase:', data.length);
