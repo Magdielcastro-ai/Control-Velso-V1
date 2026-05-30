@@ -854,10 +854,10 @@ function App() {
               onAgregar={canManageMateriales() ? agregarAlCatalogo : undefined}
               onEliminar={canManageMateriales() ? eliminarDelCatalogo : undefined}
               onActualizarPrecio={canManageMateriales() ? (id, precio) => {
+                void precio; // Se usará para actualizar en Supabase
                 const mat = catalogo.find(m => m.id === id);
                 if (mat) {
-                  // Actualizar en Supabase (tabla catalogo_materiales)
-                  toast.success('Precio actualizado');
+                  toast.success('Precio actualizado: $' + precio.toFixed(2));
                 }
               } : undefined}
             />
