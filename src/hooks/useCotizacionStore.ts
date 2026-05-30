@@ -40,7 +40,7 @@ const calcularCostoProceso = (proceso: Proceso): number => {
 
 const piezaVacia = (): PiezaCotizacion => ({
   id: crypto.randomUUID(),
-  nombre: 'Pieza',
+  nombre: 'Pieza 1',
   cantidad: 1,
   materiales: [],
   procesos: [],
@@ -56,7 +56,7 @@ const piezaVacia = (): PiezaCotizacion => ({
   totalPieza: 0,
 });
 
-const cotizacionVacia = (tipo: TipoCotizacion = 'pieza_unica'): Cotizacion => ({
+const cotizacionVacia = (tipo: TipoCotizacion = 'proyecto'): Cotizacion => ({
   id: '',
   numero: generarNumeroCotizacion(),
   fecha: new Date().toISOString().split('T')[0],

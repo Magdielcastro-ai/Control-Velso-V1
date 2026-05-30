@@ -39,8 +39,6 @@ import { useCobranzaStore } from '@/hooks/useCobranzaStore';
 import { TallerStep } from '@/components/steps/TallerStep';
 import { ClienteStep } from '@/components/steps/ClienteStep';
 import { ProyectoStep } from '@/components/steps/ProyectoStep';
-import { MaterialesStep } from '@/components/steps/MaterialesStep';
-import { ProcesosStep } from '@/components/steps/ProcesosStep';
 import { CostosStep } from '@/components/steps/CostosStep';
 import { CondicionesStep } from '@/components/steps/CondicionesStep';
 import { ResumenStep } from '@/components/steps/ResumenStep';
@@ -76,8 +74,6 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
   { id: 'cliente', label: 'Cliente', icon: User },
   { id: 'proyecto', label: 'Proyecto', icon: FileText },
   { id: 'piezas', label: 'Piezas', icon: Package },
-  { id: 'materiales', label: 'Materiales', icon: Package },
-  { id: 'procesos', label: 'Procesos', icon: Settings },
   { id: 'costos', label: 'Costos', icon: DollarSign },
   { id: 'condiciones', label: 'Condiciones', icon: Calendar },
   { id: 'resumen', label: 'Resumen', icon: CheckCircle },
@@ -583,10 +579,6 @@ function App() {
         return !!cotizacion.proyecto.nombre;
       case 'piezas':
         return cotizacion.piezas.length > 0 && cotizacion.piezas.every((p: PiezaCotizacion) => p.nombre.trim() !== '');
-      case 'materiales':
-        return cotizacion.piezas.some((p: PiezaCotizacion) => p.materiales.length > 0);
-      case 'procesos':
-        return cotizacion.piezas.some((p: PiezaCotizacion) => p.procesos.length > 0);
       default:
         return true;
     }
@@ -1046,29 +1038,18 @@ function App() {
                 {pasoActual === 'piezas' && (
                   <PiezasStep
                     piezas={cotizacion.piezas}
-                    tipo={cotizacion.tipo}
+                    catalogoMateriales={catalogo}
+                    catalogoProcesos={CATALOGO_PROCESOS_VELSO}
                     onAgregarPieza={agregarPieza}
                     onEliminarPieza={eliminarPieza}
                     onActualizarPieza={actualizarPieza}
-                    onCambiarTipo={cambiarTipoCotizacion}
+                    onAgregarMaterialACatalogo={async (material) => {
+                      const nuevo = await agregarAlCatalogo(material);
+                      return nuevo;
+                    }}
                   />
                 )}
-                {pasoActual === 'materiales' && (
-                  <MaterialesStep
-                    piezas={cotizacion.piezas}
-                    catalogo={catalogo}
-                    onAgregarMaterial={agregarMaterialAPieza}
-                    onEliminarMaterial={eliminarMaterialDePieza}
-                    onRecargarCatalogo={recargarCatalogo}
-                  />
-                )}
-                {pasoActual === 'procesos' && (
-                  <ProcesosStep
-                    piezas={cotizacion.piezas}
-                    onAgregarProceso={agregarProcesoAPieza}
-                    onEliminarProceso={eliminarProcesoDePieza}
-                  />
-                )}
+
                 {pasoActual === 'costos' && (
                   <CostosStep
                     piezas={cotizacion.piezas}
