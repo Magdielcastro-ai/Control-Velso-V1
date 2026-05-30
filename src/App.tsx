@@ -1044,7 +1044,10 @@ function App() {
                     piezas={cotizacion.piezas}
                     costosGenerales={cotizacion.costosAdicionales}
                     margenUtilidad={cotizacion.margenUtilidad}
-                                        onChangeCostosGenerales={actualizarCostosAdicionales}
+                    onChangeCostosPieza={(piezaId, datos) => {
+                      console.log('Costos por pieza:', piezaId, datos);
+                    }}
+                    onChangeCostosGenerales={actualizarCostosAdicionales}
                     onChangeMargen={actualizarMargenUtilidad}
                   />
                 )}
