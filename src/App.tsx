@@ -1041,7 +1041,7 @@ function App() {
                   />
                 )}
                 {pasoActual === 'proyecto' && (
-                  <ProyectoStep datos={cotizacion.proyecto} onChange={actualizarProyecto} />
+                  <ProyectoStep proyecto={cotizacion.proyecto} onChange={actualizarProyecto} />
                 )}
                 {pasoActual === 'piezas' && (
                   <PiezasStep
