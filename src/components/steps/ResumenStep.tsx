@@ -27,7 +27,8 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
         <h3 className="text-sm font-medium text-slate-900">Desglose por pieza</h3>
 
         {piezas.map((pieza: PiezaCotizacion, index: number) => {
-          const costoMats = pieza.materiales.reduce((sum: number, m: Material) => sum + m.costoTotal, 0);
+          // ← CAMBIO: material único en lugar de array
+          const costoMats = pieza.material ? pieza.material.costoTotal : 0;
           const costoProcs = pieza.procesos.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
           const costosAdic = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
           const costoDirecto = costoMats + costoProcs + costosAdic;
@@ -43,10 +44,14 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                 </div>
 
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Materiales ({pieza.materiales.length})</span>
-                    <span>${costoMats.toFixed(2)}</span>
-                  </div>
+                  {pieza.material && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>
+                        Material: {pieza.material.nombre} ({pieza.material.tipo})
+                      </span>
+                      <span>${costoMats.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-slate-600">
                     <span>Procesos ({pieza.procesos.length})</span>
                     <span>${costoProcs.toFixed(2)}</span>

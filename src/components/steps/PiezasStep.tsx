@@ -4,9 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check } from 'lucide-react';
+import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check, RotateCcw, Circle, Square, LayoutGrid, Layers, Hexagon, Octagon, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PiezaCotizacion, Material, Proceso, CatalogoMaterial } from '@/types/cotizacion';
+import type { PiezaCotizacion, Material, CatalogoMaterial } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 
 interface PiezasStepProps {
@@ -15,9 +15,61 @@ interface PiezasStepProps {
   onAgregarPieza: (nombre: string, cantidad: number) => void;
   onEliminarPieza: (id: string) => void;
   onActualizarPieza: (id: string, datos: Partial<PiezaCotizacion>) => void;
+  onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
+  onActualizarMaterial: (piezaId: string, material: Partial<Material>) => void;
+  onEliminarMaterial: (piezaId: string) => void;
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
 }
+
+// Configuración de formas geométricas
+const FORMAS = [
+  { id: 'redondo', label: 'Redondo', icon: Circle },
+  { id: 'cuadrado', label: 'Cuadrado', icon: Square },
+  { id: 'barra_hueca', label: 'Barra Hueca', icon: Hexagon },
+  { id: 'barra_cromada', label: 'Barra Cromada', icon: Circle },
+  { id: 'placa', label: 'Placa', icon: LayoutGrid },
+  { id: 'angulo', label: 'Ángulo', icon: Octagon },
+  { id: 'otro', label: 'Otro', icon: HelpCircle },
+] as const;
+
+type FormaId = typeof FORMAS[number]['id'];
+
+// Dimensiones por forma
+const DIMENSIONES_CONFIG: Record<FormaId, { key: string; label: string; placeholder: string; type?: string }[]> = {
+  redondo: [
+    { key: 'diametro', label: 'Diámetro', placeholder: 'mm' },
+    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+  ],
+  cuadrado: [
+    { key: 'lado', label: 'Lado', placeholder: 'mm' },
+    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+  ],
+  barra_hueca: [
+    { key: 'diametro_exterior', label: 'Diámetro Exterior', placeholder: 'mm' },
+    { key: 'diametro_interior', label: 'Diámetro Interior', placeholder: 'mm' },
+    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+  ],
+  barra_cromada: [
+    { key: 'diametro', label: 'Diámetro', placeholder: 'mm' },
+    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+  ],
+  placa: [
+    { key: 'largo', label: 'Largo', placeholder: 'mm' },
+    { key: 'ancho', label: 'Ancho', placeholder: 'mm' },
+    { key: 'espesor', label: 'Espesor', placeholder: 'mm' },
+  ],
+  angulo: [
+    { key: 'lado_a', label: 'Lado A', placeholder: 'mm' },
+    { key: 'lado_b', label: 'Lado B', placeholder: 'mm' },
+    { key: 'espesor', label: 'Espesor', placeholder: 'mm' },
+    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+  ],
+  otro: [
+    { key: 'descripcion', label: 'Descripción', placeholder: 'Describe el material...', type: 'text' },
+    { key: 'dimensiones_libre', label: 'Dimensiones', placeholder: 'Ej: 50x30x10 mm', type: 'text' },
+  ],
+};
 
 export function PiezasStep({
   piezas,
@@ -25,6 +77,9 @@ export function PiezasStep({
   onAgregarPieza,
   onEliminarPieza,
   onActualizarPieza,
+  onAsignarMaterial,
+  onActualizarMaterial,
+  onEliminarMaterial,
   onAgregarMaterialACatalogo,
   onRecargarCatalogo,
 }: PiezasStepProps) {
@@ -52,13 +107,16 @@ export function PiezasStep({
             key={pieza.id}
             pieza={pieza}
             expandida={piezaExpandida === pieza.id}
+            catalogoMateriales={catalogoMateriales}
             onToggle={() => setPiezaExpandida(piezaExpandida === pieza.id ? '' : pieza.id)}
             onEliminar={() => {
               if (piezas.length > 1) onEliminarPieza(pieza.id);
               else toast.error('Debe haber al menos una pieza');
             }}
             onActualizar={onActualizarPieza}
-            catalogoMateriales={catalogoMateriales}
+            onAsignarMaterial={onAsignarMaterial}
+            onActualizarMaterial={onActualizarMaterial}
+            onEliminarMaterial={onEliminarMaterial}
             onAbrirModalMaterial={(piezaId) => {
               setPiezaParaMaterial(piezaId);
               setModalMaterialAbierto(true);
@@ -111,159 +169,191 @@ export function PiezasStep({
   );
 }
 
+// ============================================
+// COMPONENTE: PiezaCard con Material Único
+// ============================================
 function PiezaCard({
   pieza,
   expandida,
+  catalogoMateriales,
   onToggle,
   onEliminar,
   onActualizar,
-  catalogoMateriales,
+  onAsignarMaterial,
+  onActualizarMaterial,
+  onEliminarMaterial,
   onAbrirModalMaterial,
   onRecargarCatalogo,
 }: {
   pieza: PiezaCotizacion;
   expandida: boolean;
+  catalogoMateriales: CatalogoMaterial[];
   onToggle: () => void;
   onEliminar: () => void;
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
-  catalogoMateriales: CatalogoMaterial[];
+  onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
+  onActualizarMaterial: (piezaId: string, material: Partial<Material>) => void;
+  onEliminarMaterial: (piezaId: string) => void;
   onAbrirModalMaterial: (piezaId: string) => void;
   onRecargarCatalogo?: () => void;
 }) {
-  const [materialSeleccionado, setMaterialSeleccionado] = useState<CatalogoMaterial | null>(null);
-  const [costoTotalMaterial, setCostoTotalMaterial] = useState(0);
-  const [margenMaterial, setMargenMaterial] = useState(30);
-  const [procesoSeleccionado, setProcesoSeleccionado] = useState<any>(null);
-  const [tiempoProceso, setTiempoProceso] = useState(0);
-  const [unidadTiempo, setUnidadTiempo] = useState<'minutos' | 'horas'>('minutos');
-  const [tipoMO, setTipoMO] = useState<'mo_s' | 'mo_e'>('mo_s');
-  const [nombreExterno, setNombreExterno] = useState('');
-  const [costoExterno, setCostoExterno] = useState(0);
-  const [margenExterno, setMargenExterno] = useState(30);
-  const [editandoMaterial, setEditandoMaterial] = useState<string | null>(null);
-  const [editandoProceso, setEditandoProceso] = useState<string | null>(null);
+  const [editandoMaterial, setEditandoMaterial] = useState(false);
 
-  const calcularCostoMaterial = () => {
-    if (costoTotalMaterial <= 0 || pieza.cantidad <= 0) return 0;
-    const costoPorPieza = costoTotalMaterial / pieza.cantidad;
-    const costoConMargen = costoPorPieza * (1 + margenMaterial / 100);
-    return costoConMargen;
+  // Estados para formulario de material
+  const [formaSeleccionada, setFormaSeleccionada] = useState<FormaId>('redondo');
+  const [tipoSeleccionado, setTipoSeleccionado] = useState('');
+  const [dimensiones, setDimensiones] = useState<Record<string, string>>({});
+  const [precioUnitario, setPrecioUnitario] = useState('');
+  const [precioBase, setPrecioBase] = useState(0);
+  const [margen, setMargen] = useState(0);
+  const [unidadMedida, setUnidadMedida] = useState('mm');
+  const [unidadCosto, setUnidadCosto] = useState('kg');
+
+  const tieneMaterial = !!pieza.material;
+
+  // Obtener tipos disponibles para la forma seleccionada
+  const tiposDisponibles = catalogoMateriales
+    .filter(m => m.forma === formaSeleccionada)
+    .map(m => m.tipo)
+    .filter((v, i, a) => a.indexOf(v) === i);
+
+  // Cuando cambia la forma, buscar precio base
+  const handleFormaChange = (forma: FormaId) => {
+    setFormaSeleccionada(forma);
+    setTipoSeleccionado('');
+    setDimensiones({});
+    setPrecioUnitario('');
+    setPrecioBase(0);
   };
 
-  const agregarMaterial = () => {
-    if (!materialSeleccionado || costoTotalMaterial <= 0) return;
-    const costoUnitarioConMargen = calcularCostoMaterial();
-    const nuevo: Material = {
-      id: crypto.randomUUID(),
-      nombre: materialSeleccionado.nombre,
-      tipo: materialSeleccionado.tipo,
-      forma: materialSeleccionado.forma,
-      cantidad: pieza.cantidad,
-      costoUnitario: costoUnitarioConMargen,
-      unidadMedida: materialSeleccionado.unidadMedida,
-      unidad: materialSeleccionado.unidadCosto,
-      margenPorcentaje: margenMaterial,
-      costoTotal: costoUnitarioConMargen * pieza.cantidad,
-    };
-    onActualizar(pieza.id, {
-      materiales: [...pieza.materiales, nuevo],
-    });
-    setMaterialSeleccionado(null);
-    setCostoTotalMaterial(0);
-    setMargenMaterial(30);
-  };
-
-  const actualizarMaterial = (materialId: string, campo: string, valor: number) => {
-    const mats = pieza.materiales.map((m) => {
-      if (m.id !== materialId) return m;
-      if (campo === 'margenPorcentaje') {
-        const nuevoCosto = (m.costoUnitario / (1 + m.margenPorcentaje / 100)) * (1 + valor / 100);
-        return { ...m, margenPorcentaje: valor, costoUnitario: nuevoCosto, costoTotal: nuevoCosto * m.cantidad };
-      }
-      if (campo === 'costoUnitario') {
-        return { ...m, costoUnitario: valor, costoTotal: valor * m.cantidad };
-      }
-      return m;
-    });
-    onActualizar(pieza.id, { materiales: mats });
-  };
-
-  const eliminarMaterial = (materialId: string) => {
-    onActualizar(pieza.id, {
-      materiales: pieza.materiales.filter((m) => m.id !== materialId),
-    });
-  };
-
-  const agregarProceso = () => {
-    if (!procesoSeleccionado || tiempoProceso <= 0) return;
-    const tiempoMinutos = unidadTiempo === 'horas' ? tiempoProceso * 60 : tiempoProceso;
-    const tiempoHoras = tiempoMinutos / 60;
-    let costoMO = 0;
-    if (procesoSeleccionado.categoria === 'maquina') {
-      costoMO = tiempoHoras * (tipoMO === 'mo_s' ? 191.19 : 286.78);
-    } else if (procesoSeleccionado.requiereManoObra === 'mo_s') {
-      costoMO = tiempoHoras * 191.19;
-    } else if (procesoSeleccionado.requiereManoObra === 'mo_e') {
-      costoMO = tiempoHoras * 286.78;
+  // Cuando cambia el tipo, buscar precio del catálogo
+  const handleTipoChange = (tipo: string) => {
+    setTipoSeleccionado(tipo);
+    const materialCat = catalogoMateriales.find(
+      m => m.forma === formaSeleccionada && m.tipo === tipo
+    );
+    if (materialCat) {
+      setPrecioBase(materialCat.costoUnitario);
+      setPrecioUnitario(materialCat.costoUnitario.toString());
+      setUnidadMedida(materialCat.unidadMedida || 'mm');
+      setUnidadCosto(materialCat.unidadCosto || 'kg');
+      // Pre-llenar dimensiones si existen en el catálogo
+      const dims: Record<string, string> = {};
+      if (materialCat.diametro) dims.diametro = materialCat.diametro.toString();
+      if (materialCat.lado) dims.lado = materialCat.lado.toString();
+      if (materialCat.largo) dims.largo = materialCat.largo.toString();
+      if (materialCat.ancho) dims.ancho = materialCat.ancho.toString();
+      if (materialCat.espesor) dims.espesor = materialCat.espesor.toString();
+      setDimensiones(dims);
     }
-    const nuevo: Proceso = {
-      id: crypto.randomUUID(),
-      nombre: procesoSeleccionado.nombre,
-      tipo: procesoSeleccionado.id,
-      tiempoMinutos,
-      costoPorHora: procesoSeleccionado.costoPorHora,
-      costoManoObra: costoMO,
-      costoTotal: tiempoHoras * procesoSeleccionado.costoPorHora + costoMO,
-      descripcion: `${tiempoProceso} ${unidadTiempo}`,
-      incluyeManoObra: costoMO > 0,
-      tipoManoObraSeleccionada: costoMO > 0 ? tipoMO : undefined,
-    };
-    onActualizar(pieza.id, {
-      procesos: [...pieza.procesos, nuevo],
-    });
-    setProcesoSeleccionado(null);
-    setTiempoProceso(0);
   };
 
-  const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
-    const procs = pieza.procesos.map((p) => {
-      if (p.id !== procesoId) return p;
-      return { ...p, [campo]: valor };
+  const handleGuardarMaterial = () => {
+    if (!tipoSeleccionado) {
+      toast.error('Selecciona un tipo de material');
+      return;
+    }
+    if (!precioUnitario || parseFloat(precioUnitario) <= 0) {
+      toast.error('Ingresa un precio unitario válido');
+      return;
+    }
+
+    // Validar dimensiones requeridas
+    const config = DIMENSIONES_CONFIG[formaSeleccionada];
+    const dimsNumericas: Record<string, number> = {};
+    for (const dim of config) {
+      if (dim.type === 'text') {
+        dimsNumericas[dim.key] = dimensiones[dim.key] || '';
+      } else {
+        const val = parseFloat(dimensiones[dim.key] || '');
+        if (isNaN(val) || val <= 0) {
+          toast.error(`Ingresa ${dim.label} válido`);
+          return;
+        }
+        dimsNumericas[dim.key] = val;
+      }
+    }
+
+    const materialCat = catalogoMateriales.find(
+      m => m.forma === formaSeleccionada && m.tipo === tipoSeleccionado
+    );
+
+    onAsignarMaterial(pieza.id, {
+      nombre: materialCat?.nombre || tipoSeleccionado,
+      tipo: tipoSeleccionado,
+      forma: formaSeleccionada,
+      cantidad: pieza.cantidad,
+      costoUnitario: parseFloat(precioUnitario),
+      unidadMedida: unidadMedida as 'mm' | 'in',
+      unidad: unidadCosto,
+      margenPorcentaje: margen,
+      ...dimsNumericas,
     });
-    onActualizar(pieza.id, { procesos: procs });
+
+    setEditandoMaterial(false);
+    resetForm();
   };
 
-  const eliminarProceso = (procesoId: string) => {
-    onActualizar(pieza.id, {
-      procesos: pieza.procesos.filter((p) => p.id !== procesoId),
-    });
+  const handleEliminarMaterial = () => {
+    onEliminarMaterial(pieza.id);
+    setEditandoMaterial(false);
   };
 
-  const agregarProcesoExterno = () => {
-    if (!nombreExterno.trim() || costoExterno <= 0) return;
-    const costoConMargen = costoExterno * (1 + margenExterno / 100);
-    const nuevo: Proceso = {
-      id: crypto.randomUUID(),
-      nombre: nombreExterno.trim(),
-      tipo: 'otro',
-      tiempoMinutos: 0,
-      costoPorHora: 0,
-      costoManoObra: 0,
-      costoTotal: costoConMargen,
-      descripcion: `Proveedor: $${costoExterno.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)}`,
-      incluyeManoObra: false,
-    };
-    onActualizar(pieza.id, {
-      procesos: [...pieza.procesos, nuevo],
-    });
-    setNombreExterno('');
-    setCostoExterno(0);
-    setMargenExterno(30);
+  const resetForm = () => {
+    setFormaSeleccionada('redondo');
+    setTipoSeleccionado('');
+    setDimensiones({});
+    setPrecioUnitario('');
+    setPrecioBase(0);
+    setMargen(0);
+  };
+
+  const iniciarEdicion = () => {
+    if (pieza.material) {
+      setFormaSeleccionada(pieza.material.forma as FormaId);
+      setTipoSeleccionado(pieza.material.tipo);
+      setPrecioUnitario(pieza.material.costoUnitario.toString());
+      setPrecioBase(pieza.material.costoUnitario);
+      setMargen(pieza.material.margenPorcentaje);
+      setUnidadMedida(pieza.material.unidadMedida);
+      setUnidadCosto(pieza.material.unidad);
+      // Cargar dimensiones
+      const dims: Record<string, string> = {};
+      const config = DIMENSIONES_CONFIG[pieza.material.forma as FormaId] || [];
+      for (const dim of config) {
+        const val = (pieza.material as any)[dim.key];
+        if (val !== undefined && val !== null) {
+          dims[dim.key] = val.toString();
+        }
+      }
+      setDimensiones(dims);
+    }
+    setEditandoMaterial(true);
+  };
+
+  const formatearDimensiones = (material: Material) => {
+    const forma = material.forma as FormaId;
+    const config = DIMENSIONES_CONFIG[forma];
+    if (!config) return '';
+
+    const partes = config
+      .filter(d => d.type !== 'text')
+      .map(d => {
+        const val = (material as any)[d.key];
+        return val ? `${d.label}: ${val}${material.unidadMedida}` : null;
+      })
+      .filter(Boolean);
+
+    if (forma === 'otro') {
+      return (material as any).descripcion || (material as any).dimensiones_libre || '';
+    }
+    return partes.join(' × ');
   };
 
   return (
     <Card className="border-slate-200">
       <CardContent className="p-4">
+        {/* Header de pieza */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3 flex-1">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -288,7 +378,7 @@ function PiezaCard({
                 </div>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                {pieza.materiales.length} materiales · {pieza.procesos.length} procesos
+                {tieneMaterial ? '1 material asignado' : 'Sin material'} · {pieza.procesos.length} procesos
               </p>
             </div>
           </div>
@@ -309,10 +399,11 @@ function PiezaCard({
 
         {expandida && (
           <div className="space-y-4 pt-2 border-t border-slate-100">
+            {/* === MATERIAL ÚNICO === */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-slate-900 flex items-center gap-1">
-                  <Package className="w-3 h-3" /> Materiales
+                  <Package className="w-3 h-3" /> Material
                 </h4>
                 {catalogoMateriales.length === 0 && (
                   <div className="flex items-center gap-2">
@@ -327,295 +418,192 @@ function PiezaCard({
                 )}
               </div>
 
-              {pieza.materiales.length > 0 && (
-                <div className="space-y-2 mb-3">
-                  {pieza.materiales.map((mat) => (
-                    <div key={mat.id} className="p-2 bg-slate-50 rounded-lg">
-                      {editandoMaterial === mat.id ? (
-                        <div className="flex gap-2 items-center">
-                          <span className="text-sm flex-1">{mat.nombre}</span>
-                          <Input
-                            type="number"
-                            value={mat.costoUnitario}
-                            onChange={(e) => actualizarMaterial(mat.id, 'costoUnitario', parseFloat(e.target.value) || 0)}
-                            className="w-24 h-7 text-xs"
-                          />
-                          <Input
-                            type="number"
-                            value={mat.margenPorcentaje}
-                            onChange={(e) => actualizarMaterial(mat.id, 'margenPorcentaje', parseFloat(e.target.value) || 0)}
-                            className="w-16 h-7 text-xs"
-                          />
-                          <span className="text-xs">%</span>
-                          <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditandoMaterial(null)}>
-                            <Check className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-medium">{mat.nombre}</p>
-                            <p className="text-xs text-slate-500">
-                              ${mat.costoUnitario.toFixed(2)} × {mat.cantidad} piezas = ${mat.costoTotal.toFixed(2)}
-                              {mat.margenPorcentaje > 0 && ` (incluye ${mat.margenPorcentaje}% margen)`}
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditandoMaterial(mat.id)}>
-                              <Pencil className="w-3 h-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => eliminarMaterial(mat.id)}>
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 min-w-[150px]">
-                    <Select
-                      value={materialSeleccionado?.id || ''}
-                      onValueChange={(id) => {
-                        const mat = catalogoMateriales.find(c => c.id === id);
-                        setMaterialSeleccionado(mat || null);
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar material..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalogoMateriales.map((mat) => (
-                          <SelectItem key={mat.id} value={mat.id} className="text-xs">
-                            {mat.nombre} - {mat.forma} - {mat.tipo}
-                          </SelectItem>
-                        ))}
-                        {catalogoMateriales.length === 0 && (
-                          <div className="p-2 text-xs text-slate-500">No hay materiales en catálogo</div>
+              {tieneMaterial && !editandoMaterial ? (
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{pieza.material!.nombre}</p>
+                      <p className="text-xs text-slate-500">
+                        {FORMAS.find(f => f.id === pieza.material!.forma)?.label} · {pieza.material!.tipo}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {formatearDimensiones(pieza.material!)}
+                      </p>
+                      <p className="text-sm font-semibold text-blue-700 mt-1">
+                        ${pieza.material!.costoUnitario.toFixed(2)}/{pieza.material!.unidad} × {pieza.cantidad} pzas = ${pieza.material!.costoTotal.toFixed(2)}
+                        {pieza.material!.margenPorcentaje > 0 && (
+                          <span className="text-xs text-green-600 ml-1">(+{pieza.material!.margenPorcentaje}% margen)</span>
                         )}
-                      </SelectContent>
-                    </Select>
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={iniciarEdicion}>
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={handleEliminarMaterial}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                {materialSeleccionado && (
-                  <div className="space-y-2">
+              ) : editandoMaterial ? (
+                <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-200">
+                  {/* Selector de Forma */}
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 mb-1 block">Forma del Material</label>
+                    <div className="flex flex-wrap gap-2">
+                      {FORMAS.map((forma) => {
+                        const Icon = forma.icon;
+                        return (
+                          <button
+                            key={forma.id}
+                            type="button"
+                            onClick={() => handleFormaChange(forma.id)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                              formaSeleccionada === forma.id
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300'
+                            }`}
+                          >
+                            <Icon className="w-3.5 h-3.5" />
+                            {forma.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Selector de Tipo */}
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 mb-1 block">Tipo de Material</label>
+                    {tiposDisponibles.length > 0 ? (
+                      <Select value={tipoSeleccionado} onValueChange={handleTipoChange}>
+                        <SelectTrigger className="h-8 text-xs bg-white">
+                          <SelectValue placeholder="Selecciona material..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tiposDisponibles.map((tipo) => (
+                            <SelectItem key={tipo} value={tipo} className="text-xs">
+                              {tipo}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
+                        No hay materiales en el catálogo para {FORMAS.find(f => f.id === formaSeleccionada)?.label}.
+                        <button
+                          onClick={() => onAbrirModalMaterial(pieza.id)}
+                          className="underline ml-1 font-medium"
+                        >
+                          Agregar al catálogo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dimensiones según forma */}
+                  {tipoSeleccionado && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {DIMENSIONES_CONFIG[formaSeleccionada].map((dim) => (
+                        <div key={dim.key}>
+                          <label className="text-xs text-slate-500 block mb-0.5">{dim.label} ({dim.placeholder})</label>
+                          <Input
+                            type={dim.type || 'number'}
+                            step={dim.type === 'text' ? undefined : '0.1'}
+                            value={dimensiones[dim.key] || ''}
+                            onChange={(e) => setDimensiones(prev => ({ ...prev, [dim.key]: e.target.value }))}
+                            className="h-7 text-xs bg-white"
+                            placeholder={dim.placeholder}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Precio y Margen */}
+                  {tipoSeleccionado && (
                     <div className="flex gap-2 items-end">
                       <div className="flex-1">
-                        <label className="text-xs text-slate-500">Costo TOTAL para {pieza.cantidad} piezas</label>
-                        <Input
-                          type="number"
-                          min={0.01}
-                          step={0.01}
-                          value={costoTotalMaterial}
-                          onChange={(e) => setCostoTotalMaterial(parseFloat(e.target.value) || 0)}
-                          placeholder="Costo total del material"
-                          className="h-8 text-xs"
-                        />
+                        <label className="text-xs text-slate-500 block mb-0.5">Precio Unitario ($)</label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={precioUnitario}
+                            onChange={(e) => setPrecioUnitario(e.target.value)}
+                            className={`h-8 text-xs bg-white pr-16 ${
+                              parseFloat(precioUnitario) !== precioBase ? 'border-amber-400 bg-amber-50' : ''
+                            }`}
+                          />
+                          <span className="absolute right-2 top-1.5 text-xs text-slate-400">{unidadCosto}</span>
+                        </div>
+                        {parseFloat(precioUnitario) !== precioBase && precioBase > 0 && (
+                          <button
+                            onClick={() => { setPrecioUnitario(precioBase.toString()); }}
+                            className="text-xs text-blue-600 flex items-center gap-1 mt-1"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Restaurar precio catálogo (${precioBase.toFixed(2)})
+                          </button>
+                        )}
                       </div>
-                      <div>
-                        <label className="text-xs text-slate-500">Margen %</label>
+                      <div className="w-24">
+                        <label className="text-xs text-slate-500 block mb-0.5">Margen %</label>
                         <Input
                           type="number"
                           min={0}
-                          value={margenMaterial}
-                          onChange={(e) => setMargenMaterial(parseFloat(e.target.value) || 0)}
-                          className="w-16 h-8 text-xs"
+                          value={margen}
+                          onChange={(e) => setMargen(parseFloat(e.target.value) || 0)}
+                          className="h-8 text-xs bg-white"
                         />
                       </div>
-                      <div className="pb-1">
-                        <Button onClick={agregarMaterial} disabled={costoTotalMaterial <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
                     </div>
-                    {costoTotalMaterial > 0 && (
-                      <p className="text-xs text-slate-500">
-                        Costo por pieza: ${(costoTotalMaterial / pieza.cantidad).toFixed(2)} + {margenMaterial}% = ${calcularCostoMaterial().toFixed(2)}
-                      </p>
-                    )}
+                  )}
+
+                  {/* Botones */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleGuardarMaterial}
+                      disabled={!tipoSeleccionado || !precioUnitario}
+                      className="bg-blue-600 hover:bg-blue-700 h-8 text-xs"
+                    >
+                      <Check className="w-3 h-3 mr-1" />
+                      {tieneMaterial ? 'Actualizar Material' : 'Asignar Material'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setEditandoMaterial(false); resetForm(); }}
+                      className="h-8 text-xs"
+                    >
+                      Cancelar
+                    </Button>
                   </div>
-                )}
-              </div>
-              {catalogoMateriales.length === 0 && onAbrirModalMaterial && (
+                </div>
+              ) : (
                 <button
-                  onClick={() => onAbrirModalMaterial(pieza.id)}
-                  className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                  onClick={() => { resetForm(); setEditandoMaterial(true); }}
+                  className="w-full p-3 border-2 border-dashed border-slate-300 rounded-lg text-sm text-slate-500 hover:border-blue-400 hover:text-blue-600 transition flex items-center justify-center gap-2"
                 >
-                  + Agregar material nuevo al catálogo
+                  <Plus className="w-4 h-4" />
+                  Agregar Material a esta Pieza
                 </button>
               )}
             </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
-                <Settings className="w-3 h-3" /> Procesos de Manufactura
-              </h4>
-              {pieza.procesos.filter(p => p.tipo !== 'otro').length > 0 && (
-                <div className="space-y-1 mb-2">
-                  {pieza.procesos.filter(p => p.tipo !== 'otro').map((proc) => (
-                    <div key={proc.id} className="p-2 bg-slate-50 rounded-lg">
-                      {editandoProceso === proc.id ? (
-                        <div className="flex gap-2 items-center">
-                          <span className="text-sm flex-1">{proc.nombre}</span>
-                          <Input
-                            type="number"
-                            value={proc.tiempoMinutos}
-                            onChange={(e) => actualizarProceso(proc.id, 'tiempoMinutos', parseFloat(e.target.value) || 0)}
-                            className="w-20 h-7 text-xs"
-                          />
-                          <span className="text-xs">min</span>
-                          <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditandoProceso(null)}>
-                            <Check className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm">{proc.nombre} ({proc.descripcion || proc.tiempoMinutos + ' min'})</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)}</span>
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setEditandoProceso(proc.id)}>
-                              <Pencil className="w-3 h-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="space-y-2">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 min-w-[150px]">
-                    <Select
-                      value={procesoSeleccionado?.id || ''}
-                      onValueChange={(id) => {
-                        const proc = CATALOGO_PROCESOS_VELSO.find(p => p.id === id);
-                        setProcesoSeleccionado(proc || null);
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar proceso..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATALOGO_PROCESOS_VELSO.map((proc) => (
-                          <SelectItem key={proc.id} value={proc.id} className="text-xs">
-                            {proc.nombre} - ${proc.costoPorHora}/hr
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {procesoSeleccionado && (
-                  <div className="flex gap-2 items-end">
-                    <div>
-                      <label className="text-xs text-slate-500">Tiempo</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={tiempoProceso}
-                        onChange={(e) => setTiempoProceso(parseFloat(e.target.value) || 0)}
-                        className="w-20 h-8 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500">Unidad</label>
-                      <Select value={unidadTiempo} onValueChange={(v) => setUnidadTiempo(v as 'minutos' | 'horas')}>
-                        <SelectTrigger className="h-8 w-24 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="minutos" className="text-xs">Minutos</SelectItem>
-                          <SelectItem value="horas" className="text-xs">Horas</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {procesoSeleccionado?.categoria === 'maquina' && (
-                      <Select value={tipoMO} onValueChange={(v) => setTipoMO(v as 'mo_s' | 'mo_e')}>
-                        <SelectTrigger className="h-8 w-20 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="mo_s" className="text-xs">MO-S</SelectItem>
-                          <SelectItem value="mo_e" className="text-xs">MO-E</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <div className="pb-1">
-                      <Button onClick={agregarProceso} disabled={tiempoProceso <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* === PROCESOS === */}
+            <ProcesosPieza
+              pieza={pieza}
+              onActualizar={onActualizar}
+            />
 
-            <div>
-              <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
-                <ExternalLink className="w-3 h-3" /> Procesos Externos
-              </h4>
-              {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 && (
-                <div className="space-y-1 mb-2">
-                  {pieza.procesos.filter(p => p.tipo === 'otro').map((proc) => (
-                    <div key={proc.id} className="flex justify-between p-1.5 bg-amber-50 rounded text-sm">
-                      <div>
-                        <span>{proc.nombre}</span>
-                        <span className="text-xs text-slate-500 ml-2">{proc.descripcion}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-600">${proc.costoTotal.toFixed(2)}</span>
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2 items-end">
-                <Input
-                  value={nombreExterno}
-                  onChange={(e) => setNombreExterno(e.target.value)}
-                  placeholder="Nombre del proceso externo"
-                  className="flex-1 h-8 text-xs"
-                />
-                <Input
-                  type="number"
-                  min={0.01}
-                  step={0.01}
-                  value={costoExterno}
-                  onChange={(e) => setCostoExterno(parseFloat(e.target.value) || 0)}
-                  placeholder="Costo proveedor"
-                  className="w-28 h-8 text-xs"
-                />
-                <Select value={String(margenExterno)} onValueChange={(v) => setMargenExterno(parseInt(v))}>
-                  <SelectTrigger className="h-8 w-20 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5" className="text-xs">5%</SelectItem>
-                    <SelectItem value="15" className="text-xs">15%</SelectItem>
-                    <SelectItem value="30" className="text-xs">30%</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={agregarProcesoExterno} disabled={!nombreExterno.trim() || costoExterno <= 0} className="h-8 bg-amber-600 hover:bg-amber-700">
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-              {costoExterno > 0 && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Costo proveedor: ${costoExterno.toFixed(2)} + {margenExterno}% = ${(costoExterno * (1 + margenExterno / 100)).toFixed(2)}
-                </p>
-              )}
-            </div>
+            {/* === PROCESOS EXTERNOS === */}
+            <ProcesosExternosPieza
+              pieza={pieza}
+              onActualizar={onActualizar}
+            />
           </div>
         )}
       </CardContent>
@@ -623,6 +611,286 @@ function PiezaCard({
   );
 }
 
+// ============================================
+// PROCESOS (sin cambios mayores)
+// ============================================
+function ProcesosPieza({
+  pieza,
+  onActualizar,
+}: {
+  pieza: PiezaCotizacion;
+  onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
+}) {
+  const [procesoSeleccionado, setProcesoSeleccionado] = useState<any>(null);
+  const [tiempoProceso, setTiempoProceso] = useState(0);
+  const [unidadTiempo, setUnidadTiempo] = useState<'minutos' | 'horas'>('minutos');
+  const [tipoMO, setTipoMO] = useState<'mo_s' | 'mo_e'>('mo_s');
+  const [editandoProceso, setEditandoProceso] = useState<string | null>(null);
+
+  const agregarProceso = () => {
+    if (!procesoSeleccionado || tiempoProceso <= 0) return;
+    const catalogoItem = CATALOGO_PROCESOS_VELSO.find(p => p.id === procesoSeleccionado.id);
+    if (!catalogoItem) return;
+
+    const tiempoMinutos = unidadTiempo === 'horas' ? tiempoProceso * 60 : tiempoProceso;
+    const tiempoHoras = tiempoMinutos / 60;
+    let costoMO = 0;
+    if (catalogoItem.categoria === 'maquina') {
+      costoMO = tiempoHoras * (tipoMO === 'mo_s' ? 191.19 : 286.78);
+    } else if (catalogoItem.requiereManoObra === 'mo_s') {
+      costoMO = tiempoHoras * 191.19;
+    } else if (catalogoItem.requiereManoObra === 'mo_e') {
+      costoMO = tiempoHoras * 286.78;
+    }
+
+    const nuevoProceso = {
+      id: crypto.randomUUID(),
+      nombre: catalogoItem.nombre,
+      tipo: catalogoItem.id,
+      tiempoMinutos,
+      costoPorHora: catalogoItem.costoPorHora,
+      costoManoObra: costoMO,
+      costoTotal: tiempoHoras * catalogoItem.costoPorHora + costoMO,
+      descripcion: `${tiempoProceso} ${unidadTiempo}`,
+      incluyeManoObra: costoMO > 0,
+      tipoManoObraSeleccionada: costoMO > 0 ? tipoMO : undefined,
+    };
+
+    onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevoProceso] });
+    setProcesoSeleccionado(null);
+    setTiempoProceso(0);
+  };
+
+  const eliminarProceso = (procesoId: string) => {
+    onActualizar(pieza.id, {
+      procesos: pieza.procesos.filter((p: any) => p.id !== procesoId),
+    });
+  };
+
+  const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
+    const procs = pieza.procesos.map((p: any) => {
+      if (p.id !== procesoId) return p;
+      return { ...p, [campo]: valor };
+    });
+    onActualizar(pieza.id, { procesos: procs });
+  };
+
+  return (
+    <div>
+      <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
+        <Settings className="w-3 h-3" /> Procesos de Manufactura
+      </h4>
+      {pieza.procesos.filter((p: any) => p.tipo !== 'otro').length > 0 && (
+        <div className="space-y-1 mb-2">
+          {pieza.procesos.filter((p: any) => p.tipo !== 'otro').map((proc: any) => (
+            <div key={proc.id} className="p-2 bg-slate-50 rounded-lg">
+              {editandoProceso === proc.id ? (
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm flex-1">{proc.nombre}</span>
+                  <Input
+                    type="number"
+                    value={proc.tiempoMinutos}
+                    onChange={(e) => actualizarProceso(proc.id, 'tiempoMinutos', parseFloat(e.target.value) || 0)}
+                    className="w-20 h-7 text-xs"
+                  />
+                  <span className="text-xs">min</span>
+                  <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditandoProceso(null)}>
+                    <Check className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">{proc.nombre} ({proc.descripcion || proc.tiempoMinutos + ' min'})</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)}</span>
+                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setEditandoProceso(proc.id)}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="space-y-2">
+        <div className="flex gap-2 items-end">
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              value={procesoSeleccionado?.id || ''}
+              onValueChange={(id) => {
+                const proc = CATALOGO_PROCESOS_VELSO.find(p => p.id === id);
+                setProcesoSeleccionado(proc || null);
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Seleccionar proceso..." />
+              </SelectTrigger>
+              <SelectContent>
+                {CATALOGO_PROCESOS_VELSO.map((proc) => (
+                  <SelectItem key={proc.id} value={proc.id} className="text-xs">
+                    {proc.nombre} - ${proc.costoPorHora}/hr
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {procesoSeleccionado && (
+          <div className="flex gap-2 items-end">
+            <div>
+              <label className="text-xs text-slate-500">Tiempo</label>
+              <Input
+                type="number"
+                min={1}
+                value={tiempoProceso}
+                onChange={(e) => setTiempoProceso(parseFloat(e.target.value) || 0)}
+                className="w-20 h-8 text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">Unidad</label>
+              <Select value={unidadTiempo} onValueChange={(v) => setUnidadTiempo(v as 'minutos' | 'horas')}>
+                <SelectTrigger className="h-8 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minutos" className="text-xs">Minutos</SelectItem>
+                  <SelectItem value="horas" className="text-xs">Horas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {procesoSeleccionado?.categoria === 'maquina' && (
+              <Select value={tipoMO} onValueChange={(v) => setTipoMO(v as 'mo_s' | 'mo_e')}>
+                <SelectTrigger className="h-8 w-20 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mo_s" className="text-xs">MO-S</SelectItem>
+                  <SelectItem value="mo_e" className="text-xs">MO-E</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <div className="pb-1">
+              <Button onClick={agregarProceso} disabled={tiempoProceso <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// PROCESOS EXTERNOS
+// ============================================
+function ProcesosExternosPieza({
+  pieza,
+  onActualizar,
+}: {
+  pieza: PiezaCotizacion;
+  onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
+}) {
+  const [nombreExterno, setNombreExterno] = useState('');
+  const [costoExterno, setCostoExterno] = useState(0);
+  const [margenExterno, setMargenExterno] = useState(30);
+
+  const agregarProcesoExterno = () => {
+    if (!nombreExterno.trim() || costoExterno <= 0) return;
+    const costoConMargen = costoExterno * (1 + margenExterno / 100);
+    const nuevo = {
+      id: crypto.randomUUID(),
+      nombre: nombreExterno.trim(),
+      tipo: 'otro',
+      tiempoMinutos: 0,
+      costoPorHora: 0,
+      costoManoObra: 0,
+      costoTotal: costoConMargen,
+      descripcion: `Proveedor: $${costoExterno.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)}`,
+      incluyeManoObra: false,
+    };
+    onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevo] });
+    setNombreExterno('');
+    setCostoExterno(0);
+    setMargenExterno(30);
+  };
+
+  const eliminarProceso = (procesoId: string) => {
+    onActualizar(pieza.id, {
+      procesos: pieza.procesos.filter((p: any) => p.id !== procesoId),
+    });
+  };
+
+  return (
+    <div>
+      <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
+        <ExternalLink className="w-3 h-3" /> Procesos Externos
+      </h4>
+      {pieza.procesos.filter((p: any) => p.tipo === 'otro').length > 0 && (
+        <div className="space-y-1 mb-2">
+          {pieza.procesos.filter((p: any) => p.tipo === 'otro').map((proc: any) => (
+            <div key={proc.id} className="flex justify-between p-1.5 bg-amber-50 rounded text-sm">
+              <div>
+                <span>{proc.nombre}</span>
+                <span className="text-xs text-slate-500 ml-2">{proc.descripcion}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600">${proc.costoTotal.toFixed(2)}</span>
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 items-end">
+        <Input
+          value={nombreExterno}
+          onChange={(e) => setNombreExterno(e.target.value)}
+          placeholder="Nombre del proceso externo"
+          className="flex-1 h-8 text-xs"
+        />
+        <Input
+          type="number"
+          min={0.01}
+          step={0.01}
+          value={costoExterno}
+          onChange={(e) => setCostoExterno(parseFloat(e.target.value) || 0)}
+          placeholder="Costo proveedor"
+          className="w-28 h-8 text-xs"
+        />
+        <Select value={String(margenExterno)} onValueChange={(v) => setMargenExterno(parseInt(v))}>
+          <SelectTrigger className="h-8 w-20 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5" className="text-xs">5%</SelectItem>
+            <SelectItem value="15" className="text-xs">15%</SelectItem>
+            <SelectItem value="30" className="text-xs">30%</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={agregarProcesoExterno} disabled={!nombreExterno.trim() || costoExterno <= 0} className="h-8 bg-amber-600 hover:bg-amber-700">
+          <Plus className="w-3 h-3" />
+        </Button>
+      </div>
+      {costoExterno > 0 && (
+        <p className="text-xs text-slate-500 mt-1">
+          Costo proveedor: ${costoExterno.toFixed(2)} + {margenExterno}% = ${(costoExterno * (1 + margenExterno / 100)).toFixed(2)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// MODAL NUEVO MATERIAL AL CATÁLOGO
+// ============================================
 function ModalNuevoMaterial({
   abierto,
   onCerrar,
@@ -641,7 +909,7 @@ function ModalNuevoMaterial({
   const [espesor, setEspesor] = useState('');
   const [unidad, setUnidad] = useState('mm');
 
-  const formas = ['redondo', 'cuadrado', 'placa', 'barra_hueca', 'barra_cromada'];
+  const formas = ['redondo', 'cuadrado', 'placa', 'barra_hueca', 'barra_cromada', 'angulo', 'otro'];
 
   const handleGuardar = async () => {
     if (!nombre.trim()) {
@@ -657,7 +925,7 @@ function ModalNuevoMaterial({
       largo: largo ? parseFloat(largo) : undefined,
       ancho: ancho ? parseFloat(ancho) : undefined,
       espesor: espesor ? parseFloat(espesor) : undefined,
-      costoUnitario: 0, // Sin precio, se cotiza al momento
+      costoUnitario: 0,
       unidadCosto: 'kg',
     });
     setNombre('');
@@ -682,9 +950,7 @@ function ModalNuevoMaterial({
             <div>
               <label className="text-sm font-medium">Tipo</label>
               <Select value={tipo} onValueChange={setTipo}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="acero">Acero</SelectItem>
                   <SelectItem value="aluminio">Aluminio</SelectItem>
@@ -697,9 +963,7 @@ function ModalNuevoMaterial({
             <div>
               <label className="text-sm font-medium">Forma</label>
               <Select value={forma} onValueChange={setForma}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {formas.map((f) => (
                     <SelectItem key={f} value={f}>{f.replace('_', ' ')}</SelectItem>
@@ -712,21 +976,15 @@ function ModalNuevoMaterial({
             <label className="text-sm font-medium">Dimensiones</label>
             <div className="grid grid-cols-2 gap-2">
               {(forma === 'redondo' || forma === 'barra_hueca' || forma === 'barra_cromada') && (
-                <Input
-                  value={diametro}
-                  onChange={(e) => setDiametro(e.target.value)}
-                  placeholder="Diámetro (mm)"
-                  type="number"
-                  step="0.1"
-                />
+                <Input value={diametro} onChange={(e) => setDiametro(e.target.value)} placeholder="Diámetro (mm)" type="number" step="0.1" />
               )}
-              {(forma === 'cuadrado' || forma === 'placa') && (
+              {(forma === 'cuadrado' || forma === 'placa' || forma === 'angulo') && (
                 <>
                   <Input value={largo} onChange={(e) => setLargo(e.target.value)} placeholder="Largo (mm)" type="number" step="0.1" />
                   <Input value={ancho} onChange={(e) => setAncho(e.target.value)} placeholder="Ancho (mm)" type="number" step="0.1" />
                 </>
               )}
-              {forma === 'placa' && (
+              {(forma === 'placa' || forma === 'angulo') && (
                 <Input value={espesor} onChange={(e) => setEspesor(e.target.value)} placeholder="Espesor (mm)" type="number" step="0.1" />
               )}
             </div>
@@ -734,9 +992,7 @@ function ModalNuevoMaterial({
           <div>
             <label className="text-sm font-medium">Unidad de Medida</label>
             <Select value={unidad} onValueChange={setUnidad}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="mm">mm</SelectItem>
                 <SelectItem value="in">in (pulgadas)</SelectItem>

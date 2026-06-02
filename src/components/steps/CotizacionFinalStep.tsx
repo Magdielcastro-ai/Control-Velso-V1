@@ -28,8 +28,13 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
     window.print();
   };
 
-  const costoMateriales = cotizacion.materiales.reduce((sum, m) => sum + m.costoTotal, 0);
-  const costoProcesos = cotizacion.procesos.reduce((sum, p) => sum + p.costoTotal, 0);
+  // ← CAMBIO: Calcular costos por pieza (material único)
+  const costoProcesos = cotizacion.piezas.reduce((sum, pieza) => 
+    sum + pieza.procesos.reduce((s, p) => s + p.costoTotal, 0), 0
+  );
+  const costoMateriales = cotizacion.piezas.reduce((sum, pieza) => 
+    sum + (pieza.material ? pieza.material.costoTotal : 0), 0
+  );
   const costosAdicionales = Object.values(cotizacion.costosAdicionales).reduce((sum, v) => sum + v, 0);
   const costoDirecto = costoMateriales + costoProcesos + costosAdicionales;
 
@@ -155,60 +160,49 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {/* Materiales */}
-          {cotizacion.materiales.length > 0 && (
+          {/* Piezas con Material Único y Procesos */}
+          {cotizacion.piezas.length > 0 && (
             <div className="mb-8">
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Materiales
+                Piezas y Materiales
               </h3>
               <table className="w-full text-sm">
                 <thead className="bg-slate-100">
                   <tr>
+                    <th className="text-left p-2">Pieza</th>
                     <th className="text-left p-2">Material</th>
-                    <th className="text-left p-2">Forma</th>
                     <th className="text-left p-2">Dimensiones</th>
-                    <th className="text-right p-2">Cantidad</th>
-                    <th className="text-right p-2">Margen</th>
+                    <th className="text-right p-2">Cant</th>
+                    <th className="text-right p-2">Precio Unit</th>
                     <th className="text-right p-2">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cotizacion.materiales.map((m) => {
-                    // Formatear dimensiones
-                    let dimensionesStr = '';
-                    const unidad = m.unidadMedida === 'mm' ? 'mm' : '"';
-                    if (m.forma === 'redondo' && m.diametro) {
-                      dimensionesStr = `Ø${m.diametro}${unidad}`;
-                      if (m.largo) dimensionesStr += ` × ${m.largo}${unidad}`;
-                    } else if (m.forma === 'cuadrado' && m.lado) {
-                      dimensionesStr = `${m.lado}${unidad} × ${m.lado}${unidad}`;
-                      if (m.largo) dimensionesStr += ` × ${m.largo}${unidad}`;
-                    } else if ((m.forma === 'placa' || m.forma === 'placa_rectificada') && m.largo && m.ancho) {
-                      dimensionesStr = `${m.largo}${unidad} × ${m.ancho}${unidad}`;
-                      if (m.espesor) dimensionesStr += ` × ${m.espesor}${unidad}`;
-                    }
-                    
+                  {cotizacion.piezas.map((pieza) => {
+                    const material = pieza.material;
                     return (
-                      <tr key={m.id} className="border-b">
-                        <td className="p-2">{m.nombre}</td>
+                      <tr key={pieza.id} className="border-b">
+                        <td className="p-2 font-medium">{pieza.nombre}</td>
                         <td className="p-2">
-                          <span className="text-xs bg-slate-100 px-2 py-1 rounded">
-                            {m.forma === 'redondo' ? 'Redondo' : 
-                             m.forma === 'cuadrado' ? 'Cuadrado' : 
-                             m.forma === 'placa' ? 'Placa' : 
-                             m.forma === 'placa_rectificada' ? 'Placa Rect.' : 'Otro'}
-                          </span>
-                        </td>
-                        <td className="p-2 text-xs">{dimensionesStr}</td>
-                        <td className="p-2 text-right">{m.cantidad} {m.unidad}</td>
-                        <td className="p-2 text-right">
-                          {m.margenPorcentaje > 0 ? (
-                            <span className="text-green-600">{m.margenPorcentaje}%</span>
+                          {material ? (
+                            <div>
+                              <span className="font-medium">{material.nombre}</span>
+                              <span className="text-xs text-slate-500 block">{material.tipo}</span>
+                            </div>
                           ) : (
-                            <span className="text-slate-400">-</span>
+                            <span className="text-slate-400 italic">Sin material</span>
                           )}
                         </td>
-                        <td className="p-2 text-right font-medium">${m.costoTotal.toFixed(2)}</td>
+                        <td className="p-2 text-xs">
+                          {material && formatearDimensiones(material)}
+                        </td>
+                        <td className="p-2 text-right">{pieza.cantidad}</td>
+                        <td className="p-2 text-right">
+                          {material ? `$${material.costoUnitario.toFixed(2)}/${material.unidad}` : '-'}
+                        </td>
+                        <td className="p-2 text-right font-medium">
+                          {material ? `$${material.costoTotal.toFixed(2)}` : '-'}
+                        </td>
                       </tr>
                     );
                   })}
@@ -223,8 +217,8 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           )}
 
-          {/* Procesos */}
-          {cotizacion.procesos.length > 0 && (
+          {/* Procesos por pieza */}
+          {cotizacion.piezas.some(p => p.procesos.length > 0) && (
             <div className="mb-8">
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
                 Procesos y Operaciones
@@ -232,7 +226,7 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
               <table className="w-full text-sm">
                 <thead className="bg-slate-100">
                   <tr>
-                    <th className="text-left p-2">Proceso</th>
+                    <th className="text-left p-2">Pieza / Proceso</th>
                     <th className="text-right p-2">Tiempo</th>
                     <th className="text-right p-2">$/Hora Máq.</th>
                     <th className="text-right p-2">$/Hora MO</th>
@@ -240,26 +234,29 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
                   </tr>
                 </thead>
                 <tbody>
-                  {cotizacion.procesos.map((p) => (
-                    <tr key={p.id} className="border-b">
-                      <td className="p-2">
-                        {p.nombre}
-                        {p.descripcion && <p className="text-xs text-slate-500">{p.descripcion}</p>}
-                      </td>
-                      <td className="p-2 text-right">
-                        {Math.floor(p.tiempoMinutos / 60) > 0 && `${Math.floor(p.tiempoMinutos / 60)}h `}
-                        {p.tiempoMinutos % 60}m
-                      </td>
-                      <td className="p-2 text-right">${p.costoPorHora.toFixed(2)}</td>
-                      <td className="p-2 text-right">
-                        {p.costoManoObra > 0 ? (
-                          <span className="text-green-600">${p.costoManoObra.toFixed(2)}</span>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="p-2 text-right font-medium">${p.costoTotal.toFixed(2)}</td>
-                    </tr>
+                  {cotizacion.piezas.map((pieza) => (
+                    pieza.procesos.map((p, idx) => (
+                      <tr key={`${pieza.id}-${p.id}`} className="border-b">
+                        <td className="p-2">
+                          {idx === 0 && <span className="font-medium block">{pieza.nombre}</span>}
+                          <span className={idx === 0 ? '' : 'pl-4'}>{p.nombre}</span>
+                          {p.descripcion && <p className="text-xs text-slate-500">{p.descripcion}</p>}
+                        </td>
+                        <td className="p-2 text-right">
+                          {Math.floor(p.tiempoMinutos / 60) > 0 && `${Math.floor(p.tiempoMinutos / 60)}h `}
+                          {p.tiempoMinutos % 60}m
+                        </td>
+                        <td className="p-2 text-right">${p.costoPorHora.toFixed(2)}</td>
+                        <td className="p-2 text-right">
+                          {p.costoManoObra > 0 ? (
+                            <span className="text-green-600">${p.costoManoObra.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="p-2 text-right font-medium">${p.costoTotal.toFixed(2)}</td>
+                      </tr>
+                    ))
                   ))}
                 </tbody>
                 <tfoot>
@@ -391,4 +388,25 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
       `}</style>
     </div>
   );
+}
+
+// Helper para formatear dimensiones
+function formatearDimensiones(material: any): string {
+  const unidad = material.unidadMedida === 'mm' ? 'mm' : '"';
+  if (material.forma === 'redondo' && material.diametro) {
+    return `Ø${material.diametro}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
+  } else if (material.forma === 'cuadrado' && material.lado) {
+    return `${material.lado}${unidad} × ${material.lado}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
+  } else if (material.forma === 'barra_hueca' && material.diametro_exterior) {
+    return `Ø${material.diametro_exterior}${unidad} × Ø${material.diametro_interior || '?'}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
+  } else if (material.forma === 'barra_cromada' && material.diametro) {
+    return `Ø${material.diametro}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
+  } else if (material.forma === 'placa' && material.largo && material.ancho) {
+    return `${material.largo}${unidad} × ${material.ancho}${unidad}${material.espesor ? ` × ${material.espesor}${unidad}` : ''}`;
+  } else if (material.forma === 'angulo' && material.lado_a) {
+    return `${material.lado_a}${unidad} × ${material.lado_b || material.lado_a}${unidad}${material.espesor ? ` × ${material.espesor}${unidad}` : ''}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
+  } else if (material.forma === 'otro') {
+    return material.descripcion || material.dimensiones_libre || 'Dimensiones no especificadas';
+  }
+  return '';
 }
