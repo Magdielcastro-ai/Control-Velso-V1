@@ -75,7 +75,6 @@ export function PiezasStep({
   onActualizarPieza,
   onAsignarMaterial,
   onEliminarMaterial,
-  onAgregarMaterialACatalogo,
   onRecargarCatalogo,
 }: PiezasStepProps) {
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');

@@ -52,7 +52,7 @@ export function MaterialesStep({
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500">
-                  {pieza.materiales.length} materiales
+                  {pieza.material ? '1 material' : 'Sin material'}
                 </span>
                 {piezaExpandida === pieza.id ? (
                   <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -66,29 +66,26 @@ export function MaterialesStep({
             {piezaExpandida === pieza.id && (
               <div className="space-y-3">
                 {/* Lista de materiales de esta pieza */}
-                {pieza.materiales.length > 0 && (
+                {pieza.material && (
                   <div className="space-y-2">
-                    {pieza.materiales.map((mat: Material) => (
-                      <div
-                        key={mat.id}
-                        className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{mat.nombre}</p>
-                          <p className="text-xs text-slate-500">
-                            {mat.cantidad} {mat.unidadMedida} × ${mat.costoUnitario.toFixed(2)} = ${mat.costoTotal.toFixed(2)}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEliminarMaterial(pieza.id, mat.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                    <div
+                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{pieza.material.nombre}</p>
+                        <p className="text-xs text-slate-500">
+                          {pieza.material.cantidad} {pieza.material.unidadMedida} × ${pieza.material.costoUnitario.toFixed(2)} = ${pieza.material.costoTotal.toFixed(2)}
+                        </p>
                       </div>
-                    ))}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEliminarMaterial(pieza.id, pieza.material!.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                 )}
 
