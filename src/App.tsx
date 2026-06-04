@@ -233,10 +233,6 @@ function App() {
     return () => clearInterval(intervalId);
   }, [initialized, authLoading, user, refreshSession]);
 
-  // NOTA: Las horas disponibles se manejan solo en estado React.
-  // Si deseas persistirlas en Supabase, crea una tabla 'configuracion'.
-  // Por ahora se pierden al recargar la página.
-
   // Stores existentes
   const {
     cotizacion,
@@ -247,6 +243,8 @@ function App() {
     agregarPieza,
     eliminarPieza,
     actualizarPieza,
+    asignarMaterialAPieza,
+    eliminarMaterialDePieza,
     actualizarCostosAdicionales,
     actualizarCondiciones,
     actualizarMargenUtilidad,
@@ -837,7 +835,6 @@ function App() {
               onAgregar={canManageMateriales() ? agregarAlCatalogo : undefined}
               onEliminar={canManageMateriales() ? eliminarDelCatalogo : undefined}
               onActualizarPrecio={canManageMateriales() ? (id, precio) => {
-                // precio se usará para actualizar en Supabase
                 const mat = catalogo.find(m => m.id === id);
                 if (mat) {
                   toast.success('Precio actualizado: $' + precio.toFixed(2));
@@ -1028,10 +1025,11 @@ function App() {
                   <PiezasStep
                     piezas={cotizacion.piezas}
                     catalogoMateriales={catalogo}
-
                     onAgregarPieza={agregarPieza}
                     onEliminarPieza={eliminarPieza}
                     onActualizarPieza={actualizarPieza}
+                    onAsignarMaterial={asignarMaterialAPieza}
+                    onEliminarMaterial={eliminarMaterialDePieza}
                     onAgregarMaterialACatalogo={async (material) => {
                       const nuevo = await agregarAlCatalogo(material);
                       return nuevo;

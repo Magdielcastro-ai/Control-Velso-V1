@@ -42,7 +42,7 @@ const piezaVacia = (): PiezaCotizacion => ({
   id: crypto.randomUUID(),
   nombre: 'Pieza 1',
   cantidad: 1,
-  material: null,
+  material: null,  // ← MATERIAL UNICO
   procesos: [],
   costosAdicionales: {
     disenoCAD: 0,
@@ -323,6 +323,7 @@ export const useCotizacionStore = () => {
 
   const recalcularTotales = (c: Cotizacion): Cotizacion => {
     const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
+      // ← MATERIAL UNICO
       const costoMateriales = pieza.material ? pieza.material.costoTotal : 0;
       const costoProcesos = pieza.procesos.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);

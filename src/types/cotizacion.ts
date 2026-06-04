@@ -29,7 +29,17 @@ export interface EspecificacionesProyecto {
   notas?: string;
 }
 
-export type FormaMaterial = 'redondo' | 'cuadrado' | 'placa' | 'placa_rectificada' | 'otro';
+// FORMAS DE MATERIAL - ACTUALIZADAS CON NUEVAS FORMAS
+export type FormaMaterial = 
+  | 'redondo' 
+  | 'cuadrado' 
+  | 'placa' 
+  | 'placa_rectificada' 
+  | 'barra_hueca' 
+  | 'barra_cromada' 
+  | 'angulo' 
+  | 'otro';
+
 export type UnidadMedida = 'mm' | 'in';
 
 export interface CatalogoMaterial {
@@ -43,21 +53,36 @@ export interface CatalogoMaterial {
   largo?: number;
   ancho?: number;
   espesor?: number;
+  diametro_exterior?: number;
+  diametro_interior?: number;
+  lado_a?: number;
+  lado_b?: number;
+  descripcion?: string;
+  dimensiones_libre?: string;
   costoUnitario: number;
   unidadCosto: 'kg' | 'pieza' | 'metro';
 }
 
+// MATERIAL ASIGNADO A UNA PIEZA (UNICO)
 export interface Material {
   id: string;
   nombre: string;
   tipo: string;
   forma: FormaMaterial;
   unidadMedida: UnidadMedida;
+  // Dimensiones según forma
   diametro?: number;
   lado?: number;
   largo?: number;
   ancho?: number;
   espesor?: number;
+  diametro_exterior?: number;
+  diametro_interior?: number;
+  lado_a?: number;
+  lado_b?: number;
+  descripcion?: string;
+  dimensiones_libre?: string;
+  // Costos
   cantidad: number;
   unidad: 'kg' | 'pieza' | 'metro';
   costoUnitario: number;
@@ -204,13 +229,12 @@ export interface CondicionesComerciales {
   notasLegales?: string;
 }
 
-// ========== NUEVOS TIPOS PARA PIEZAS/PROYECTOS ==========
-
+// PIEZA CON MATERIAL UNICO (NO ARRAY)
 export interface PiezaCotizacion {
   id: string;
   nombre: string;
   cantidad: number;
-  materiales: Material[];
+  material: Material | null;  // ← UN SOLO MATERIAL POR PIEZA
   procesos: Proceso[];
   costosAdicionales: CostosAdicionales;
   subtotalPieza: number;
@@ -227,8 +251,8 @@ export interface Cotizacion {
   datosCliente: DatosCliente;
   proyecto: EspecificacionesProyecto;
   piezas: PiezaCotizacion[];
-  materiales: Material[];
-  procesos: Proceso[];
+  materiales: Material[];  // Legacy - mantenido para compatibilidad
+  procesos: Proceso[];     // Legacy
   costosAdicionales: CostosAdicionales;
   condiciones: CondicionesComerciales;
   subtotal: number;

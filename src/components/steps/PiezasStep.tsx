@@ -173,7 +173,7 @@ function PiezaCard({
   const [precioBase, setPrecioBase] = useState(0);
   const [margen, setMargen] = useState(0);
   const [unidadMedida, setUnidadMedida] = useState<'mm' | 'in'>('mm');
-  const [unidadCosto, setUnidadCosto] = useState('kg');
+  const [unidadCosto, setUnidadCosto] = useState<'kg' | 'pieza' | 'metro'>('kg');
 
   const tieneMaterial = !!pieza.material;
 
@@ -249,7 +249,7 @@ function PiezaCard({
       unidad: unidadCosto,
       margenPorcentaje: margen,
       ...dimsNumericas,
-    } as any);
+    } as Omit<Material, 'id' | 'costoTotal'>);
 
     setEditandoMaterial(false);
     resetForm();
@@ -277,7 +277,7 @@ function PiezaCard({
       setPrecioBase(pieza.material.costoUnitario);
       setMargen(pieza.material.margenPorcentaje);
       setUnidadMedida(pieza.material.unidadMedida);
-      setUnidadCosto(pieza.material.unidad);
+      setUnidadCosto(pieza.material.unidad as 'kg' | 'pieza' | 'metro');
       const dims: Record<string, string> = {};
       const config = DIMENSIONES_CONFIG[pieza.material.forma as FormaId] || [];
       for (const dim of config) {
@@ -590,7 +590,7 @@ function ProcesosPieza({
   pieza: PiezaCotizacion;
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
 }) {
-  const [procesoSeleccionado, setProcesoSeleccionado] = useState<any>(null);
+  const [procesoSeleccionado, setProcesoSeleccionado] = useState<CatalogoProceso | null>(null);
   const [tiempoProceso, setTiempoProceso] = useState(0);
   const [unidadTiempo, setUnidadTiempo] = useState<'minutos' | 'horas'>('minutos');
   const [tipoMO, setTipoMO] = useState<'mo_s' | 'mo_e'>('mo_s');
@@ -772,7 +772,7 @@ function ProcesosExternosPieza({
     const nuevo: Proceso = {
       id: crypto.randomUUID(),
       nombre: nombreExterno.trim(),
-      tipo: 'otro' as any,
+      tipo: 'otro',
       tiempoMinutos: 0,
       costoPorHora: 0,
       costoManoObra: 0,
@@ -852,4 +852,13 @@ function ProcesosExternosPieza({
       )}
     </div>
   );
+}
+
+// Tipo local para el select de procesos
+interface CatalogoProceso {
+  id: string;
+  nombre: string;
+  costoPorHora: number;
+  categoria: string;
+  requiereManoObra: string;
 }
