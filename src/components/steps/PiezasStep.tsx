@@ -3,26 +3,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check, RotateCcw, Circle, Square, LayoutGrid, Layers, Hexagon, Octagon, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check, RotateCcw, Circle, Square, LayoutGrid, Hexagon, Octagon, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PiezaCotizacion, Material, CatalogoMaterial } from '@/types/cotizacion';
+import type { PiezaCotizacion, Material, CatalogoMaterial, Proceso } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 
 interface PiezasStepProps {
   piezas: PiezaCotizacion[];
   catalogoMateriales: CatalogoMaterial[];
-  onAgregarPieza: (nombre: string, cantidad: number) => void;
-  onEliminarPieza: (id: string) => void;
-  onActualizarPieza: (id: string, datos: Partial<PiezaCotizacion>) => void;
+  onAgregarPieza: (nombre: string, cantidad?: number) => void;
+  onEliminarPieza: (piezaId: string) => void;
+  onActualizarPieza: (piezaId: string, datos: Partial<PiezaCotizacion>) => void;
   onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
-  onActualizarMaterial: (piezaId: string, material: Partial<Material>) => void;
   onEliminarMaterial: (piezaId: string) => void;
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
 }
 
-// Configuración de formas geométricas
 const FORMAS = [
   { id: 'redondo', label: 'Redondo', icon: Circle },
   { id: 'cuadrado', label: 'Cuadrado', icon: Square },
@@ -35,7 +32,6 @@ const FORMAS = [
 
 type FormaId = typeof FORMAS[number]['id'];
 
-// Dimensiones por forma
 const DIMENSIONES_CONFIG: Record<FormaId, { key: string; label: string; placeholder: string; type?: string }[]> = {
   redondo: [
     { key: 'diametro', label: 'Diámetro', placeholder: 'mm' },
@@ -78,7 +74,6 @@ export function PiezasStep({
   onEliminarPieza,
   onActualizarPieza,
   onAsignarMaterial,
-  onActualizarMaterial,
   onEliminarMaterial,
   onAgregarMaterialACatalogo,
   onRecargarCatalogo,
@@ -86,8 +81,6 @@ export function PiezasStep({
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');
   const [nuevaPiezaCantidad, setNuevaPiezaCantidad] = useState(1);
   const [piezaExpandida, setPiezaExpandida] = useState<string>(piezas[0]?.id || '');
-  const [modalMaterialAbierto, setModalMaterialAbierto] = useState(false);
-  const [piezaParaMaterial, setPiezaParaMaterial] = useState<string>('');
 
   const handleAgregarPieza = () => {
     if (!nuevaPiezaNombre.trim()) {
@@ -115,12 +108,7 @@ export function PiezasStep({
             }}
             onActualizar={onActualizarPieza}
             onAsignarMaterial={onAsignarMaterial}
-            onActualizarMaterial={onActualizarMaterial}
             onEliminarMaterial={onEliminarMaterial}
-            onAbrirModalMaterial={(piezaId) => {
-              setPiezaParaMaterial(piezaId);
-              setModalMaterialAbierto(true);
-            }}
             onRecargarCatalogo={onRecargarCatalogo}
           />
         ))}
@@ -151,27 +139,10 @@ export function PiezasStep({
           <strong>{piezas.length}</strong> {piezas.length === 1 ? 'pieza' : 'piezas'} en total
         </p>
       </div>
-
-      <ModalNuevoMaterial
-        abierto={modalMaterialAbierto}
-        onCerrar={() => setModalMaterialAbierto(false)}
-        onGuardar={async (material) => {
-          if (onAgregarMaterialACatalogo) {
-            const nuevo = await onAgregarMaterialACatalogo(material);
-            if (nuevo && piezaParaMaterial) {
-              toast.success('Material agregado al catálogo');
-            }
-          }
-          setModalMaterialAbierto(false);
-        }}
-      />
     </div>
   );
 }
 
-// ============================================
-// COMPONENTE: PiezaCard con Material Único
-// ============================================
 function PiezaCard({
   pieza,
   expandida,
@@ -180,9 +151,7 @@ function PiezaCard({
   onEliminar,
   onActualizar,
   onAsignarMaterial,
-  onActualizarMaterial,
   onEliminarMaterial,
-  onAbrirModalMaterial,
   onRecargarCatalogo,
 }: {
   pieza: PiezaCotizacion;
@@ -192,32 +161,27 @@ function PiezaCard({
   onEliminar: () => void;
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
   onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
-  onActualizarMaterial: (piezaId: string, material: Partial<Material>) => void;
   onEliminarMaterial: (piezaId: string) => void;
-  onAbrirModalMaterial: (piezaId: string) => void;
   onRecargarCatalogo?: () => void;
 }) {
   const [editandoMaterial, setEditandoMaterial] = useState(false);
 
-  // Estados para formulario de material
   const [formaSeleccionada, setFormaSeleccionada] = useState<FormaId>('redondo');
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
   const [dimensiones, setDimensiones] = useState<Record<string, string>>({});
   const [precioUnitario, setPrecioUnitario] = useState('');
   const [precioBase, setPrecioBase] = useState(0);
   const [margen, setMargen] = useState(0);
-  const [unidadMedida, setUnidadMedida] = useState('mm');
+  const [unidadMedida, setUnidadMedida] = useState<'mm' | 'in'>('mm');
   const [unidadCosto, setUnidadCosto] = useState('kg');
 
   const tieneMaterial = !!pieza.material;
 
-  // Obtener tipos disponibles para la forma seleccionada
   const tiposDisponibles = catalogoMateriales
     .filter(m => m.forma === formaSeleccionada)
     .map(m => m.tipo)
     .filter((v, i, a) => a.indexOf(v) === i);
 
-  // Cuando cambia la forma, buscar precio base
   const handleFormaChange = (forma: FormaId) => {
     setFormaSeleccionada(forma);
     setTipoSeleccionado('');
@@ -226,7 +190,6 @@ function PiezaCard({
     setPrecioBase(0);
   };
 
-  // Cuando cambia el tipo, buscar precio del catálogo
   const handleTipoChange = (tipo: string) => {
     setTipoSeleccionado(tipo);
     const materialCat = catalogoMateriales.find(
@@ -237,7 +200,6 @@ function PiezaCard({
       setPrecioUnitario(materialCat.costoUnitario.toString());
       setUnidadMedida(materialCat.unidadMedida || 'mm');
       setUnidadCosto(materialCat.unidadCosto || 'kg');
-      // Pre-llenar dimensiones si existen en el catálogo
       const dims: Record<string, string> = {};
       if (materialCat.diametro) dims.diametro = materialCat.diametro.toString();
       if (materialCat.lado) dims.lado = materialCat.lado.toString();
@@ -258,9 +220,8 @@ function PiezaCard({
       return;
     }
 
-    // Validar dimensiones requeridas
     const config = DIMENSIONES_CONFIG[formaSeleccionada];
-    const dimsNumericas: Record<string, number> = {};
+    const dimsNumericas: Record<string, number | string> = {};
     for (const dim of config) {
       if (dim.type === 'text') {
         dimsNumericas[dim.key] = dimensiones[dim.key] || '';
@@ -284,11 +245,11 @@ function PiezaCard({
       forma: formaSeleccionada,
       cantidad: pieza.cantidad,
       costoUnitario: parseFloat(precioUnitario),
-      unidadMedida: unidadMedida as 'mm' | 'in',
+      unidadMedida: unidadMedida,
       unidad: unidadCosto,
       margenPorcentaje: margen,
       ...dimsNumericas,
-    });
+    } as any);
 
     setEditandoMaterial(false);
     resetForm();
@@ -317,7 +278,6 @@ function PiezaCard({
       setMargen(pieza.material.margenPorcentaje);
       setUnidadMedida(pieza.material.unidadMedida);
       setUnidadCosto(pieza.material.unidad);
-      // Cargar dimensiones
       const dims: Record<string, string> = {};
       const config = DIMENSIONES_CONFIG[pieza.material.forma as FormaId] || [];
       for (const dim of config) {
@@ -350,10 +310,11 @@ function PiezaCard({
     return partes.join(' × ');
   };
 
+  const dimensionesConfig = DIMENSIONES_CONFIG[formaSeleccionada] || [];
+
   return (
     <Card className="border-slate-200">
       <CardContent className="p-4">
-        {/* Header de pieza */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3 flex-1">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -399,7 +360,6 @@ function PiezaCard({
 
         {expandida && (
           <div className="space-y-4 pt-2 border-t border-slate-100">
-            {/* === MATERIAL ÚNICO === */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-slate-900 flex items-center gap-1">
@@ -448,7 +408,6 @@ function PiezaCard({
                 </div>
               ) : editandoMaterial ? (
                 <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-200">
-                  {/* Selector de Forma */}
                   <div>
                     <label className="text-xs font-medium text-slate-700 mb-1 block">Forma del Material</label>
                     <div className="flex flex-wrap gap-2">
@@ -473,13 +432,14 @@ function PiezaCard({
                     </div>
                   </div>
 
-                  {/* Selector de Tipo */}
                   <div>
-                    <label className="text-xs font-medium text-slate-700 mb-1 block">Tipo de Material</label>
+                    <label className="text-xs font-medium text-slate-700 mb-1 block">
+                      Tipo de Material ({FORMAS.find(f => f.id === formaSeleccionada)?.label})
+                    </label>
                     {tiposDisponibles.length > 0 ? (
                       <Select value={tipoSeleccionado} onValueChange={handleTipoChange}>
                         <SelectTrigger className="h-8 text-xs bg-white">
-                          <SelectValue placeholder="Selecciona material..." />
+                          <SelectValue placeholder="Selecciona un material..." />
                         </SelectTrigger>
                         <SelectContent>
                           {tiposDisponibles.map((tipo) => (
@@ -490,78 +450,92 @@ function PiezaCard({
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
-                        No hay materiales en el catálogo para {FORMAS.find(f => f.id === formaSeleccionada)?.label}.
-                        <button
-                          onClick={() => onAbrirModalMaterial(pieza.id)}
-                          className="underline ml-1 font-medium"
-                        >
-                          Agregar al catálogo
-                        </button>
+                      <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                        No hay materiales registrados para {FORMAS.find(f => f.id === formaSeleccionada)?.label}.
                       </div>
                     )}
                   </div>
 
-                  {/* Dimensiones según forma */}
-                  {tipoSeleccionado && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {DIMENSIONES_CONFIG[formaSeleccionada].map((dim) => (
-                        <div key={dim.key}>
-                          <label className="text-xs text-slate-500 block mb-0.5">{dim.label} ({dim.placeholder})</label>
-                          <Input
-                            type={dim.type || 'number'}
-                            step={dim.type === 'text' ? undefined : '0.1'}
-                            value={dimensiones[dim.key] || ''}
-                            onChange={(e) => setDimensiones(prev => ({ ...prev, [dim.key]: e.target.value }))}
-                            className="h-7 text-xs bg-white"
-                            placeholder={dim.placeholder}
-                          />
-                        </div>
-                      ))}
+                  {tipoSeleccionado && dimensionesConfig.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Dimensiones</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {dimensionesConfig.map(dim => (
+                          <div key={dim.key}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              {dim.label} ({dim.placeholder})
+                            </label>
+                            <Input
+                              type={dim.type || 'number'}
+                              step={dim.type === 'text' ? undefined : '0.1'}
+                              value={dimensiones[dim.key] || ''}
+                              onChange={(e) => setDimensiones(prev => ({ ...prev, [dim.key]: e.target.value }))}
+                              placeholder={dim.placeholder}
+                              className="w-full border rounded-lg px-3 py-2 text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Precio y Margen */}
                   {tipoSeleccionado && (
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="text-xs text-slate-500 block mb-0.5">Precio Unitario ($)</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Precio Unitario
+                        </label>
                         <div className="relative">
                           <Input
                             type="number"
                             step="0.01"
                             value={precioUnitario}
                             onChange={(e) => setPrecioUnitario(e.target.value)}
-                            className={`h-8 text-xs bg-white pr-16 ${
+                            className={`w-full border rounded-lg pl-8 pr-10 py-2 ${
                               parseFloat(precioUnitario) !== precioBase ? 'border-amber-400 bg-amber-50' : ''
                             }`}
                           />
-                          <span className="absolute right-2 top-1.5 text-xs text-slate-400">{unidadCosto}</span>
+                          {parseFloat(precioUnitario) !== precioBase && precioBase > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => { setPrecioUnitario(precioBase.toString()); }}
+                              className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                              title="Restaurar precio del catálogo"
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          )}
                         </div>
-                        {parseFloat(precioUnitario) !== precioBase && precioBase > 0 && (
-                          <button
-                            onClick={() => { setPrecioUnitario(precioBase.toString()); }}
-                            className="text-xs text-blue-600 flex items-center gap-1 mt-1"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            Restaurar precio catálogo (${precioBase.toFixed(2)})
-                          </button>
-                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Precio catálogo: ${precioBase.toFixed(2)}
+                          {parseFloat(precioUnitario) !== precioBase && (
+                            <span className="text-amber-600 ml-1">(modificado para esta pieza)</span>
+                          )}
+                        </p>
                       </div>
-                      <div className="w-24">
-                        <label className="text-xs text-slate-500 block mb-0.5">Margen %</label>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Margen %
+                        </label>
                         <Input
                           type="number"
                           min={0}
                           value={margen}
                           onChange={(e) => setMargen(parseFloat(e.target.value) || 0)}
-                          className="h-8 text-xs bg-white"
+                          className="w-full border rounded-lg px-3 py-2"
                         />
+                      </div>
+
+                      <div className="bg-blue-50 rounded-lg p-3 text-center">
+                        <p className="text-xs text-blue-600 font-medium">Subtotal Material</p>
+                        <p className="text-xl font-bold text-blue-800">
+                          ${((parseFloat(precioUnitario) || 0) * pieza.cantidad * (1 + margen / 100)).toFixed(2)}
+                        </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Botones */}
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -593,13 +567,11 @@ function PiezaCard({
               )}
             </div>
 
-            {/* === PROCESOS === */}
             <ProcesosPieza
               pieza={pieza}
               onActualizar={onActualizar}
             />
 
-            {/* === PROCESOS EXTERNOS === */}
             <ProcesosExternosPieza
               pieza={pieza}
               onActualizar={onActualizar}
@@ -611,9 +583,6 @@ function PiezaCard({
   );
 }
 
-// ============================================
-// PROCESOS (sin cambios mayores)
-// ============================================
 function ProcesosPieza({
   pieza,
   onActualizar,
@@ -643,7 +612,7 @@ function ProcesosPieza({
       costoMO = tiempoHoras * 286.78;
     }
 
-    const nuevoProceso = {
+    const nuevoProceso: Proceso = {
       id: crypto.randomUUID(),
       nombre: catalogoItem.nombre,
       tipo: catalogoItem.id,
@@ -663,12 +632,12 @@ function ProcesosPieza({
 
   const eliminarProceso = (procesoId: string) => {
     onActualizar(pieza.id, {
-      procesos: pieza.procesos.filter((p: any) => p.id !== procesoId),
+      procesos: pieza.procesos.filter((p: Proceso) => p.id !== procesoId),
     });
   };
 
   const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
-    const procs = pieza.procesos.map((p: any) => {
+    const procs = pieza.procesos.map((p: Proceso) => {
       if (p.id !== procesoId) return p;
       return { ...p, [campo]: valor };
     });
@@ -680,9 +649,9 @@ function ProcesosPieza({
       <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
         <Settings className="w-3 h-3" /> Procesos de Manufactura
       </h4>
-      {pieza.procesos.filter((p: any) => p.tipo !== 'otro').length > 0 && (
+      {pieza.procesos.filter((p: Proceso) => p.tipo !== 'otro').length > 0 && (
         <div className="space-y-1 mb-2">
-          {pieza.procesos.filter((p: any) => p.tipo !== 'otro').map((proc: any) => (
+          {pieza.procesos.filter((p: Proceso) => p.tipo !== 'otro').map((proc: Proceso) => (
             <div key={proc.id} className="p-2 bg-slate-50 rounded-lg">
               {editandoProceso === proc.id ? (
                 <div className="flex gap-2 items-center">
@@ -786,9 +755,6 @@ function ProcesosPieza({
   );
 }
 
-// ============================================
-// PROCESOS EXTERNOS
-// ============================================
 function ProcesosExternosPieza({
   pieza,
   onActualizar,
@@ -803,10 +769,10 @@ function ProcesosExternosPieza({
   const agregarProcesoExterno = () => {
     if (!nombreExterno.trim() || costoExterno <= 0) return;
     const costoConMargen = costoExterno * (1 + margenExterno / 100);
-    const nuevo = {
+    const nuevo: Proceso = {
       id: crypto.randomUUID(),
       nombre: nombreExterno.trim(),
-      tipo: 'otro',
+      tipo: 'otro' as any,
       tiempoMinutos: 0,
       costoPorHora: 0,
       costoManoObra: 0,
@@ -822,7 +788,7 @@ function ProcesosExternosPieza({
 
   const eliminarProceso = (procesoId: string) => {
     onActualizar(pieza.id, {
-      procesos: pieza.procesos.filter((p: any) => p.id !== procesoId),
+      procesos: pieza.procesos.filter((p: Proceso) => p.id !== procesoId),
     });
   };
 
@@ -831,9 +797,9 @@ function ProcesosExternosPieza({
       <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center gap-1">
         <ExternalLink className="w-3 h-3" /> Procesos Externos
       </h4>
-      {pieza.procesos.filter((p: any) => p.tipo === 'otro').length > 0 && (
+      {pieza.procesos.filter((p: Proceso) => p.tipo === 'otro').length > 0 && (
         <div className="space-y-1 mb-2">
-          {pieza.procesos.filter((p: any) => p.tipo === 'otro').map((proc: any) => (
+          {pieza.procesos.filter((p: Proceso) => p.tipo === 'otro').map((proc: Proceso) => (
             <div key={proc.id} className="flex justify-between p-1.5 bg-amber-50 rounded text-sm">
               <div>
                 <span>{proc.nombre}</span>
@@ -885,129 +851,5 @@ function ProcesosExternosPieza({
         </p>
       )}
     </div>
-  );
-}
-
-// ============================================
-// MODAL NUEVO MATERIAL AL CATÁLOGO
-// ============================================
-function ModalNuevoMaterial({
-  abierto,
-  onCerrar,
-  onGuardar,
-}: {
-  abierto: boolean;
-  onCerrar: () => void;
-  onGuardar: (material: Omit<CatalogoMaterial, 'id'>) => Promise<void>;
-}) {
-  const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState('acero');
-  const [forma, setForma] = useState('redondo');
-  const [diametro, setDiametro] = useState('');
-  const [largo, setLargo] = useState('');
-  const [ancho, setAncho] = useState('');
-  const [espesor, setEspesor] = useState('');
-  const [unidad, setUnidad] = useState('mm');
-
-  const formas = ['redondo', 'cuadrado', 'placa', 'barra_hueca', 'barra_cromada', 'angulo', 'otro'];
-
-  const handleGuardar = async () => {
-    if (!nombre.trim()) {
-      toast.error('Ingresa un nombre para el material');
-      return;
-    }
-    await onGuardar({
-      nombre: nombre.trim(),
-      tipo,
-      forma: forma as any,
-      unidadMedida: unidad as 'mm' | 'in',
-      diametro: diametro ? parseFloat(diametro) : undefined,
-      largo: largo ? parseFloat(largo) : undefined,
-      ancho: ancho ? parseFloat(ancho) : undefined,
-      espesor: espesor ? parseFloat(espesor) : undefined,
-      costoUnitario: 0,
-      unidadCosto: 'kg',
-    });
-    setNombre('');
-    setDiametro('');
-    setLargo('');
-    setAncho('');
-    setEspesor('');
-  };
-
-  return (
-    <Dialog open={abierto} onOpenChange={onCerrar}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Agregar Material al Catálogo</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div>
-            <label className="text-sm font-medium">Nombre</label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Bronce SAE 660" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-sm font-medium">Tipo</label>
-              <Select value={tipo} onValueChange={setTipo}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="acero">Acero</SelectItem>
-                  <SelectItem value="aluminio">Aluminio</SelectItem>
-                  <SelectItem value="bronce">Bronce</SelectItem>
-                  <SelectItem value="plastico">Plástico</SelectItem>
-                  <SelectItem value="otro">Otro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Forma</label>
-              <Select value={forma} onValueChange={setForma}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {formas.map((f) => (
-                    <SelectItem key={f} value={f}>{f.replace('_', ' ')}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium">Dimensiones</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(forma === 'redondo' || forma === 'barra_hueca' || forma === 'barra_cromada') && (
-                <Input value={diametro} onChange={(e) => setDiametro(e.target.value)} placeholder="Diámetro (mm)" type="number" step="0.1" />
-              )}
-              {(forma === 'cuadrado' || forma === 'placa' || forma === 'angulo') && (
-                <>
-                  <Input value={largo} onChange={(e) => setLargo(e.target.value)} placeholder="Largo (mm)" type="number" step="0.1" />
-                  <Input value={ancho} onChange={(e) => setAncho(e.target.value)} placeholder="Ancho (mm)" type="number" step="0.1" />
-                </>
-              )}
-              {(forma === 'placa' || forma === 'angulo') && (
-                <Input value={espesor} onChange={(e) => setEspesor(e.target.value)} placeholder="Espesor (mm)" type="number" step="0.1" />
-              )}
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium">Unidad de Medida</label>
-            <Select value={unidad} onValueChange={setUnidad}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mm">mm</SelectItem>
-                <SelectItem value="in">in (pulgadas)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-slate-500">
-            El precio se ingresará al momento de cotizar. Aquí solo guardamos las características del material.
-          </p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onCerrar}>Cancelar</Button>
-          <Button onClick={handleGuardar} className="bg-blue-600 hover:bg-blue-700">Guardar al Catálogo</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

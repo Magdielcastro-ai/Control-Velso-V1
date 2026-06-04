@@ -28,7 +28,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
     window.print();
   };
 
-  // ← CAMBIO: Calcular costos por pieza (material único)
   const costoProcesos = cotizacion.piezas.reduce((sum, pieza) => 
     sum + pieza.procesos.reduce((s, p) => s + p.costoTotal, 0), 0
   );
@@ -48,7 +47,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
         <p className="text-slate-600">Tu cotización está lista para enviar o imprimir</p>
       </div>
 
-      {/* Acciones */}
       <div className="flex flex-wrap justify-center gap-3 no-print">
         <Button onClick={handlePrint} variant="outline" className="border-slate-300">
           <Printer className="w-4 h-4 mr-2" />
@@ -64,10 +62,8 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
         </Button>
       </div>
 
-      {/* Documento de cotización */}
       <Card ref={cotizacionRef} className="border-slate-300 shadow-lg print:shadow-none">
         <CardContent className="p-8">
-          {/* Encabezado */}
           <div className="flex justify-between items-start mb-8 border-b pb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -118,7 +114,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {/* Cliente */}
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
               Cliente
@@ -142,7 +137,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {/* Proyecto */}
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
               <FileText className="w-4 h-4 inline mr-1" />
@@ -160,7 +154,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {/* Piezas con Material Único y Procesos */}
           {cotizacion.piezas.length > 0 && (
             <div className="mb-8">
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
@@ -217,7 +210,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           )}
 
-          {/* Procesos por pieza */}
           {cotizacion.piezas.some(p => p.procesos.length > 0) && (
             <div className="mb-8">
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
@@ -269,7 +261,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           )}
 
-          {/* Costos adicionales */}
           {(costosAdicionales > 0) && (
             <div className="mb-8">
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
@@ -310,7 +301,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           )}
 
-          {/* Totales */}
           <div className="border-t-2 border-slate-300 pt-6 mb-8">
             <div className="w-full md:w-1/2 ml-auto space-y-2">
               <div className="flex justify-between text-sm">
@@ -336,7 +326,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {/* Condiciones */}
           <div className="bg-slate-50 p-6 rounded-lg">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
               Condiciones Comerciales
@@ -371,7 +360,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {/* Pie de página */}
           <div className="mt-8 pt-6 border-t text-center text-sm text-slate-500">
             <p>Esta cotización fue generada con Presupuesto Pro CNC</p>
             <p className="mt-1">Documento válido únicamente con firma y sello del taller</p>
@@ -390,7 +378,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
   );
 }
 
-// Helper para formatear dimensiones
 function formatearDimensiones(material: any): string {
   const unidad = material.unidadMedida === 'mm' ? 'mm' : '"';
   if (material.forma === 'redondo' && material.diametro) {

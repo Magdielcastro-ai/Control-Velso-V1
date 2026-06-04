@@ -42,7 +42,7 @@ const piezaVacia = (): PiezaCotizacion => ({
   id: crypto.randomUUID(),
   nombre: 'Pieza 1',
   cantidad: 1,
-  material: null,        // ← MATERIAL ÚNICO (null por defecto)
+  material: null,
   procesos: [],
   costosAdicionales: {
     disenoCAD: 0,
@@ -80,8 +80,8 @@ const cotizacionVacia = (tipo: TipoCotizacion = 'proyecto'): Cotizacion => ({
     cantidad: 1,
   },
   piezas: [piezaVacia()],
-  materiales: [],   // ← Legacy: mantenido por compatibilidad, no se usa en cálculos
-  procesos: [],     // ← Legacy
+  materiales: [],
+  procesos: [],
   costosAdicionales: {
     disenoCAD: 0,
     programacionCNC: 0,
@@ -191,7 +191,7 @@ export const useCotizacionStore = () => {
     });
   }, []);
 
-  // ========== MATERIAL ÚNICO POR PIEZA ==========
+  // ========== MATERIAL UNICO POR PIEZA ==========
 
   const asignarMaterialAPieza = useCallback((piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => {
     const nuevoMaterial: Material = {
@@ -248,15 +248,15 @@ export const useCotizacionStore = () => {
     let tipoManoObraSeleccionada: 'mo_s' | 'mo_e' | undefined = undefined;
 
     if (catalogoItem.categoria === 'maquina' && tipoManoObra) {
-      costoManoObra = COSTOS_MANO_OBRA[tipoManoObra];
+      costoManoObra = tiempoMinutos / 60 * (tipoManoObra === 'mo_s' ? COSTOS_MANO_OBRA.mo_s : COSTOS_MANO_OBRA.mo_e);
       incluyeManoObra = true;
       tipoManoObraSeleccionada = tipoManoObra;
     } else if (catalogoItem.requiereManoObra === 'mo_s') {
-      costoManoObra = COSTOS_MANO_OBRA.mo_s;
+      costoManoObra = tiempoMinutos / 60 * COSTOS_MANO_OBRA.mo_s;
       incluyeManoObra = true;
       tipoManoObraSeleccionada = 'mo_s';
     } else if (catalogoItem.requiereManoObra === 'mo_e') {
-      costoManoObra = COSTOS_MANO_OBRA.mo_e;
+      costoManoObra = tiempoMinutos / 60 * COSTOS_MANO_OBRA.mo_e;
       incluyeManoObra = true;
       tipoManoObraSeleccionada = 'mo_e';
     }
@@ -319,12 +319,10 @@ export const useCotizacionStore = () => {
     });
   }, []);
 
-  // ========== CÁLCULOS ==========
+  // ========== CALCULOS ==========
 
   const recalcularTotales = (c: Cotizacion): Cotizacion => {
-    // Recalcular cada pieza
     const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
-      // ← CAMBIO: material único en lugar de array
       const costoMateriales = pieza.material ? pieza.material.costoTotal : 0;
       const costoProcesos = pieza.procesos.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
@@ -343,10 +341,7 @@ export const useCotizacionStore = () => {
       };
     });
 
-    // Costos generales del proyecto
     const costosGenerales = Object.values(c.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
-
-    // Total del proyecto
     const subtotal = piezasRecalculadas.reduce((sum, p) => sum + p.subtotalPieza, 0) + costosGenerales;
     const iva = subtotal * (c.ivaPorcentaje / 100);
     const total = subtotal + iva;
@@ -388,14 +383,12 @@ export const useCotizacionStore = () => {
   const cambiarTipoCotizacion = useCallback((tipo: TipoCotizacion) => {
     setCotizacion(prev => {
       if (tipo === 'pieza_unica' && prev.piezas.length > 1) {
-        const todasMateriales = prev.piezas.map(p => p.material).filter(Boolean) as Material[];
-        const todosProcesos = prev.piezas.flatMap(p => p.procesos);
         const piezaUnica: PiezaCotizacion = {
           ...piezaVacia(),
           nombre: prev.proyecto.nombre || 'Pieza Única',
           cantidad: prev.proyecto.cantidad || 1,
-          material: todasMateriales.length > 0 ? todasMateriales[0] : null,
-          procesos: todosProcesos,
+          material: prev.piezas[0]?.material || null,
+          procesos: prev.piezas.flatMap(p => p.procesos),
         };
         return recalcularTotales({ ...prev, tipo, piezas: [piezaUnica] });
       }
@@ -531,7 +524,6 @@ export const useCotizacionStore = () => {
         if (data.piezas) {
           try {
             piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
-            // Asegurar que cada pieza tenga material (null si no existe)
             piezas = piezas.map((p: any) => ({
               ...p,
               material: p.material || null,
@@ -628,7 +620,7 @@ export const useCotizacionStore = () => {
     agregarPieza,
     eliminarPieza,
     actualizarPieza,
-    // Material único por pieza
+    // Material unico por pieza
     asignarMaterialAPieza,
     actualizarMaterialDePieza,
     eliminarMaterialDePieza,
