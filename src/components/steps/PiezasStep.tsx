@@ -14,7 +14,7 @@ interface PiezasStepProps {
   onAgregarPieza: (nombre: string, cantidad?: number) => void;
   onEliminarPieza: (piezaId: string) => void;
   onActualizarPieza: (piezaId: string, datos: Partial<PiezaCotizacion>) => void;
-  onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
+  onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id'>) => void;
   onEliminarMaterial: (piezaId: string) => void;
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
@@ -159,7 +159,7 @@ function PiezaCard({
   onToggle: () => void;
   onEliminar: () => void;
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
-  onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
+  onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id'>) => void;
   onEliminarMaterial: (piezaId: string) => void;
   onRecargarCatalogo?: () => void;
 }) {
@@ -238,17 +238,20 @@ function PiezaCard({
       m => m.forma === formaSeleccionada && m.tipo === tipoSeleccionado
     );
 
+    const costoTotalMaterial = parseFloat(precioUnitario);
+
     onAsignarMaterial(pieza.id, {
       nombre: materialCat?.nombre || tipoSeleccionado,
       tipo: tipoSeleccionado,
       forma: formaSeleccionada,
       cantidad: pieza.cantidad,
-      costoUnitario: parseFloat(precioUnitario),
+      costoUnitario: costoTotalMaterial / pieza.cantidad,
       unidadMedida: unidadMedida,
       unidad: unidadCosto,
       margenPorcentaje: margen,
+      costoTotal: costoTotalMaterial,
       ...dimsNumericas,
-    } as Omit<Material, 'id' | 'costoTotal'>);
+    } as Omit<Material, 'id'>);
 
     setEditandoMaterial(false);
     resetForm();
@@ -337,9 +340,16 @@ function PiezaCard({
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {tieneMaterial ? '1 material asignado' : 'Sin material'} · {pieza.procesos.length} procesos
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-slate-500">
+                  {tieneMaterial ? '1 material' : 'Sin material'} · {pieza.procesos.length} procesos
+                </span>
+                {pieza.subtotalPieza > 0 && (
+                  <span className="text-xs font-medium text-blue-600">
+                    ${(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}/pieza · ${pieza.subtotalPieza.toFixed(2)} total
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -389,7 +399,10 @@ function PiezaCard({
                         {formatearDimensiones(pieza.material!)}
                       </p>
                       <p className="text-sm font-semibold text-blue-700 mt-1">
-                        ${pieza.material!.costoUnitario.toFixed(2)}/{pieza.material!.unidad} × {pieza.cantidad} pzas = ${pieza.material!.costoTotal.toFixed(2)}
+                        Costo total: ${pieza.material!.costoTotal.toFixed(2)}
+                        <span className="text-xs text-slate-500 ml-1">
+                          (${(pieza.material!.costoTotal / pieza.cantidad).toFixed(2)} por pieza)
+                        </span>
                         {pieza.material!.margenPorcentaje > 0 && (
                           <span className="text-xs text-green-600 ml-1">(+{pieza.material!.margenPorcentaje}% margen)</span>
                         )}
@@ -479,58 +492,80 @@ function PiezaCard({
                   )}
 
                   {tipoSeleccionado && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Precio Unitario
-                        </label>
-                        <div className="relative">
+                    <div className="space-y-3">
+                      {/* Selector mm / in */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-700">Unidad de medida:</span>
+                        <button
+                          onClick={() => setUnidadMedida('mm')}
+                          className={`text-xs px-2 py-1 rounded ${unidadMedida === 'mm' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-slate-500'}`}
+                        >
+                          mm
+                        </button>
+                        <button
+                          onClick={() => setUnidadMedida('in')}
+                          className={`text-xs px-2 py-1 rounded ${unidadMedida === 'in' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-slate-500'}`}
+                        >
+                          in (pulgadas)
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Costo Total del Material
+                          </label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={precioUnitario}
+                              onChange={(e) => setPrecioUnitario(e.target.value)}
+                              className={`w-full border rounded-lg pl-8 pr-10 py-2 ${
+                                parseFloat(precioUnitario) !== precioBase ? 'border-amber-400 bg-amber-50' : ''
+                              }`}
+                            />
+                            {parseFloat(precioUnitario) !== precioBase && precioBase > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => { setPrecioUnitario(precioBase.toString()); }}
+                                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                                title="Restaurar precio del catálogo"
+                              >
+                                <RotateCcw size={16} />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Precio catálogo: ${precioBase.toFixed(2)}
+                            {parseFloat(precioUnitario) !== precioBase && (
+                              <span className="text-amber-600 ml-1">(modificado para esta pieza)</span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Margen %
+                          </label>
                           <Input
                             type="number"
-                            step="0.01"
-                            value={precioUnitario}
-                            onChange={(e) => setPrecioUnitario(e.target.value)}
-                            className={`w-full border rounded-lg pl-8 pr-10 py-2 ${
-                              parseFloat(precioUnitario) !== precioBase ? 'border-amber-400 bg-amber-50' : ''
-                            }`}
+                            min={0}
+                            value={margen}
+                            onChange={(e) => setMargen(parseFloat(e.target.value) || 0)}
+                            className="w-full border rounded-lg px-3 py-2"
                           />
-                          {parseFloat(precioUnitario) !== precioBase && precioBase > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => { setPrecioUnitario(precioBase.toString()); }}
-                              className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                              title="Restaurar precio del catálogo"
-                            >
-                              <RotateCcw size={16} />
-                            </button>
-                          )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Precio catálogo: ${precioBase.toFixed(2)}
-                          {parseFloat(precioUnitario) !== precioBase && (
-                            <span className="text-amber-600 ml-1">(modificado para esta pieza)</span>
-                          )}
-                        </p>
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Margen %
-                        </label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={margen}
-                          onChange={(e) => setMargen(parseFloat(e.target.value) || 0)}
-                          className="w-full border rounded-lg px-3 py-2"
-                        />
-                      </div>
-
-                      <div className="bg-blue-50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-blue-600 font-medium">Subtotal Material</p>
-                        <p className="text-xl font-bold text-blue-800">
-                          ${((parseFloat(precioUnitario) || 0) * pieza.cantidad * (1 + margen / 100)).toFixed(2)}
-                        </p>
+                        <div className="bg-blue-50 rounded-lg p-3 text-center">
+                          <p className="text-xs text-blue-600 font-medium">Costo Total Material</p>
+                          <p className="text-xl font-bold text-blue-800">
+                            ${(parseFloat(precioUnitario) || 0).toFixed(2)}
+                          </p>
+                          <p className="text-xs text-blue-500 mt-1">
+                            ${((parseFloat(precioUnitario) || 0) / pieza.cantidad).toFixed(2)} por pieza
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -600,7 +635,8 @@ function ProcesosPieza({
     const catalogoItem = CATALOGO_PROCESOS_VELSO.find(p => p.id === procesoSeleccionado.id);
     if (!catalogoItem) return;
 
-    const tiempoMinutos = unidadTiempo === 'horas' ? tiempoProceso * 60 : tiempoProceso;
+    const tiempoMinutosPorPieza = unidadTiempo === 'horas' ? tiempoProceso * 60 : tiempoProceso;
+    const tiempoMinutos = tiempoMinutosPorPieza * pieza.cantidad;
     const tiempoHoras = tiempoMinutos / 60;
     let costoMO = 0;
     if (catalogoItem.categoria === 'maquina') {
@@ -615,11 +651,12 @@ function ProcesosPieza({
       id: crypto.randomUUID(),
       nombre: catalogoItem.nombre,
       tipo: catalogoItem.id,
+      tiempoMinutosPorPieza,
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
       costoManoObra: costoMO,
       costoTotal: tiempoHoras * catalogoItem.costoPorHora + costoMO,
-      descripcion: `${tiempoProceso} ${unidadTiempo}`,
+      descripcion: `${tiempoProceso} ${unidadTiempo} por pieza × ${pieza.cantidad} pzas = ${tiempoMinutos} min total`,
       incluyeManoObra: costoMO > 0,
       tipoManoObraSeleccionada: costoMO > 0 ? tipoMO : undefined,
     };
@@ -708,45 +745,53 @@ function ProcesosPieza({
           </div>
         </div>
         {procesoSeleccionado && (
-          <div className="flex gap-2 items-end">
-            <div>
-              <label className="text-xs text-slate-500">Tiempo</label>
-              <Input
-                type="number"
-                min={1}
-                value={tiempoProceso}
-                onChange={(e) => setTiempoProceso(parseFloat(e.target.value) || 0)}
-                className="w-20 h-8 text-xs"
-              />
+          <div className="space-y-2">
+            <div className="flex gap-2 items-end">
+              <div>
+                <label className="text-xs text-slate-500">Tiempo por pieza</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={tiempoProceso}
+                  onChange={(e) => setTiempoProceso(parseFloat(e.target.value) || 0)}
+                  className="w-24 h-8 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500">Unidad</label>
+                <Select value={unidadTiempo} onValueChange={(v) => setUnidadTiempo(v as 'minutos' | 'horas')}>
+                  <SelectTrigger className="h-8 w-24 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minutos" className="text-xs">Minutos</SelectItem>
+                    <SelectItem value="horas" className="text-xs">Horas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {procesoSeleccionado?.categoria === 'maquina' && (
+                <Select value={tipoMO} onValueChange={(v) => setTipoMO(v as 'mo_s' | 'mo_e')}>
+                  <SelectTrigger className="h-8 w-20 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mo_s" className="text-xs">MO-S</SelectItem>
+                    <SelectItem value="mo_e" className="text-xs">MO-E</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="pb-1">
+                <Button onClick={agregarProceso} disabled={tiempoProceso <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
+                  <Plus className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-slate-500">Unidad</label>
-              <Select value={unidadTiempo} onValueChange={(v) => setUnidadTiempo(v as 'minutos' | 'horas')}>
-                <SelectTrigger className="h-8 w-24 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="minutos" className="text-xs">Minutos</SelectItem>
-                  <SelectItem value="horas" className="text-xs">Horas</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {procesoSeleccionado?.categoria === 'maquina' && (
-              <Select value={tipoMO} onValueChange={(v) => setTipoMO(v as 'mo_s' | 'mo_e')}>
-                <SelectTrigger className="h-8 w-20 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mo_s" className="text-xs">MO-S</SelectItem>
-                  <SelectItem value="mo_e" className="text-xs">MO-E</SelectItem>
-                </SelectContent>
-              </Select>
+            {tiempoProceso > 0 && (
+              <p className="text-xs text-slate-500">
+                Tiempo total: {(unidadTiempo === 'horas' ? tiempoProceso * 60 : tiempoProceso) * pieza.cantidad} min
+                {' '}({tiempoProceso} {unidadTiempo} × {pieza.cantidad} piezas)
+              </p>
             )}
-            <div className="pb-1">
-              <Button onClick={agregarProceso} disabled={tiempoProceso <= 0} className="h-8 bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-3 h-3" />
-              </Button>
-            </div>
           </div>
         )}
       </div>
@@ -772,12 +817,14 @@ function ProcesosExternosPieza({
       id: crypto.randomUUID(),
       nombre: nombreExterno.trim(),
       tipo: 'otro',
+      tiempoMinutosPorPieza: 0,
       tiempoMinutos: 0,
       costoPorHora: 0,
       costoManoObra: 0,
       costoTotal: costoConMargen,
-      descripcion: `Proveedor: $${costoExterno.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)}`,
+      descripcion: `Proveedor: $${costoExterno.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)} (total ${pieza.cantidad} pzas)`,
       incluyeManoObra: false,
+      costoTotalIngresado: costoConMargen,
     };
     onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevo] });
     setNombreExterno('');
@@ -827,7 +874,7 @@ function ProcesosExternosPieza({
           step={0.01}
           value={costoExterno}
           onChange={(e) => setCostoExterno(parseFloat(e.target.value) || 0)}
-          placeholder="Costo proveedor"
+          placeholder="Costo total"
           className="w-28 h-8 text-xs"
         />
         <Select value={String(margenExterno)} onValueChange={(v) => setMargenExterno(parseInt(v))}>
@@ -846,7 +893,9 @@ function ProcesosExternosPieza({
       </div>
       {costoExterno > 0 && (
         <p className="text-xs text-slate-500 mt-1">
-          Costo proveedor: ${costoExterno.toFixed(2)} + {margenExterno}% = ${(costoExterno * (1 + margenExterno / 100)).toFixed(2)}
+          Costo total: ${(costoExterno * (1 + margenExterno / 100)).toFixed(2)}
+          {' '}
+          (${((costoExterno * (1 + margenExterno / 100)) / pieza.cantidad).toFixed(2)} por pieza)
         </p>
       )}
     </div>

@@ -83,11 +83,11 @@ export interface Material {
   descripcion?: string;
   dimensiones_libre?: string;
   // Costos
-  cantidad: number;
+  cantidad: number;           // cantidad física de material (kg, metros, etc.)
   unidad: 'kg' | 'pieza' | 'metro';
-  costoUnitario: number;
+  costoUnitario: number;     // costo por unidad de medida del material
   margenPorcentaje: number;
-  costoTotal: number;
+  costoTotal: number;         // COSTO TOTAL del material para TODAS las piezas (ingresado por usuario)
 }
 
 export type TipoProcesoVelso =
@@ -203,13 +203,15 @@ export interface Proceso {
   id: string;
   nombre: string;
   tipo: TipoProcesoVelso;
-  tiempoMinutos: number;
+  tiempoMinutosPorPieza: number;  // TIEMPO POR PIEZA (ingresado por usuario)
+  tiempoMinutos: number;          // TIEMPO TOTAL = tiempoMinutosPorPieza × cantidadPiezas
   costoPorHora: number;
   costoManoObra: number;
   costoTotal: number;
   descripcion?: string;
   incluyeManoObra: boolean;
   tipoManoObraSeleccionada?: 'mo_s' | 'mo_e';
+  costoTotalIngresado?: number;   // Para procesos externos: costo total ingresado por usuario
 }
 
 export interface CostosAdicionales {

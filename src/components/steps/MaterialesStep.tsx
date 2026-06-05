@@ -9,7 +9,7 @@ import type { PiezaCotizacion, Material, CatalogoMaterial } from '@/types/cotiza
 interface MaterialesStepProps {
   piezas: PiezaCotizacion[];
   catalogo: CatalogoMaterial[];
-  onAgregarMaterial: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
+  onAgregarMaterial: (piezaId: string, material: Omit<Material, 'id'>) => void;
   onEliminarMaterial: (piezaId: string, materialId: string) => void;
   onRecargarCatalogo?: () => void;
 }
@@ -74,7 +74,9 @@ export function MaterialesStep({
                       <div>
                         <p className="text-sm font-medium">{pieza.material.nombre}</p>
                         <p className="text-xs text-slate-500">
-                          {pieza.material.cantidad} {pieza.material.unidadMedida} × ${pieza.material.costoUnitario.toFixed(2)} = ${pieza.material.costoTotal.toFixed(2)}
+                          Costo total: ${pieza.material.costoTotal.toFixed(2)}
+                          {' '}
+                          ({(pieza.material.costoTotal / pieza.cantidad).toFixed(2)} por pieza)
                         </p>
                       </div>
                       <Button
@@ -111,7 +113,7 @@ function AgregarMaterialForm({
 }: {
   piezaId: string;
   catalogo: CatalogoMaterial[];
-  onAgregar: (piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => void;
+  onAgregar: (piezaId: string, material: Omit<Material, 'id'>) => void;
 }) {
   const [materialSeleccionado, setMaterialSeleccionado] = useState<CatalogoMaterial | null>(null);
   const [cantidad, setCantidad] = useState(1);
@@ -128,15 +130,17 @@ function AgregarMaterialForm({
         tipo: 'otro',
         forma: 'otro' as any,
         cantidad,
-        costoUnitario: costoLibre,
+        costoUnitario: costoLibre / cantidad,
         unidadMedida: 'mm',
         unidad: 'kg',
         margenPorcentaje: margen,
+        costoTotal: costoLibre,
       });
       setNombreLibre('');
       setCostoLibre(0);
     } else {
       if (!materialSeleccionado) return;
+      const costoTotalCalculado = cantidad * materialSeleccionado.costoUnitario;
       onAgregar(piezaId, {
         nombre: materialSeleccionado.nombre,
         tipo: materialSeleccionado.tipo,
@@ -146,6 +150,7 @@ function AgregarMaterialForm({
         unidadMedida: materialSeleccionado.unidadMedida,
         unidad: materialSeleccionado.unidadCosto,
         margenPorcentaje: margen,
+        costoTotal: costoTotalCalculado,
       });
       setMaterialSeleccionado(null);
     }
@@ -172,7 +177,7 @@ function AgregarMaterialForm({
             step={0.01}
             value={costoLibre}
             onChange={(e) => setCostoLibre(parseFloat(e.target.value) || 0)}
-            placeholder="Costo unitario"
+            placeholder="Costo total"
             className="w-28"
           />
           <Input
@@ -227,7 +232,7 @@ function AgregarMaterialForm({
             step={0.01}
             value={costoLibre}
             onChange={(e) => setCostoLibre(parseFloat(e.target.value) || 0)}
-            placeholder="Costo unitario"
+            placeholder="Costo total"
             className="w-28"
           />
           <Input

@@ -25,18 +25,7 @@ const generarNumeroCotizacion = () => {
   return `CNC-${anio}${mes}-${random}`;
 };
 
-const calcularCostoMaterial = (material: Material): number => {
-  const costoBase = material.cantidad * material.costoUnitario;
-  const factorMargen = 1 + (material.margenPorcentaje / 100);
-  return costoBase * factorMargen;
-};
-
-const calcularCostoProceso = (proceso: Proceso): number => {
-  const tiempoHoras = proceso.tiempoMinutos / 60;
-  const costoMaquina = tiempoHoras * proceso.costoPorHora;
-  const costoManoObra = tiempoHoras * proceso.costoManoObra;
-  return costoMaquina + costoManoObra;
-};
+// Funciones de cálculo ahora integradas en recalcularTotales y agregarProcesoAPieza
 
 const piezaVacia = (): PiezaCotizacion => ({
   id: crypto.randomUUID(),
@@ -193,11 +182,11 @@ export const useCotizacionStore = () => {
 
   // ========== MATERIAL UNICO POR PIEZA ==========
 
-  const asignarMaterialAPieza = useCallback((piezaId: string, material: Omit<Material, 'id' | 'costoTotal'>) => {
+  const asignarMaterialAPieza = useCallback((piezaId: string, material: Omit<Material, 'id'>) => {
     const nuevoMaterial: Material = {
       ...material,
       id: crypto.randomUUID(),
-      costoTotal: calcularCostoMaterial({ ...material, id: '', costoTotal: 0 }),
+      // costoTotal es ingresado por el usuario (costo total del material para TODAS las piezas)
     };
 
     setCotizacion(prev => {
@@ -213,9 +202,7 @@ export const useCotizacionStore = () => {
     setCotizacion(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId || !p.material) return p;
-        const materialActualizado = { ...p.material, ...material };
-        materialActualizado.costoTotal = calcularCostoMaterial(materialActualizado);
-        return { ...p, material: materialActualizado };
+        return { ...p, material: { ...p.material, ...material } };
       });
       return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
@@ -236,45 +223,54 @@ export const useCotizacionStore = () => {
   const agregarProcesoAPieza = useCallback((
     piezaId: string,
     tipoProceso: TipoProcesoVelso,
-    tiempoMinutos: number,
+    tiempoMinutosPorPieza: number,
     descripcion?: string,
     tipoManoObra?: 'mo_s' | 'mo_e'
   ) => {
     const catalogoItem = CATALOGO_PROCESOS_VELSO.find(p => p.id === tipoProceso);
     if (!catalogoItem) return;
 
+    // Obtener cantidad de piezas para calcular tiempo total
+    const pieza = cotizacion.piezas.find(p => p.id === piezaId);
+    const cantidadPiezas = pieza?.cantidad || 1;
+    const tiempoMinutos = tiempoMinutosPorPieza * cantidadPiezas;
+
     let costoManoObra = 0;
     let incluyeManoObra = false;
     let tipoManoObraSeleccionada: 'mo_s' | 'mo_e' | undefined = undefined;
 
+    const tiempoHoras = tiempoMinutos / 60;
+
     if (catalogoItem.categoria === 'maquina' && tipoManoObra) {
-      costoManoObra = tiempoMinutos / 60 * (tipoManoObra === 'mo_s' ? COSTOS_MANO_OBRA.mo_s : COSTOS_MANO_OBRA.mo_e);
+      costoManoObra = tiempoHoras * (tipoManoObra === 'mo_s' ? COSTOS_MANO_OBRA.mo_s : COSTOS_MANO_OBRA.mo_e);
       incluyeManoObra = true;
       tipoManoObraSeleccionada = tipoManoObra;
     } else if (catalogoItem.requiereManoObra === 'mo_s') {
-      costoManoObra = tiempoMinutos / 60 * COSTOS_MANO_OBRA.mo_s;
+      costoManoObra = tiempoHoras * COSTOS_MANO_OBRA.mo_s;
       incluyeManoObra = true;
       tipoManoObraSeleccionada = 'mo_s';
     } else if (catalogoItem.requiereManoObra === 'mo_e') {
-      costoManoObra = tiempoMinutos / 60 * COSTOS_MANO_OBRA.mo_e;
+      costoManoObra = tiempoHoras * COSTOS_MANO_OBRA.mo_e;
       incluyeManoObra = true;
       tipoManoObraSeleccionada = 'mo_e';
     }
+
+    const costoMaquina = tiempoHoras * catalogoItem.costoPorHora;
+    const costoTotal = costoMaquina + costoManoObra;
 
     const nuevoProceso: Proceso = {
       id: crypto.randomUUID(),
       nombre: catalogoItem.nombre,
       tipo: tipoProceso,
+      tiempoMinutosPorPieza,
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
       costoManoObra,
-      costoTotal: 0,
+      costoTotal,
       descripcion: descripcion || catalogoItem.descripcion,
       incluyeManoObra,
       tipoManoObraSeleccionada,
     };
-
-    nuevoProceso.costoTotal = calcularCostoProceso(nuevoProceso);
 
     setCotizacion(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
@@ -283,7 +279,7 @@ export const useCotizacionStore = () => {
       });
       return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
-  }, []);
+  }, [cotizacion.piezas]);
 
   const eliminarProcesoDePieza = useCallback((piezaId: string, procesoId: string) => {
     setCotizacion(prev => {
@@ -323,9 +319,31 @@ export const useCotizacionStore = () => {
 
   const recalcularTotales = (c: Cotizacion): Cotizacion => {
     const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
-      // ← MATERIAL UNICO
+      // Recalcular procesos cuando cambia la cantidad de piezas
+      const procesosRecalculados = pieza.procesos.map((proceso: Proceso) => {
+        if (proceso.tipo === 'otro') {
+          // Proceso externo: el costoTotal es el costo total ingresado (no cambia con cantidad)
+          return {
+            ...proceso,
+            costoTotal: proceso.costoTotalIngresado || proceso.costoTotal,
+          };
+        }
+        // Proceso de máquina: recalcular tiempo total y costo
+        const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
+        const tiempoHoras = tiempoMinutos / 60;
+        const costoMaquina = tiempoHoras * proceso.costoPorHora;
+        const costoManoObra = tiempoHoras * proceso.costoManoObra;
+        const costoTotal = costoMaquina + costoManoObra;
+        return {
+          ...proceso,
+          tiempoMinutos,
+          costoTotal,
+        };
+      });
+
+      // Material: costoTotal es el costo total ingresado por el usuario (no cambia con cantidad)
       const costoMateriales = pieza.material ? pieza.material.costoTotal : 0;
-      const costoProcesos = pieza.procesos.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
+      const costoProcesos = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
 
       const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
@@ -336,6 +354,7 @@ export const useCotizacionStore = () => {
 
       return {
         ...pieza,
+        procesos: procesosRecalculados,
         subtotalPieza,
         ivaPieza,
         totalPieza,

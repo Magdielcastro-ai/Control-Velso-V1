@@ -37,7 +37,14 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                   <h4 className="font-medium text-slate-900">
                     {index + 1}. {pieza.nombre}
                   </h4>
-                  <span className="text-xs text-slate-500">Cant: {pieza.cantidad}</span>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-500">Cant: {pieza.cantidad}</span>
+                    {pieza.cantidad > 1 && (
+                      <p className="text-xs font-medium text-blue-600">
+                        ${(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}/pieza
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1 text-sm">
@@ -46,12 +53,26 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                       <span>
                         Material: {pieza.material.nombre} ({pieza.material.tipo})
                       </span>
-                      <span>${costoMats.toFixed(2)}</span>
+                      <div className="text-right">
+                        <span>${costoMats.toFixed(2)}</span>
+                        {pieza.cantidad > 1 && (
+                          <span className="text-xs text-slate-400 ml-1">
+                            ({(costoMats / pieza.cantidad).toFixed(2)}/pz)
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                   <div className="flex justify-between text-slate-600">
                     <span>Procesos ({pieza.procesos.length})</span>
-                    <span>${costoProcs.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span>${costoProcs.toFixed(2)}</span>
+                      {pieza.cantidad > 1 && (
+                        <span className="text-xs text-slate-400 ml-1">
+                          ({(costoProcs / pieza.cantidad).toFixed(2)}/pz)
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {(costosAdic as number) > 0 && (
                     <div className="flex justify-between text-slate-600">
@@ -61,11 +82,25 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                   )}
                   <div className="flex justify-between font-medium text-slate-900 pt-1 border-t border-slate-100">
                     <span>Costo directo</span>
-                    <span>${costoDirecto.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span>${costoDirecto.toFixed(2)}</span>
+                      {pieza.cantidad > 1 && (
+                        <span className="text-xs text-slate-400 ml-1">
+                          ({(costoDirecto / pieza.cantidad).toFixed(2)}/pz)
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between text-blue-600">
                     <span>Con margen ({margenUtilidad}%)</span>
-                    <span>${pieza.subtotalPieza.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span>${pieza.subtotalPieza.toFixed(2)}</span>
+                      {pieza.cantidad > 1 && (
+                        <span className="text-xs text-blue-400 ml-1">
+                          ({(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}/pz)
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between text-slate-500 text-xs">
                     <span>IVA ({ivaPorcentaje}%)</span>
@@ -73,7 +108,14 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                   </div>
                   <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200">
                     <span>Total pieza</span>
-                    <span>${pieza.totalPieza.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span>${pieza.totalPieza.toFixed(2)}</span>
+                      {pieza.cantidad > 1 && (
+                        <span className="text-xs text-slate-500 ml-1">
+                          ({(pieza.totalPieza / pieza.cantidad).toFixed(2)}/pz)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
