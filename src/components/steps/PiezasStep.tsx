@@ -75,6 +75,7 @@ export function PiezasStep({
   onActualizarPieza,
   onAsignarMaterial,
   onEliminarMaterial,
+  onAgregarMaterialACatalogo,
   onRecargarCatalogo,
 }: PiezasStepProps) {
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');
@@ -108,6 +109,7 @@ export function PiezasStep({
             onActualizar={onActualizarPieza}
             onAsignarMaterial={onAsignarMaterial}
             onEliminarMaterial={onEliminarMaterial}
+            onAgregarMaterialACatalogo={onAgregarMaterialACatalogo}
             onRecargarCatalogo={onRecargarCatalogo}
           />
         ))}
@@ -151,6 +153,7 @@ function PiezaCard({
   onActualizar,
   onAsignarMaterial,
   onEliminarMaterial,
+  onAgregarMaterialACatalogo,
   onRecargarCatalogo,
 }: {
   pieza: PiezaCotizacion;
@@ -161,6 +164,7 @@ function PiezaCard({
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
   onAsignarMaterial: (piezaId: string, material: Omit<Material, 'id'>) => void;
   onEliminarMaterial: (piezaId: string) => void;
+  onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
 }) {
   const [editandoMaterial, setEditandoMaterial] = useState(false);
@@ -172,6 +176,8 @@ function PiezaCard({
   const [precioBase, setPrecioBase] = useState(0);
   const [margen, setMargen] = useState(0);
   const [unidadMedida, setUnidadMedida] = useState<'mm' | 'in'>('mm');
+  const [nombreMaterial, setNombreMaterial] = useState('');
+  const [guardarEnCatalogo, setGuardarEnCatalogo] = useState(false);
   const [unidadCosto, setUnidadCosto] = useState<'kg' | 'pieza' | 'metro'>('kg');
 
   const tieneMaterial = !!pieza.material;
@@ -184,9 +190,11 @@ function PiezaCard({
   const handleFormaChange = (forma: FormaId) => {
     setFormaSeleccionada(forma);
     setTipoSeleccionado('');
+    setNombreMaterial('');
     setDimensiones({});
     setPrecioUnitario('');
     setPrecioBase(0);
+    setGuardarEnCatalogo(false);
   };
 
   const handleTipoChange = (tipo: string) => {
@@ -195,6 +203,7 @@ function PiezaCard({
       m => m.forma === formaSeleccionada && m.tipo === tipo
     );
     if (materialCat) {
+      setNombreMaterial(materialCat.nombre);
       setPrecioBase(materialCat.costoUnitario);
       setPrecioUnitario(materialCat.costoUnitario.toString());
       setUnidadMedida(materialCat.unidadMedida || 'mm');
@@ -206,6 +215,10 @@ function PiezaCard({
       if (materialCat.ancho) dims.ancho = materialCat.ancho.toString();
       if (materialCat.espesor) dims.espesor = materialCat.espesor.toString();
       setDimensiones(dims);
+      setGuardarEnCatalogo(false);
+    } else {
+      setNombreMaterial(tipo);
+      setGuardarEnCatalogo(true);
     }
   };
 
@@ -239,9 +252,10 @@ function PiezaCard({
     );
 
     const costoTotalMaterial = parseFloat(precioUnitario);
+    const nombreFinal = nombreMaterial.trim() || tipoSeleccionado;
 
     onAsignarMaterial(pieza.id, {
-      nombre: materialCat?.nombre || tipoSeleccionado,
+      nombre: nombreFinal,
       tipo: tipoSeleccionado,
       forma: formaSeleccionada,
       cantidad: pieza.cantidad,
@@ -252,6 +266,23 @@ function PiezaCard({
       costoTotal: costoTotalMaterial,
       ...dimsNumericas,
     } as Omit<Material, 'id'>);
+
+    // Guardar en catálogo si es material nuevo y el usuario lo solicitó
+    if (guardarEnCatalogo && onAgregarMaterialACatalogo && !materialCat) {
+      onAgregarMaterialACatalogo({
+        nombre: nombreFinal,
+        tipo: tipoSeleccionado,
+        forma: formaSeleccionada,
+        unidadMedida: unidadMedida,
+        costoUnitario: costoTotalMaterial / pieza.cantidad,
+        unidadCosto: unidadCosto,
+        ...dimsNumericas,
+      } as Omit<CatalogoMaterial, 'id'>).then(() => {
+        toast.success('Material guardado en catálogo');
+      }).catch(() => {
+        toast.error('No se pudo guardar en catálogo');
+      });
+    }
 
     setEditandoMaterial(false);
     resetForm();
@@ -265,16 +296,19 @@ function PiezaCard({
   const resetForm = () => {
     setFormaSeleccionada('redondo');
     setTipoSeleccionado('');
+    setNombreMaterial('');
     setDimensiones({});
     setPrecioUnitario('');
     setPrecioBase(0);
     setMargen(0);
+    setGuardarEnCatalogo(false);
   };
 
   const iniciarEdicion = () => {
     if (pieza.material) {
       setFormaSeleccionada(pieza.material.forma as FormaId);
       setTipoSeleccionado(pieza.material.tipo);
+      setNombreMaterial(pieza.material.nombre);
       setPrecioUnitario(pieza.material.costoUnitario.toString());
       setPrecioBase(pieza.material.costoUnitario);
       setMargen(pieza.material.margenPorcentaje);
@@ -289,6 +323,7 @@ function PiezaCard({
         }
       }
       setDimensiones(dims);
+      setGuardarEnCatalogo(false);
     }
     setEditandoMaterial(true);
   };
@@ -462,11 +497,48 @@ function PiezaCard({
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                        No hay materiales registrados para {FORMAS.find(f => f.id === formaSeleccionada)?.label}.
+                      <div className="space-y-2">
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                          No hay materiales registrados para {FORMAS.find(f => f.id === formaSeleccionada)?.label}.
+                        </div>
+                        <Input
+                          value={tipoSeleccionado}
+                          onChange={(e) => handleTipoChange(e.target.value)}
+                          placeholder="Escribe el tipo de material (ej: Acero H13)"
+                          className="h-8 text-xs"
+                        />
                       </div>
                     )}
                   </div>
+
+                  {/* Nombre del material (editable) */}
+                  <div>
+                    <label className="text-xs font-medium text-slate-700 mb-1 block">
+                      Nombre del Material
+                    </label>
+                    <Input
+                      value={nombreMaterial}
+                      onChange={(e) => setNombreMaterial(e.target.value)}
+                      placeholder="Ej: Acero H13 Redondo 3in"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+
+                  {/* Guardar en catálogo */}
+                  {guardarEnCatalogo && onAgregarMaterialACatalogo && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`guardar-catalogo-${pieza.id}`}
+                        checked={guardarEnCatalogo}
+                        onChange={(e) => setGuardarEnCatalogo(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <label htmlFor={`guardar-catalogo-${pieza.id}`} className="text-xs text-blue-600">
+                        Guardar este material en el catálogo para futuras cotizaciones
+                      </label>
+                    </div>
+                  )}
 
                   {tipoSeleccionado && dimensionesConfig.length > 0 && (
                     <div className="bg-gray-50 rounded-lg p-4">
