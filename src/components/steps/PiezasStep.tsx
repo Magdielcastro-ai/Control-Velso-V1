@@ -483,10 +483,18 @@ function PiezaCard({
                     <label className="text-xs font-medium text-slate-700 mb-1 block">
                       Tipo de Material ({FORMAS.find(f => f.id === formaSeleccionada)?.label})
                     </label>
-                    {tiposDisponibles.length > 0 ? (
+                    {/* Input de tipo siempre visible */}
+                    <Input
+                      value={tipoSeleccionado}
+                      onChange={(e) => handleTipoChange(e.target.value)}
+                      placeholder="Escribe o selecciona el tipo (ej: Acero H13)"
+                      className="h-8 text-xs mb-2"
+                    />
+                    {/* Select solo como ayuda cuando hay tipos en catálogo */}
+                    {tiposDisponibles.length > 0 && (
                       <Select value={tipoSeleccionado} onValueChange={handleTipoChange}>
                         <SelectTrigger className="h-8 text-xs bg-white">
-                          <SelectValue placeholder="Selecciona un material..." />
+                          <SelectValue placeholder="Seleccionar del catálogo..." />
                         </SelectTrigger>
                         <SelectContent>
                           {tiposDisponibles.map((tipo) => (
@@ -496,17 +504,10 @@ function PiezaCard({
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                          No hay materiales registrados para {FORMAS.find(f => f.id === formaSeleccionada)?.label}.
-                        </div>
-                        <Input
-                          value={tipoSeleccionado}
-                          onChange={(e) => handleTipoChange(e.target.value)}
-                          placeholder="Escribe el tipo de material (ej: Acero H13)"
-                          className="h-8 text-xs"
-                        />
+                    )}
+                    {tiposDisponibles.length === 0 && (
+                      <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                        No hay materiales registrados para esta forma. Escribe el tipo arriba.
                       </div>
                     )}
                   </div>
