@@ -91,8 +91,19 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                       )}
                     </div>
                   </div>
-                  <div className="flex justify-between text-blue-600">
-                    <span>Con margen ({margenUtilidad}%)</span>
+                  <div className="flex justify-between text-green-600">
+                    <span>Utilidad ({margenUtilidad}%)</span>
+                    <div className="text-right">
+                      <span>${(pieza.subtotalPieza - costoDirecto).toFixed(2)}</span>
+                      {pieza.cantidad > 1 && (
+                        <span className="text-xs text-green-400 ml-1">
+                          ({((pieza.subtotalPieza - costoDirecto) / pieza.cantidad).toFixed(2)}/pz)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-blue-600 font-medium">
+                    <span>Subtotal (antes de IVA)</span>
                     <div className="text-right">
                       <span>${pieza.subtotalPieza.toFixed(2)}</span>
                       {pieza.cantidad > 1 && (
@@ -134,10 +145,38 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="p-4">
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
+            {/* Calcular costo directo global y margen global */}
+            {(() => {
+              const costoDirectoGlobal = piezas.reduce((sum, p) => {
+                const mats = p.material ? p.material.costoTotal : 0;
+                const procs = p.procesos.reduce((s, pr) => s + pr.costoTotal, 0);
+                const adic = Object.values(p.costosAdicionales).reduce((s, v) => s + v, 0);
+                return sum + mats + procs + adic;
+              }, 0);
+              const margenGlobal = subtotal - costoDirectoGlobal - costosGenerales;
+              return (
+                <>
+                  <div className="flex justify-between text-sm text-slate-600">
+                    <span>Costo directo total</span>
+                    <span>${costoDirectoGlobal.toFixed(2)}</span>
+                  </div>
+                  {costosGenerales > 0 && (
+                    <div className="flex justify-between text-sm text-slate-600">
+                      <span>Costos generales</span>
+                      <span>${costosGenerales.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Utilidad ({margenUtilidad}%)</span>
+                    <span>${margenGlobal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium text-blue-700 pt-1 border-t border-blue-200">
+                    <span>Subtotal (antes de IVA)</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                </>
+              );
+            })()}
             <div className="flex justify-between text-sm text-slate-600">
               <span>IVA ({ivaPorcentaje}%)</span>
               <span>${iva.toFixed(2)}</span>
