@@ -1,5 +1,5 @@
 // Service Worker para Velso CNC - Modo Offline
-const CACHE_NAME = 'velso-cnc-v1';
+const CACHE_NAME = 'velso-cnc-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -16,7 +16,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activar el service worker
+// Activar el service worker - Limpiar caches viejas
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -30,7 +30,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Interceptar peticiones
+// Interceptar peticiones - Network first, cache fallback
 self.addEventListener('fetch', (event) => {
   // Solo cachear GET requests
   if (event.request.method !== 'GET') return;
@@ -39,30 +39,60 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('supabase.co')) {
     return;
   }
+
+  // Para navegación (cambio de página), siempre ir a network primero
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Actualizar cache con la nueva versión
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          // Si falla, usar cache
+          return caches.match(event.request).then((cachedResponse) => {
+            return cachedResponse || caches.match('/index.html');
+          });
+        })
+    );
+    return;
+  }
   
+  // Para assets estáticos (JS, CSS, imágenes), usar cache primero
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Si está en cache, devolver cache
-      if (response) {
-        return response;
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // En background, actualizar el cache
+        fetch(event.request).then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+        }).catch(() => {});
+        return cachedResponse;
       }
       
-      // Si no está en cache, hacer fetch y guardar en cache
-      return fetch(event.request).then((fetchResponse) => {
-        // Solo cachear respuestas exitosas
-        if (!fetchResponse || fetchResponse.status !== 200 || fetchResponse.type !== 'basic') {
-          return fetchResponse;
+      // Si no está en cache, hacer fetch
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
         }
         
-        const responseToCache = fetchResponse.clone();
+        const responseToCache = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
         });
         
-        return fetchResponse;
+        return response;
       });
     }).catch(() => {
-      // Si falla el fetch y no hay cache, mostrar página offline
+      // Si falla todo, mostrar página offline
       if (event.request.mode === 'navigate') {
         return caches.match('/index.html');
       }
