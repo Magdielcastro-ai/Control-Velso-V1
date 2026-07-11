@@ -59,6 +59,9 @@ import { AdminUsuariosView } from '@/components/AdminUsuariosView';
 import { DiagnosticoSupabase } from '@/components/DiagnosticoSupabase';
 import { PantallaCarga } from '@/components/PantallaCarga';
 
+// NUEVO: Vista de Producción
+import { ProduccionView } from '@/components/ProduccionView';
+
 // NUEVOS COMPONENTES VELSO OS v2
 import { PendientesView } from '@/components/PendientesView';
 import { CobranzaView } from '@/components/CobranzaView';
@@ -81,7 +84,7 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' | 
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' | 
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo';
+                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion';
 
 // Horas disponibles por defecto
 const HORAS_DEFAULT: Record<string, number> = {
@@ -399,6 +402,7 @@ function App() {
   const irAPendientes = () => setVistaActual('pendientes');
   const irACobranza = () => setVistaActual('cobranza');
   const irADashboardEjecutivo = () => setVistaActual('dashboard-ejecutivo');
+  const irAProduccion = () => setVistaActual('produccion');
 
   const irANuevaCotizacion = () => {
     if (!canCreateCotizacion()) {
@@ -635,6 +639,7 @@ function App() {
               onPendientes={irAPendientes}
               onCobranza={irACobranza}
               onDashboardEjecutivo={irADashboardEjecutivo}
+              onProduccion={irAProduccion}
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
               cobranzaVencidaCount={getVencidos().length}
@@ -752,6 +757,25 @@ function App() {
             <ProduccionDashboardView
               onVolver={irAHome}
               proyectos={proyectos}
+            />
+          </>
+        );
+
+      case 'produccion':
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <ProduccionView
+              onVolver={irAHome}
+              proyectos={proyectos}
+              registros={[]}
+              onIniciarProceso={(id) => console.log('Iniciar', id)}
+              onCompletarProceso={(id, tiempo) => console.log('Completar', id, tiempo)}
             />
           </>
         );

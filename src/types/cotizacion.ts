@@ -206,7 +206,8 @@ export interface Proceso {
   tiempoMinutosPorPieza: number;  // TIEMPO POR PIEZA (ingresado por usuario)
   tiempoMinutos: number;          // TIEMPO TOTAL = tiempoMinutosPorPieza × cantidadPiezas
   costoPorHora: number;
-  costoManoObra: number;
+  costoManoObraPorHora: number;   // TASA por hora de MO (191.19 o 286.78)
+  costoManoObra: number;          // Costo TOTAL de MO (para compatibilidad)
   costoTotal: number;
   descripcion?: string;
   incluyeManoObra: boolean;

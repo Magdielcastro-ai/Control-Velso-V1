@@ -265,6 +265,7 @@ export const useCotizacionStore = () => {
       tiempoMinutosPorPieza,
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
+      costoManoObraPorHora: tipoManoObraSeleccionada === 'mo_e' ? COSTOS_MANO_OBRA.mo_e : COSTOS_MANO_OBRA.mo_s,
       costoManoObra,
       costoTotal,
       descripcion: descripcion || catalogoItem.descripcion,
@@ -332,7 +333,7 @@ export const useCotizacionStore = () => {
         const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
         const tiempoHoras = tiempoMinutos / 60;
         const costoMaquina = tiempoHoras * proceso.costoPorHora;
-        const costoManoObra = tiempoHoras * proceso.costoManoObra;
+        const costoManoObra = tiempoHoras * (proceso.costoManoObraPorHora || 0);
         const costoTotal = costoMaquina + costoManoObra;
         return {
           ...proceso,
@@ -349,7 +350,8 @@ export const useCotizacionStore = () => {
       const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
       // Margen financiero: utilidad sobre el precio de venta (no markup sobre costo)
       // subtotal = costoDirecto / (1 - margen%) para que la utilidad sea exactamente el margen% del precio
-      const factorMargen = 1 - (c.margenUtilidad / 100);
+      const margenValido = Math.max(0, Math.min(99, c.margenUtilidad));
+      const factorMargen = 1 - (margenValido / 100);
       const subtotalPieza = factorMargen > 0 ? costoDirectoPieza / factorMargen : costoDirectoPieza;
       const ivaPieza = subtotalPieza * (c.ivaPorcentaje / 100);
       const totalPieza = subtotalPieza + ivaPieza;
@@ -595,7 +597,7 @@ export const useCotizacionStore = () => {
           materiales: data.materiales || [],
           procesos: data.procesos || [],
           costosAdicionales: data.costos_adicionales || cotizacionVacia().costosAdicionales,
-          condiciones: cotizacionVacia().condiciones,
+          condiciones: data.condiciones || cotizacionVacia().condiciones,
           subtotal: data.subtotal || 0,
           ivaPorcentaje: data.iva_porcentaje || 16,
           iva: (data.subtotal || 0) * (data.iva_porcentaje || 16) / 100,

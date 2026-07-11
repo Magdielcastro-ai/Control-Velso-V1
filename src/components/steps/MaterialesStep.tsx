@@ -10,7 +10,7 @@ interface MaterialesStepProps {
   piezas: PiezaCotizacion[];
   catalogo: CatalogoMaterial[];
   onAgregarMaterial: (piezaId: string, material: Omit<Material, 'id'>) => void;
-  onEliminarMaterial: (piezaId: string, materialId: string) => void;
+  onEliminarMaterial: (piezaId: string) => void;
   onRecargarCatalogo?: () => void;
 }
 
@@ -82,7 +82,7 @@ export function MaterialesStep({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onEliminarMaterial(pieza.id, pieza.material!.id)}
+                        onClick={() => onEliminarMaterial(pieza.id)}
                         className="text-red-500 hover:text-red-700"
                       >
                         <Trash2 className="w-3 h-3" />

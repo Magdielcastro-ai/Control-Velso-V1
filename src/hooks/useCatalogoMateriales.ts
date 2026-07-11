@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import type { CatalogoMaterial, FormaMaterial } from '@/types/cotizacion';
+import type { CatalogoMaterial, FormaMaterial, UnidadMedida } from '@/types/cotizacion';
 
 export const useCatalogoMateriales = () => {
   const [catalogo, setCatalogo] = useState<CatalogoMaterial[]>([]);
@@ -33,14 +33,20 @@ export const useCatalogoMateriales = () => {
           nombre: m.nombre,
           tipo: m.tipo,
           forma: (m.forma || 'redondo') as FormaMaterial,
-          unidadMedida: m.unidad || 'mm',
+          unidadMedida: (m.unidad_medida || 'mm') as UnidadMedida,
           diametro: m.diametro,
           lado: m.lado,
           largo: m.largo,
           ancho: m.ancho,
           espesor: m.espesor,
+          diametro_exterior: m.diametro_exterior,
+          diametro_interior: m.diametro_interior,
+          lado_a: m.lado_a,
+          lado_b: m.lado_b,
+          descripcion: m.descripcion,
+          dimensiones_libre: m.dimensiones_libre,
           costoUnitario: m.costo_unitario ? Number(m.costo_unitario) : 0,
-          unidadCosto: m.unidad || 'kg',
+          unidadCosto: (m.unidad_costo || 'kg') as 'kg' | 'pieza' | 'metro',
         }));
         console.log('[useCatalogoMateriales] Formateados:', materialesFormateados);
         setCatalogo(materialesFormateados);
@@ -65,6 +71,9 @@ export const useCatalogoMateriales = () => {
       id: crypto.randomUUID(),
     };
 
+    // Optimistic update: agregar al estado local primero
+    setCatalogo(prev => [...prev, nuevo]);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
@@ -74,29 +83,46 @@ export const useCatalogoMateriales = () => {
           nombre: nuevo.nombre,
           tipo: nuevo.tipo,
           forma: nuevo.forma,
-          unidad: nuevo.unidadMedida,
+          unidad_medida: nuevo.unidadMedida,
           diametro: nuevo.diametro,
           lado: nuevo.lado,
           largo: nuevo.largo,
           ancho: nuevo.ancho,
           espesor: nuevo.espesor,
+          diametro_exterior: nuevo.diametro_exterior,
+          diametro_interior: nuevo.diametro_interior,
+          lado_a: nuevo.lado_a,
+          lado_b: nuevo.lado_b,
+          descripcion: nuevo.descripcion,
+          dimensiones_libre: nuevo.dimensiones_libre,
           costo_unitario: nuevo.costoUnitario,
+          unidad_costo: nuevo.unidadCosto,
           usuario_id: user?.id,
         }]);
 
       if (error) {
         console.error('[useCatalogoMateriales] Error guardando:', error);
         toast.error('Error guardando material: ' + error.message);
+        // Revertir optimistic update en caso de error
+        setCatalogo(prev => prev.filter(m => m.id !== nuevo.id));
       }
     } catch (err) {
       console.error('[useCatalogoMateriales] Error:', err);
+      toast.error('Error de conexión al guardar material');
+      // Revertir optimistic update en caso de error
+      setCatalogo(prev => prev.filter(m => m.id !== nuevo.id));
     }
 
-    setCatalogo(prev => [...prev, nuevo]);
     return nuevo;
   }, []);
 
   const eliminarDelCatalogo = useCallback(async (id: string) => {
+    // Guardar estado previo para posible revert
+    const materialEliminado = catalogo.find(m => m.id === id);
+    
+    // Optimistic update: eliminar del estado local primero
+    setCatalogo(prev => prev.filter(m => m.id !== id));
+
     try {
       const { error } = await supabase
         .from('catalogo_materiales')
@@ -105,13 +131,21 @@ export const useCatalogoMateriales = () => {
 
       if (error) {
         console.error('[useCatalogoMateriales] Error eliminando:', error);
+        toast.error('Error eliminando material: ' + error.message);
+        // Revertir optimistic update en caso de error
+        if (materialEliminado) {
+          setCatalogo(prev => [...prev, materialEliminado]);
+        }
       }
     } catch (err) {
       console.error('[useCatalogoMateriales] Error:', err);
+      toast.error('Error de conexión al eliminar material');
+      // Revertir optimistic update en caso de error
+      if (materialEliminado) {
+        setCatalogo(prev => [...prev, materialEliminado]);
+      }
     }
-
-    setCatalogo(prev => prev.filter(m => m.id !== id));
-  }, []);
+  }, [catalogo]);
 
   const buscarMateriales = useCallback((query: string, forma?: FormaMaterial) => {
     const q = query.toLowerCase();

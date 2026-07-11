@@ -409,15 +409,15 @@ function PiezaCard({
                 <h4 className="text-sm font-medium text-slate-900 flex items-center gap-1">
                   <Package className="w-3 h-3" /> Material
                 </h4>
-                {catalogoMateriales.length === 0 && (
+                {onRecargarCatalogo && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-amber-600">Catálogo vacío</span>
-                    {onRecargarCatalogo && (
-                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onRecargarCatalogo}>
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Recargar
-                      </Button>
+                    {catalogoMateriales.length === 0 && (
+                      <span className="text-xs text-amber-600">Catálogo vacío</span>
                     )}
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onRecargarCatalogo}>
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Recargar
+                    </Button>
                   </div>
                 )}
               </div>
@@ -727,6 +727,7 @@ function ProcesosPieza({
       tiempoMinutosPorPieza,
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
+      costoManoObraPorHora: tipoMO === 'mo_e' ? 286.78 : 191.19,
       costoManoObra: costoMO,
       costoTotal: tiempoHoras * catalogoItem.costoPorHora + costoMO,
       descripcion: `${tiempoProceso} ${unidadTiempo} por pieza × ${pieza.cantidad} pzas = ${tiempoMinutos} min total`,
@@ -893,6 +894,7 @@ function ProcesosExternosPieza({
       tiempoMinutosPorPieza: 0,
       tiempoMinutos: 0,
       costoPorHora: 0,
+      costoManoObraPorHora: 0,
       costoManoObra: 0,
       costoTotal: costoConMargen,
       descripcion: `Proveedor: $${costoExterno.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)} (total ${pieza.cantidad} pzas)`,

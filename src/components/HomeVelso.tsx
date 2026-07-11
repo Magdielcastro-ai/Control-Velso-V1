@@ -30,6 +30,7 @@ interface HomeVelsoProps {
   onPendientes: () => void;
   onCobranza: () => void;
   onDashboardEjecutivo: () => void;
+  onProduccion: () => void;
   alertasCount: number;
   pendientesCount: number;
   cobranzaVencidaCount: number;
@@ -48,6 +49,7 @@ export function HomeVelso({
   onPendientes,
   onCobranza,
   onDashboardEjecutivo,
+  onProduccion,
   alertasCount,
   pendientesCount,
   cobranzaVencidaCount,
@@ -201,7 +203,20 @@ export function HomeVelso({
             <div className="flex flex-col items-center text-center gap-2">
               <ClipboardList className="w-8 h-8 text-slate-600" />
               <h3 className="font-medium text-slate-900 text-sm">Proyectos</h3>
-              <p className="text-xs text-slate-500">Ventas y producción</p>
+              <p className="text-xs text-slate-500">Ventas y seguimiento</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer bg-blue-50"
+          onClick={onProduccion}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <Factory className="w-8 h-8 text-blue-600" />
+              <h3 className="font-medium text-blue-900 text-sm">Producción</h3>
+              <p className="text-xs text-blue-600">Tiempos y trazabilidad</p>
             </div>
           </CardContent>
         </Card>
