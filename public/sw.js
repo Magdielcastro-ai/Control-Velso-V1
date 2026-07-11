@@ -1,5 +1,5 @@
 // Service Worker para Velso CNC - Modo Offline
-const CACHE_NAME = 'velso-cnc-v2';
+const CACHE_NAME = 'velso-cnc-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -62,40 +62,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Para assets estáticos (JS, CSS, imágenes), usar cache primero
+  // Para assets estáticos (JS, CSS, imágenes), usar network primero
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // En background, actualizar el cache
-        fetch(event.request).then((response) => {
-          if (response && response.status === 200 && response.type === 'basic') {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      
-      // Si no está en cache, hacer fetch
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        
         return response;
-      });
-    }).catch(() => {
-      // Si falla todo, mostrar página offline
-      if (event.request.mode === 'navigate') {
-        return caches.match('/index.html');
-      }
-    })
+      })
+      .catch(() => {
+        // Si falla el network, usar cache
+        return caches.match(event.request).then((cachedResponse) => {
+          return cachedResponse || new Response('Offline', { status: 503 });
+        });
+      })
   );
 });
