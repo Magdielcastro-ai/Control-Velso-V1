@@ -13,13 +13,16 @@ interface TallerStepProps {
   onChange: (datos: Partial<DatosTaller>) => void;
   talleresGuardados: TallerGuardado[];
   onGuardarTaller?: (datos: DatosTaller) => TallerGuardado | null | Promise<TallerGuardado | null>;
+  onActualizarTaller?: (id: string, datos: Partial<DatosTaller>) => Promise<void>;
   userRol?: string;
 }
 
-export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller, userRol = 'vendedor' }: TallerStepProps) {
+export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller, onActualizarTaller, userRol = 'vendedor' }: TallerStepProps) {
   const [tallerSeleccionado, setTallerSeleccionado] = useState<string>('');
   const [mostrarGuardar, setMostrarGuardar] = useState(false);
+  const [mostrarActualizar, setMostrarActualizar] = useState(false);
   const [tallerGuardado, setTallerGuardado] = useState(false);
+  const [tallerOriginal, setTallerOriginal] = useState<TallerGuardado | null>(null);
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
 
@@ -30,18 +33,33 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
         t.nombre.toLowerCase() === datos.nombre.toLowerCase()
       );
       setTallerGuardado(existe);
-      // Solo mostrar botón de guardar si es admin/superadmin
-      setMostrarGuardar(isAdmin && !existe && datos.nombre.length > 0);
+      
+      // Detectar si hay cambios respecto al taller original seleccionado
+      if (tallerOriginal && tallerSeleccionado === tallerOriginal.id) {
+        const hayCambios = 
+          datos.direccion !== tallerOriginal.direccion ||
+          datos.telefono !== tallerOriginal.telefono ||
+          datos.email !== tallerOriginal.email ||
+          datos.rfc !== tallerOriginal.rfc;
+        setMostrarActualizar(isAdmin && hayCambios);
+        setMostrarGuardar(false);
+      } else {
+        // Solo mostrar botón de guardar si es admin/superadmin y no existe
+        setMostrarGuardar(isAdmin && !existe && datos.nombre.length > 0);
+        setMostrarActualizar(false);
+      }
     } else {
       setMostrarGuardar(false);
+      setMostrarActualizar(false);
       setTallerGuardado(false);
     }
-  }, [datos, talleresGuardados, isAdmin]);
+  }, [datos, talleresGuardados, isAdmin, tallerOriginal, tallerSeleccionado]);
 
   const handleSeleccionarTaller = (tallerId: string) => {
     setTallerSeleccionado(tallerId);
     if (tallerId === 'nuevo') {
       // Limpiar todos los campos para nuevo taller
+      setTallerOriginal(null);
       onChange({
         nombre: '',
         direccion: '',
@@ -52,6 +70,7 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
     } else {
       const taller = talleresGuardados.find(t => t.id === tallerId);
       if (taller) {
+        setTallerOriginal(taller);
         onChange({
           nombre: taller.nombre,
           direccion: taller.direccion,
@@ -70,6 +89,25 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
       setTallerGuardado(true);
       setMostrarGuardar(false);
     }
+  };
+
+  const handleActualizarTaller = async () => {
+    if (!onActualizarTaller || !tallerOriginal) return;
+    await onActualizarTaller(tallerOriginal.id, {
+      direccion: datos.direccion,
+      telefono: datos.telefono,
+      email: datos.email,
+      rfc: datos.rfc,
+    });
+    // Actualizar el taller original con los nuevos datos
+    setTallerOriginal({
+      ...tallerOriginal,
+      direccion: datos.direccion,
+      telefono: datos.telefono,
+      email: datos.email,
+      rfc: datos.rfc,
+    });
+    setMostrarActualizar(false);
   };
 
   return (
@@ -150,6 +188,19 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Guardar este taller para futuras cotizaciones
+                </Button>
+              )}
+              {/* Botón actualizar taller - solo visible para admin/superadmin cuando hay cambios */}
+              {mostrarActualizar && onActualizarTaller && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleActualizarTaller}
+                  className="mt-2 border-orange-300 text-orange-600 hover:bg-orange-50"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Actualizar datos del taller guardado
                 </Button>
               )}
             </div>

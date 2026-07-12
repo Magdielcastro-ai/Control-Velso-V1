@@ -282,6 +282,7 @@ function App() {
   const {
     talleres,
     guardarTallerDesdeCotizacion,
+    actualizarTaller,
     recargarTalleres,
   } = useTalleresStore();
 
@@ -1020,6 +1021,9 @@ function App() {
                     onGuardarTaller={canManageTalleres() ? async (datos) => {
                       const result = await guardarTallerDesdeCotizacion(datos);
                       return result;
+                    } : undefined}
+                    onActualizarTaller={canManageTalleres() ? async (id, datos) => {
+                      await actualizarTaller(id, datos);
                     } : undefined}
                     userRol={user.rol}
                   />
