@@ -32,40 +32,40 @@ const FORMAS = [
 
 type FormaId = typeof FORMAS[number]['id'];
 
-const DIMENSIONES_CONFIG: Record<FormaId, { key: string; label: string; placeholder: string; type?: string }[]> = {
+const getDimensionesConfig = (unidad: 'mm' | 'in'): Record<FormaId, { key: string; label: string; placeholder: string; type?: string }[]> => ({
   redondo: [
-    { key: 'diametro', label: 'Diámetro', placeholder: 'mm' },
-    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+    { key: 'diametro', label: 'Diámetro', placeholder: unidad },
+    { key: 'longitud', label: 'Longitud', placeholder: unidad },
   ],
   cuadrado: [
-    { key: 'lado', label: 'Lado', placeholder: 'mm' },
-    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+    { key: 'lado', label: 'Lado', placeholder: unidad },
+    { key: 'longitud', label: 'Longitud', placeholder: unidad },
   ],
   barra_hueca: [
-    { key: 'diametro_exterior', label: 'Diámetro Exterior', placeholder: 'mm' },
-    { key: 'diametro_interior', label: 'Diámetro Interior', placeholder: 'mm' },
-    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+    { key: 'diametro_exterior', label: 'Diámetro Exterior', placeholder: unidad },
+    { key: 'diametro_interior', label: 'Diámetro Interior', placeholder: unidad },
+    { key: 'longitud', label: 'Longitud', placeholder: unidad },
   ],
   barra_cromada: [
-    { key: 'diametro', label: 'Diámetro', placeholder: 'mm' },
-    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+    { key: 'diametro', label: 'Diámetro', placeholder: unidad },
+    { key: 'longitud', label: 'Longitud', placeholder: unidad },
   ],
   placa: [
-    { key: 'largo', label: 'Largo', placeholder: 'mm' },
-    { key: 'ancho', label: 'Ancho', placeholder: 'mm' },
-    { key: 'espesor', label: 'Espesor', placeholder: 'mm' },
+    { key: 'largo', label: 'Largo', placeholder: unidad },
+    { key: 'ancho', label: 'Ancho', placeholder: unidad },
+    { key: 'espesor', label: 'Espesor', placeholder: unidad },
   ],
   angulo: [
-    { key: 'lado_a', label: 'Lado A', placeholder: 'mm' },
-    { key: 'lado_b', label: 'Lado B', placeholder: 'mm' },
-    { key: 'espesor', label: 'Espesor', placeholder: 'mm' },
-    { key: 'longitud', label: 'Longitud', placeholder: 'mm' },
+    { key: 'lado_a', label: 'Lado A', placeholder: unidad },
+    { key: 'lado_b', label: 'Lado B', placeholder: unidad },
+    { key: 'espesor', label: 'Espesor', placeholder: unidad },
+    { key: 'longitud', label: 'Longitud', placeholder: unidad },
   ],
   otro: [
     { key: 'descripcion', label: 'Descripción', placeholder: 'Describe el material...', type: 'text' },
-    { key: 'dimensiones_libre', label: 'Dimensiones', placeholder: 'Ej: 50x30x10 mm', type: 'text' },
+    { key: 'dimensiones_libre', label: 'Dimensiones', placeholder: `Ej: 50x30x10 ${unidad}`, type: 'text' },
   ],
-};
+});
 
 export function PiezasStep({
   piezas,
@@ -232,7 +232,7 @@ function PiezaCard({
       return;
     }
 
-    const config = DIMENSIONES_CONFIG[formaSeleccionada];
+    const config = getDimensionesConfig(unidadMedida)[formaSeleccionada];
     const dimsNumericas: Record<string, number | string> = {};
     for (const dim of config) {
       if (dim.type === 'text') {
@@ -315,7 +315,7 @@ function PiezaCard({
       setUnidadMedida(pieza.material.unidadMedida);
       setUnidadCosto(pieza.material.unidad as 'kg' | 'pieza' | 'metro');
       const dims: Record<string, string> = {};
-      const config = DIMENSIONES_CONFIG[pieza.material.forma as FormaId] || [];
+      const config = getDimensionesConfig(pieza.material.unidadMedida)[pieza.material.forma as FormaId] || [];
       for (const dim of config) {
         const val = (pieza.material as any)[dim.key];
         if (val !== undefined && val !== null) {
@@ -330,7 +330,7 @@ function PiezaCard({
 
   const formatearDimensiones = (material: Material) => {
     const forma = material.forma as FormaId;
-    const config = DIMENSIONES_CONFIG[forma];
+    const config = getDimensionesConfig(material.unidadMedida)[forma];
     if (!config) return '';
 
     const partes = config
@@ -347,7 +347,7 @@ function PiezaCard({
     return partes.join(' × ');
   };
 
-  const dimensionesConfig = DIMENSIONES_CONFIG[formaSeleccionada] || [];
+  const dimensionesConfig = getDimensionesConfig(unidadMedida)[formaSeleccionada] || [];
 
   return (
     <Card className="border-slate-200">
