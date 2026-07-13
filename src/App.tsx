@@ -262,6 +262,7 @@ function App() {
   const { 
     clientes, 
     agregarCliente, 
+    actualizarCliente,
     eliminarCliente, 
     agregarUsuario, 
     eliminarUsuario,
@@ -794,6 +795,7 @@ function App() {
               onVolver={irAHome}
               clientes={clientes}
               onAgregarCliente={canManageClientes() ? agregarCliente : undefined}
+              onActualizarCliente={canManageClientes() ? actualizarCliente : undefined}
               onEliminarCliente={canDeleteClientes() ? eliminarCliente : undefined}
               onAgregarUsuario={agregarUsuario}
               onEliminarUsuario={eliminarUsuario}

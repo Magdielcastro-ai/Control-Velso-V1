@@ -17,7 +17,8 @@ import {
   User,
   Trash2,
   Search,
-  UserPlus
+  UserPlus,
+  Pencil
 } from 'lucide-react';
 import type { Cliente, UsuarioCliente } from '@/types/ventas';
 
@@ -25,15 +26,17 @@ interface ClientesViewProps {
   onVolver: () => void;
   clientes: Cliente[];
   onAgregarCliente?: (cliente: Omit<Cliente, 'id' | 'fechaRegistro' | 'usuarios'>) => void;
+  onActualizarCliente?: (id: string, datos: Partial<Cliente>) => void;
   onEliminarCliente?: (id: string) => void;
   onAgregarUsuario?: (clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => void;
   onEliminarUsuario?: (clienteId: string, usuarioId: string) => void;
 }
 
-export function ClientesView({ 
-  onVolver, 
-  clientes, 
+export function ClientesView({
+  onVolver,
+  clientes,
   onAgregarCliente,
+  onActualizarCliente,
   onEliminarCliente,
   onAgregarUsuario,
   onEliminarUsuario
@@ -41,6 +44,7 @@ export function ClientesView({
   const [busqueda, setBusqueda] = useState('');
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [dialogoNuevoCliente, setDialogoNuevoCliente] = useState(false);
+  const [dialogoEditarCliente, setDialogoEditarCliente] = useState<string | null>(null);
   const [dialogoNuevoUsuario, setDialogoNuevoUsuario] = useState<string | null>(null);
 
   // Formulario nuevo cliente
@@ -60,6 +64,15 @@ export function ClientesView({
     telefono: '',
     celular: '',
     esPrincipal: false,
+  });
+
+  // Formulario editar cliente
+  const [clienteEditando, setClienteEditando] = useState({
+    nombreEmpresa: '',
+    direccion: '',
+    telefono: '',
+    rfc: '',
+    terminosPago: '',
   });
 
   const clientesFiltrados = clientes.filter(c => 
@@ -92,6 +105,23 @@ export function ClientesView({
       esPrincipal: false,
     });
     setDialogoNuevoUsuario(null);
+  };
+
+  const abrirEditarCliente = (cliente: Cliente) => {
+    setClienteEditando({
+      nombreEmpresa: cliente.nombreEmpresa,
+      direccion: cliente.direccion,
+      telefono: cliente.telefono,
+      rfc: cliente.rfc,
+      terminosPago: cliente.terminosPago,
+    });
+    setDialogoEditarCliente(cliente.id);
+  };
+
+  const handleActualizarCliente = () => {
+    if (!dialogoEditarCliente || !clienteEditando.nombreEmpresa || !clienteEditando.rfc || !onActualizarCliente) return;
+    onActualizarCliente(dialogoEditarCliente, clienteEditando);
+    setDialogoEditarCliente(null);
   };
 
   return (
@@ -243,6 +273,16 @@ export function ClientesView({
                       {clienteExpandido === cliente.id ? 'Ocultar' : 'Ver Contactos'}
                       <Badge variant="secondary" className="ml-2">{cliente.usuarios.length}</Badge>
                     </Button>
+                    {onActualizarCliente && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => abrirEditarCliente(cliente)}
+                        className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
                     {onEliminarCliente && (
                       <Button
                         variant="ghost"
@@ -329,6 +369,65 @@ export function ClientesView({
           ))
         )}
       </div>
+
+      {/* Diálogo para editar cliente */}
+      <Dialog open={!!dialogoEditarCliente} onOpenChange={() => setDialogoEditarCliente(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Nombre de la Empresa *</Label>
+              <Input
+                value={clienteEditando.nombreEmpresa}
+                onChange={(e) => setClienteEditando(prev => ({ ...prev, nombreEmpresa: e.target.value }))}
+                placeholder="Ej: Industrias del Norte SA de CV"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>RFC *</Label>
+              <Input
+                value={clienteEditando.rfc}
+                onChange={(e) => setClienteEditando(prev => ({ ...prev, rfc: e.target.value.toUpperCase() }))}
+                placeholder="ABC010203XXX"
+                maxLength={13}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Dirección</Label>
+              <Input
+                value={clienteEditando.direccion}
+                onChange={(e) => setClienteEditando(prev => ({ ...prev, direccion: e.target.value }))}
+                placeholder="Calle, número, colonia, ciudad"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Teléfono</Label>
+              <Input
+                value={clienteEditando.telefono}
+                onChange={(e) => setClienteEditando(prev => ({ ...prev, telefono: e.target.value }))}
+                placeholder="(55) 1234-5678"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Términos de Pago</Label>
+              <Input
+                value={clienteEditando.terminosPago}
+                onChange={(e) => setClienteEditando(prev => ({ ...prev, terminosPago: e.target.value }))}
+                placeholder="Ej: 50% anticipo, 50% contra entrega"
+              />
+            </div>
+            <Button
+              onClick={handleActualizarCliente}
+              disabled={!clienteEditando.nombreEmpresa || !clienteEditando.rfc}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              Guardar Cambios
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo para agregar contacto */}
       <Dialog open={!!dialogoNuevoUsuario} onOpenChange={() => setDialogoNuevoUsuario(null)}>
