@@ -100,14 +100,14 @@ export const useClientesStore = () => {
     return nuevo;
   }, []);
 
-  const actualizarCliente = useCallback(async (id: string, datos: Partial<Cliente>) => {
+  const actualizarCliente = useCallback(async (id: string, datos: Partial<Cliente>): Promise<boolean> => {
     try {
       const updateData: any = {};
-      if (datos.nombreEmpresa) updateData.nombre_empresa = datos.nombreEmpresa;
+      if (datos.nombreEmpresa !== undefined) updateData.nombre_empresa = datos.nombreEmpresa;
       if (datos.direccion !== undefined) updateData.direccion = datos.direccion;
       if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
       if (datos.rfc !== undefined) updateData.rfc = datos.rfc;
-      if (datos.terminosPago) updateData.terminos_pago = datos.terminosPago;
+      if (datos.terminosPago !== undefined) updateData.terminos_pago = datos.terminosPago;
 
       if (Object.keys(updateData).length > 0) {
         const { error } = await supabase
@@ -117,13 +117,19 @@ export const useClientesStore = () => {
 
         if (error) {
           console.error('[useClientesStore] Error actualizando en Supabase:', error);
+          toast.error('Error al guardar en la nube: ' + error.message);
+          return false;
         }
       }
-    } catch (err) {
-      console.error('[useClientesStore] Error:', err);
-    }
 
-    setClientes(prev => prev.map(c => c.id === id ? { ...c, ...datos } : c));
+      setClientes(prev => prev.map(c => c.id === id ? { ...c, ...datos } : c));
+      toast.success('Cliente actualizado correctamente');
+      return true;
+    } catch (err: any) {
+      console.error('[useClientesStore] Error:', err);
+      toast.error('Error de conexión: ' + err.message);
+      return false;
+    }
   }, []);
 
   const eliminarCliente = useCallback(async (id: string) => {
@@ -177,7 +183,7 @@ export const useClientesStore = () => {
     return nuevoUsuario;
   }, []);
 
-  const actualizarUsuario = useCallback(async (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>) => {
+  const actualizarUsuario = useCallback(async (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>): Promise<boolean> => {
     try {
       const updateData: any = {};
       if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
@@ -195,19 +201,25 @@ export const useClientesStore = () => {
 
         if (error) {
           console.error('[useClientesStore] Error actualizando contacto:', error);
+          toast.error('Error al guardar contacto: ' + error.message);
+          return false;
         }
       }
-    } catch (err) {
-      console.error('[useClientesStore] Error:', err);
-    }
 
-    setClientes(prev => prev.map(c => {
-      if (c.id !== clienteId) return c;
-      return {
-        ...c,
-        usuarios: c.usuarios.map(u => u.id === usuarioId ? { ...u, ...datos } : u)
-      };
-    }));
+      setClientes(prev => prev.map(c => {
+        if (c.id !== clienteId) return c;
+        return {
+          ...c,
+          usuarios: c.usuarios.map(u => u.id === usuarioId ? { ...u, ...datos } : u)
+        };
+      }));
+      toast.success('Contacto actualizado correctamente');
+      return true;
+    } catch (err: any) {
+      console.error('[useClientesStore] Error:', err);
+      toast.error('Error de conexión: ' + err.message);
+      return false;
+    }
   }, []);
 
   const eliminarUsuario = useCallback(async (clienteId: string, usuarioId: string) => {

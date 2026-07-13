@@ -26,10 +26,10 @@ interface ClientesViewProps {
   onVolver: () => void;
   clientes: Cliente[];
   onAgregarCliente?: (cliente: Omit<Cliente, 'id' | 'fechaRegistro' | 'usuarios'>) => void;
-  onActualizarCliente?: (id: string, datos: Partial<Cliente>) => void;
+  onActualizarCliente?: (id: string, datos: Partial<Cliente>) => Promise<boolean> | void;
   onEliminarCliente?: (id: string) => void;
   onAgregarUsuario?: (clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => void;
-  onActualizarUsuario?: (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>) => void;
+  onActualizarUsuario?: (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>) => Promise<boolean> | void;
   onEliminarUsuario?: (clienteId: string, usuarioId: string) => void;
 }
 
@@ -49,6 +49,7 @@ export function ClientesView({
   const [dialogoEditarCliente, setDialogoEditarCliente] = useState<string | null>(null);
   const [dialogoEditarUsuario, setDialogoEditarUsuario] = useState<{clienteId: string, usuarioId: string} | null>(null);
   const [dialogoNuevoUsuario, setDialogoNuevoUsuario] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   // Formulario nuevo cliente
   const [nuevoCliente, setNuevoCliente] = useState({
@@ -131,10 +132,17 @@ export function ClientesView({
     setDialogoEditarCliente(cliente.id);
   };
 
-  const handleActualizarCliente = () => {
+  const handleActualizarCliente = async () => {
     if (!dialogoEditarCliente || !clienteEditando.nombreEmpresa || !clienteEditando.rfc || !onActualizarCliente) return;
-    onActualizarCliente(dialogoEditarCliente, clienteEditando);
-    setDialogoEditarCliente(null);
+    setGuardando(true);
+    try {
+      const resultado = await onActualizarCliente(dialogoEditarCliente, clienteEditando);
+      if (resultado !== false) {
+        setDialogoEditarCliente(null);
+      }
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const abrirEditarUsuario = (clienteId: string, usuario: UsuarioCliente) => {
@@ -149,10 +157,17 @@ export function ClientesView({
     setDialogoEditarUsuario({ clienteId, usuarioId: usuario.id });
   };
 
-  const handleActualizarUsuario = () => {
+  const handleActualizarUsuario = async () => {
     if (!dialogoEditarUsuario || !usuarioEditando.nombre || !onActualizarUsuario) return;
-    onActualizarUsuario(dialogoEditarUsuario.clienteId, dialogoEditarUsuario.usuarioId, usuarioEditando);
-    setDialogoEditarUsuario(null);
+    setGuardando(true);
+    try {
+      const resultado = await onActualizarUsuario(dialogoEditarUsuario.clienteId, dialogoEditarUsuario.usuarioId, usuarioEditando);
+      if (resultado !== false) {
+        setDialogoEditarUsuario(null);
+      }
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -463,10 +478,10 @@ export function ClientesView({
             </div>
             <Button
               onClick={handleActualizarCliente}
-              disabled={!clienteEditando.nombreEmpresa || !clienteEditando.rfc}
+              disabled={!clienteEditando.nombreEmpresa || !clienteEditando.rfc || guardando}
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
-              Guardar Cambios
+              {guardando ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
         </DialogContent>
@@ -532,10 +547,10 @@ export function ClientesView({
             </div>
             <Button
               onClick={handleActualizarUsuario}
-              disabled={!usuarioEditando.nombre}
+              disabled={!usuarioEditando.nombre || guardando}
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
-              Guardar Cambios
+              {guardando ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </div>
         </DialogContent>
