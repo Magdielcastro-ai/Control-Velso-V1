@@ -43,33 +43,11 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
       } else {
         // Cliente no encontrado (puede haber sido eliminado o renombrado)
         console.warn('[ClienteStep] Cliente no encontrado:', datos.clienteId);
-        setClienteSeleccionado(undefined);
-        setContactoSeleccionado(undefined);
+        // NO limpiar el clienteSeleccionado para evitar el crash del Select
+        // En su lugar, mantener el ID pero mostrar que no está disponible
         setContactosDisponibles([]);
+        setContactoSeleccionado(undefined);
         setModoNuevo(false);
-      }
-    } else if (!datos.nombre && !datos.empresa) {
-      // No hay cliente seleccionado
-      setClienteSeleccionado(undefined);
-      setContactoSeleccionado(undefined);
-      setModoNuevo(false);
-    }
-  }, [datos.clienteId, datos.nombre, datos.empresa, clientesGuardados]);
-  useEffect(() => {
-    if (datos.clienteId) {
-      setClienteSeleccionado(datos.clienteId);
-      setModoNuevo(false);
-      const cliente = clientesGuardados.find(c => c.id === datos.clienteId);
-      if (cliente) {
-        setContactosDisponibles(cliente.usuarios || []);
-        
-        // Si hay un contacto seleccionado en los datos, sincronizar
-        if (datos.nombre && cliente.usuarios) {
-          const contacto = cliente.usuarios.find(u => u.nombre === datos.nombre);
-          if (contacto) {
-            setContactoSeleccionado(contacto.id);
-          }
-        }
       }
     } else if (!datos.nombre && !datos.empresa) {
       // No hay cliente seleccionado
