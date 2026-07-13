@@ -357,8 +357,9 @@ export const useCotizacionStore = () => {
         };
       });
 
-      // Material: costoTotal es el costo total ingresado por el usuario (no cambia con cantidad)
-      const costoMateriales = pieza.material ? pieza.material.costoTotal : 0;
+      // Material: costoTotal es el costo total ingresado por el usuario para TODAS las piezas
+      // Se divide por la cantidad de piezas para obtener el costo unitario por pieza
+      const costoMateriales = pieza.material ? pieza.material.costoTotal / pieza.cantidad : 0;
       const costoProcesos = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
 
