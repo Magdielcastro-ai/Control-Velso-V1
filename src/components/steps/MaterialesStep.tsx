@@ -266,11 +266,13 @@ function AgregarMaterialForm({
                 <SelectValue placeholder="Seleccionar material..." />
               </SelectTrigger>
               <SelectContent className="max-h-[300px] overflow-y-auto">
-                {catalogo.map((mat) => (
-                  <SelectItem key={mat.id} value={mat.id} className="cursor-pointer">
-                    {mat.nombre} - ${mat.costoUnitario}/{mat.unidadMedida}
-                  </SelectItem>
-                ))}
+                {catalogo
+                  .filter((mat) => mat.id && mat.id.trim() !== '')
+                  .map((mat) => (
+                    <SelectItem key={mat.id} value={mat.id} className="cursor-pointer">
+                      {mat.nombre} - ${mat.costoUnitario}/{mat.unidadMedida}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

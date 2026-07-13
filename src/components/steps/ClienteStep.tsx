@@ -17,8 +17,8 @@ interface ClienteStepProps {
 }
 
 export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, onIrAClientes }: ClienteStepProps) {
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
-  const [contactoSeleccionado, setContactoSeleccionado] = useState<string>('');
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<string | undefined>(undefined);
+  const [contactoSeleccionado, setContactoSeleccionado] = useState<string | undefined>(undefined);
   const [contactosDisponibles, setContactosDisponibles] = useState<UsuarioCliente[]>([]);
   const [modoNuevo, setModoNuevo] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -42,14 +42,15 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
       }
     } else if (!datos.nombre && !datos.empresa) {
       // No hay cliente seleccionado
-      setClienteSeleccionado('');
+      setClienteSeleccionado(undefined);
+      setContactoSeleccionado(undefined);
       setModoNuevo(false);
     }
   }, [datos.clienteId, datos.nombre, datos.empresa, clientesGuardados]);
 
   const handleSeleccionarCliente = (clienteId: string) => {
     setClienteSeleccionado(clienteId);
-    setContactoSeleccionado('');
+    setContactoSeleccionado(undefined);
     
     if (clienteId === 'nuevo') {
       // Modo nuevo cliente
@@ -212,16 +213,18 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
                   <span>+ Agregar nuevo cliente</span>
                 </div>
               </SelectItem>
-              {clientesGuardados.map((cliente) => (
-                <SelectItem key={cliente.id} value={cliente.id}>
-                  {cliente.nombreEmpresa} {cliente.rfc && `(${cliente.rfc})`}
-                  {cliente.usuarios.length > 0 && (
-                    <span className="ml-2 text-xs text-slate-500">
-                      ({cliente.usuarios.length} contacto{cliente.usuarios.length !== 1 ? 's' : ''})
-                    </span>
-                  )}
-                </SelectItem>
-              ))}
+              {clientesGuardados
+                .filter((cliente) => cliente.id && cliente.id.trim() !== '')
+                .map((cliente) => (
+                  <SelectItem key={cliente.id} value={cliente.id}>
+                    {cliente.nombreEmpresa} {cliente.rfc && `(${cliente.rfc})`}
+                    {cliente.usuarios.length > 0 && (
+                      <span className="ml-2 text-xs text-slate-500">
+                        ({cliente.usuarios.length} contacto{cliente.usuarios.length !== 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
 
@@ -261,23 +264,25 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
                   <SelectItem value="ninguno">
                     <span className="text-slate-500">-- Sin contacto específico --</span>
                   </SelectItem>
-                  {contactosDisponibles.map((contacto) => (
-                    <SelectItem key={contacto.id} value={contacto.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{contacto.nombre}</span>
-                        {contacto.esPrincipal && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                            Principal
-                          </span>
-                        )}
-                        {contacto.departamento && (
-                          <span className="text-xs text-slate-500">
-                            ({contacto.departamento})
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {contactosDisponibles
+                    .filter((contacto) => contacto.id && contacto.id.trim() !== '')
+                    .map((contacto) => (
+                      <SelectItem key={contacto.id} value={contacto.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{contacto.nombre}</span>
+                          {contacto.esPrincipal && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              Principal
+                            </span>
+                          )}
+                          {contacto.departamento && (
+                            <span className="text-xs text-slate-500">
+                              ({contacto.departamento})
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

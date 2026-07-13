@@ -809,11 +809,13 @@ function ProcesosPieza({
                 <SelectValue placeholder="Seleccionar proceso..." />
               </SelectTrigger>
               <SelectContent>
-                {CATALOGO_PROCESOS_VELSO.map((proc) => (
-                  <SelectItem key={proc.id} value={proc.id} className="text-xs">
-                    {proc.nombre} - ${proc.costoPorHora}/hr
-                  </SelectItem>
-                ))}
+                {CATALOGO_PROCESOS_VELSO
+                  .filter((proc) => proc.id && proc.id.trim() !== '')
+                  .map((proc) => (
+                    <SelectItem key={proc.id} value={proc.id} className="text-xs">
+                      {proc.nombre} - ${proc.costoPorHora}/hr
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

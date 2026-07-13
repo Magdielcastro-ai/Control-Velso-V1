@@ -138,11 +138,13 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
                     <span>Crear nuevo taller</span>
                   </div>
                 </SelectItem>
-                {talleresGuardados.map((taller) => (
-                  <SelectItem key={taller.id} value={taller.id}>
-                    {taller.nombre}
-                  </SelectItem>
-                ))}
+                {talleresGuardados
+                  .filter((taller) => taller.id && taller.id.trim() !== '')
+                  .map((taller) => (
+                    <SelectItem key={taller.id} value={taller.id}>
+                      {taller.nombre}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </CardContent>
