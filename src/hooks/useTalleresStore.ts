@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import type { DatosTaller } from '@/types/cotizacion';
 
 export interface TallerGuardado extends DatosTaller {
@@ -94,10 +95,10 @@ export const useTalleresStore = () => {
     return nuevo;
   }, [talleres]);
 
-  const actualizarTaller = useCallback(async (id: string, datos: Partial<DatosTaller>) => {
+  const actualizarTaller = useCallback(async (id: string, datos: Partial<DatosTaller>): Promise<boolean> => {
     try {
       const updateData: any = {};
-      if (datos.nombre) updateData.nombre = datos.nombre;
+      if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
       if (datos.direccion !== undefined) updateData.direccion = datos.direccion;
       if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
       if (datos.email !== undefined) updateData.email = datos.email;
@@ -111,13 +112,19 @@ export const useTalleresStore = () => {
 
         if (error) {
           console.error('[useTalleresStore] Error actualizando en Supabase:', error);
+          toast.error('Error al guardar taller: ' + error.message);
+          return false;
         }
       }
-    } catch (err) {
-      console.error('[useTalleresStore] Error:', err);
-    }
 
-    setTalleres(prev => prev.map(t => t.id === id ? { ...t, ...datos } : t));
+      setTalleres(prev => prev.map(t => t.id === id ? { ...t, ...datos } : t));
+      toast.success('Taller actualizado correctamente');
+      return true;
+    } catch (err: any) {
+      console.error('[useTalleresStore] Error:', err);
+      toast.error('Error de conexión: ' + err.message);
+      return false;
+    }
   }, []);
 
   const eliminarTaller = useCallback(async (id: string) => {
