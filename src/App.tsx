@@ -1033,6 +1033,16 @@ function App() {
                     datos={cotizacion.datosCliente} 
                     onChange={actualizarDatosCliente}
                     clientesGuardados={clientes}
+                    onGuardarCliente={canManageClientes() ? async (datos) => {
+                      const clienteData = {
+                        nombreEmpresa: datos.empresa || datos.nombre,
+                        direccion: datos.direccion,
+                        telefono: datos.telefono,
+                        rfc: datos.rfc || '',
+                        terminosPago: '50% anticipo, 50% contra entrega',
+                      };
+                      return await agregarCliente(clienteData);
+                    } : undefined}
                     onIrAClientes={canManageClientes() ? irAClientes : undefined}
                     userRol={user.rol}
                   />

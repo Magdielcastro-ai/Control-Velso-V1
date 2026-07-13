@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Building2, MapPin, Phone, Mail, Briefcase, Plus, Check, Users, ExternalLink } from 'lucide-react';
+import { User, Building2, MapPin, Phone, Mail, Briefcase, Plus, Check, Users, ExternalLink, Save } from 'lucide-react';
 import type { DatosCliente } from '@/types/cotizacion';
 import type { Cliente, UsuarioCliente } from '@/types/ventas';
 
@@ -12,19 +12,23 @@ interface ClienteStepProps {
   datos: DatosCliente;
   onChange: (datos: Partial<DatosCliente>) => void;
   clientesGuardados: Cliente[];
+  onGuardarCliente?: (datos: DatosCliente) => Promise<Cliente | null>;
   onIrAClientes?: () => void;
   userRol?: string;
 }
 
-export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes, userRol = 'vendedor' }: ClienteStepProps) {
+export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, onIrAClientes, userRol = 'vendedor' }: ClienteStepProps) {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
   const [contactoSeleccionado, setContactoSeleccionado] = useState<string>('');
   const [contactosDisponibles, setContactosDisponibles] = useState<UsuarioCliente[]>([]);
+  const [modoNuevo, setModoNuevo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
   // Sincronizar estado cuando cambian los datos externos
   useEffect(() => {
     if (datos.clienteId) {
       setClienteSeleccionado(datos.clienteId);
+      setModoNuevo(false);
       const cliente = clientesGuardados.find(c => c.id === datos.clienteId);
       if (cliente) {
         setContactosDisponibles(cliente.usuarios || []);
@@ -37,15 +41,33 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes,
           }
         }
       }
+    } else if (!datos.nombre && !datos.empresa) {
+      // No hay cliente seleccionado
+      setClienteSeleccionado('');
+      setModoNuevo(false);
     }
-  }, [datos.clienteId, datos.nombre, clientesGuardados]);
+  }, [datos.clienteId, datos.nombre, datos.empresa, clientesGuardados]);
 
   const handleSeleccionarCliente = (clienteId: string) => {
     setClienteSeleccionado(clienteId);
     setContactoSeleccionado('');
     
     if (clienteId === 'nuevo') {
-      // Limpiar todos los campos
+      // Modo nuevo cliente
+      setModoNuevo(true);
+      setContactosDisponibles([]);
+      onChange({
+        nombre: '',
+        empresa: '',
+        direccion: '',
+        telefono: '',
+        email: '',
+        rfc: '',
+        clienteId: undefined,
+      });
+    } else if (clienteId === '') {
+      // Sin selección
+      setModoNuevo(false);
       setContactosDisponibles([]);
       onChange({
         nombre: '',
@@ -57,6 +79,8 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes,
         clienteId: undefined,
       });
     } else {
+      // Cliente existente seleccionado
+      setModoNuevo(false);
       const cliente = clientesGuardados.find(c => c.id === clienteId);
       if (cliente) {
         const contactos = cliente.usuarios || [];
@@ -118,13 +142,41 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes,
     }
   };
 
-  const hayClienteSeleccionado = clienteSeleccionado && clienteSeleccionado !== 'nuevo';
+  const handleGuardarNuevoCliente = async () => {
+    if (!onGuardarCliente) return;
+    
+    // Validar campos mínimos
+    if (!datos.nombre && !datos.empresa) {
+      alert('Debes ingresar al menos el nombre o la empresa del cliente');
+      return;
+    }
+
+    setGuardando(true);
+    try {
+      const resultado = await onGuardarCliente(datos);
+      if (resultado) {
+        // El cliente se guardó exitosamente
+        setModoNuevo(false);
+        setClienteSeleccionado(resultado.id);
+        onChange({
+          ...datos,
+          clienteId: resultado.id,
+        });
+      }
+    } catch (error) {
+      console.error('Error guardando cliente:', error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const hayClienteSeleccionado = clienteSeleccionado && clienteSeleccionado !== 'nuevo' && clienteSeleccionado !== '';
 
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-slate-900">Datos del Cliente</h2>
-        <p className="text-slate-600">Selecciona un cliente de tu base de datos</p>
+        <p className="text-slate-600">Selecciona un cliente existente o agrega uno nuevo</p>
       </div>
 
       {/* Selector de clientes */}
@@ -152,13 +204,16 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes,
         <CardContent className="space-y-4">
           <Select value={clienteSeleccionado} onValueChange={handleSeleccionarCliente}>
             <SelectTrigger className="border-slate-300">
-              <SelectValue placeholder="Selecciona un cliente guardado" />
+              <SelectValue placeholder="Selecciona un cliente" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="">
+                <span className="text-slate-500">-- Selecciona un cliente --</span>
+              </SelectItem>
               <SelectItem value="nuevo">
-                <div className="flex items-center gap-2 text-slate-500">
+                <div className="flex items-center gap-2 text-blue-600 font-medium">
                   <Plus className="w-4 h-4" />
-                  <span>-- Sin cliente seleccionado --</span>
+                  <span>+ Agregar nuevo cliente</span>
                 </div>
               </SelectItem>
               {clientesGuardados.map((cliente) => (
@@ -195,7 +250,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes,
             </div>
           )}
 
-          {/* Selector de contactos */}
+          {/* Selector de contactos - solo para clientes existentes */}
           {hayClienteSeleccionado && contactosDisponibles.length > 0 && (
             <div className="pt-4 border-t border-slate-200">
               <Label className="flex items-center gap-2 mb-2 text-slate-700">
@@ -243,6 +298,126 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onIrAClientes,
           )}
         </CardContent>
       </Card>
+
+      {/* Formulario para NUEVO cliente */}
+      {modoNuevo && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Plus className="w-5 h-5 text-blue-600" />
+              Nuevo Cliente
+              <span className="text-xs font-normal text-blue-600 flex items-center gap-1 ml-auto">
+                <span className="bg-blue-100 px-2 py-0.5 rounded-full">Modo edición</span>
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombreNuevo">
+                  Nombre de Contacto <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="nombreNuevo"
+                  value={datos.nombre}
+                  onChange={(e) => onChange({ nombre: e.target.value })}
+                  placeholder="Nombre completo"
+                  className="bg-white border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="empresaNueva">
+                  <Building2 className="w-4 h-4 inline mr-1" />
+                  Empresa <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="empresaNueva"
+                  value={datos.empresa}
+                  onChange={(e) => onChange({ empresa: e.target.value })}
+                  placeholder="Nombre de la empresa"
+                  className="bg-white border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="direccionNueva">
+                  <MapPin className="w-4 h-4 inline mr-1" />
+                  Dirección
+                </Label>
+                <Input
+                  id="direccionNueva"
+                  value={datos.direccion}
+                  onChange={(e) => onChange({ direccion: e.target.value })}
+                  placeholder="Calle, número, colonia, ciudad, CP"
+                  className="bg-white border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="telefonoNuevo">
+                  <Phone className="w-4 h-4 inline mr-1" />
+                  Teléfono
+                </Label>
+                <Input
+                  id="telefonoNuevo"
+                  value={datos.telefono}
+                  onChange={(e) => onChange({ telefono: e.target.value })}
+                  placeholder="(55) 1234-5678"
+                  className="bg-white border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="emailNuevo">
+                  <Mail className="w-4 h-4 inline mr-1" />
+                  Correo Electrónico
+                </Label>
+                <Input
+                  id="emailNuevo"
+                  type="email"
+                  value={datos.email}
+                  onChange={(e) => onChange({ email: e.target.value })}
+                  placeholder="cliente@empresa.com"
+                  className="bg-white border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rfcNuevo">
+                  <Briefcase className="w-4 h-4 inline mr-1" />
+                  RFC
+                </Label>
+                <Input
+                  id="rfcNuevo"
+                  value={datos.rfc || ''}
+                  onChange={(e) => onChange({ rfc: e.target.value.toUpperCase() })}
+                  placeholder="ABCD010203XXX"
+                  className="bg-white border-slate-300"
+                  maxLength={13}
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-blue-200 flex items-center justify-between">
+              <p className="text-xs text-blue-600">
+                * Debes ingresar al menos el nombre o la empresa
+              </p>
+              {onGuardarCliente && (
+                <Button
+                  type="button"
+                  onClick={handleGuardarNuevoCliente}
+                  disabled={guardando || (!datos.nombre && !datos.empresa)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {guardando ? 'Guardando...' : 'Guardar Cliente'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Datos del cliente seleccionado - SOLO LECTURA */}
       {hayClienteSeleccionado && (
