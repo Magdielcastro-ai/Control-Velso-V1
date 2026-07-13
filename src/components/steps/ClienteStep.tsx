@@ -14,10 +14,9 @@ interface ClienteStepProps {
   clientesGuardados: Cliente[];
   onGuardarCliente?: (datos: DatosCliente) => Promise<Cliente | null>;
   onIrAClientes?: () => void;
-  userRol?: string;
 }
 
-export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, onIrAClientes, userRol = 'vendedor' }: ClienteStepProps) {
+export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, onIrAClientes }: ClienteStepProps) {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('');
   const [contactoSeleccionado, setContactoSeleccionado] = useState<string>('');
   const [contactosDisponibles, setContactosDisponibles] = useState<UsuarioCliente[]>([]);

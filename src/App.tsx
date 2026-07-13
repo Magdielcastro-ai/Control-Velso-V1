@@ -1046,7 +1046,6 @@ function App() {
                       return await agregarCliente(clienteData);
                     } : undefined}
                     onIrAClientes={canManageClientes() ? irAClientes : undefined}
-                    userRol={user.rol}
                   />
                 )}
                 {pasoActual === 'proyecto' && (
