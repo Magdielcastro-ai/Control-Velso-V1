@@ -141,8 +141,8 @@ export const useClientesStore = () => {
           .eq('id', id);
 
         if (error) {
-          console.error('[useClientesStore] Error actualizando en Supabase:', error);
-          toast.error('Error al guardar en la nube: ' + error.message);
+          console.error('[useClientesStore] Error actualizando en Supabase:', JSON.stringify(error));
+          toast.error(`Error ${error.code}: ${error.message}`);
           return false;
         }
       }
