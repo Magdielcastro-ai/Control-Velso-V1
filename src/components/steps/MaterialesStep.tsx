@@ -256,7 +256,7 @@ function AgregarMaterialForm({
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[200px]">
             <Select
-              value={materialSeleccionado?.id || ''}
+              value={materialSeleccionado?.id || undefined}
               onValueChange={(id) => {
                 const mat = catalogo.find(c => c.id === id);
                 setMaterialSeleccionado(mat || null);

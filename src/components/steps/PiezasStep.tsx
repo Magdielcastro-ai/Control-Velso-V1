@@ -799,7 +799,7 @@ function ProcesosPieza({
         <div className="flex gap-2 items-end">
           <div className="flex-1 min-w-[150px]">
             <Select
-              value={procesoSeleccionado?.id || ''}
+              value={procesoSeleccionado?.id || undefined}
               onValueChange={(id) => {
                 const proc = CATALOGO_PROCESOS_VELSO.find(p => p.id === id);
                 setProcesoSeleccionado(proc || null);
