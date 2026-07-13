@@ -478,6 +478,7 @@ export const useCotizacionStore = () => {
           cliente_id: nuevaCotizacion.datosCliente.clienteId || null,
           cliente_nombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
           proyecto_nombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
+          proyecto: nuevaCotizacion.proyecto,
           datos_taller: nuevaCotizacion.datosTaller,
           datos_cliente: nuevaCotizacion.datosCliente,
           piezas: nuevaCotizacion.piezas,
@@ -608,7 +609,7 @@ export const useCotizacionStore = () => {
           tipo: data.tipo || 'pieza_unica',
           datosTaller: data.datos_taller || cotizacionVacia().datosTaller,
           datosCliente: datosCliente,
-          proyecto: {
+          proyecto: data.proyecto || {
             nombre: data.proyecto_nombre || '',
             descripcion: '',
             cantidad: 1,
