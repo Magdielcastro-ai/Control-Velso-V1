@@ -127,12 +127,14 @@ export const useClientesStore = () => {
     try {
       const updateData: any = {};
       if (datos.nombreEmpresa !== undefined) updateData.nombre_empresa = datos.nombreEmpresa;
-      if (datos.direccion !== undefined) updateData.direccion = datos.direccion;
-      if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
-      if (datos.rfc !== undefined) updateData.rfc = datos.rfc;
-      if (datos.terminosPago !== undefined) updateData.terminos_pago = datos.terminosPago;
+      // Enviar null en lugar de string vacío para campos opcionales
+      if (datos.direccion !== undefined) updateData.direccion = datos.direccion || null;
+      if (datos.telefono !== undefined) updateData.telefono = datos.telefono || null;
+      if (datos.rfc !== undefined) updateData.rfc = datos.rfc || null;
+      if (datos.terminosPago !== undefined) updateData.terminos_pago = datos.terminosPago || null;
 
       if (Object.keys(updateData).length > 0) {
+        console.log('[useClientesStore] Enviando a Supabase:', updateData);
         const { error } = await supabase
           .from('clientes')
           .update(updateData)
@@ -210,13 +212,14 @@ export const useClientesStore = () => {
     try {
       const updateData: any = {};
       if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
-      if (datos.departamento !== undefined) updateData.departamento = datos.departamento;
-      if (datos.email !== undefined) updateData.email = datos.email;
-      if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
-      if (datos.celular !== undefined) updateData.celular = datos.celular;
+      if (datos.departamento !== undefined) updateData.departamento = datos.departamento || null;
+      if (datos.email !== undefined) updateData.email = datos.email || null;
+      if (datos.telefono !== undefined) updateData.telefono = datos.telefono || null;
+      if (datos.celular !== undefined) updateData.celular = datos.celular || null;
       if (datos.esPrincipal !== undefined) updateData.es_principal = datos.esPrincipal;
 
       if (Object.keys(updateData).length > 0) {
+        console.log('[useClientesStore] Enviando contacto a Supabase:', updateData);
         const { error } = await supabase
           .from('contactos')
           .update(updateData)

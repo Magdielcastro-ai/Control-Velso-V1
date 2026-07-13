@@ -114,12 +114,13 @@ export const useTalleresStore = () => {
     try {
       const updateData: any = {};
       if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
-      if (datos.direccion !== undefined) updateData.direccion = datos.direccion;
-      if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
-      if (datos.email !== undefined) updateData.email = datos.email;
-      if (datos.rfc !== undefined) updateData.rfc = datos.rfc;
+      if (datos.direccion !== undefined) updateData.direccion = datos.direccion || null;
+      if (datos.telefono !== undefined) updateData.telefono = datos.telefono || null;
+      if (datos.email !== undefined) updateData.email = datos.email || null;
+      if (datos.rfc !== undefined) updateData.rfc = datos.rfc || null;
 
       if (Object.keys(updateData).length > 0) {
+        console.log('[useTalleresStore] Enviando a Supabase:', updateData);
         const { error } = await supabase
           .from('talleres')
           .update(updateData)
