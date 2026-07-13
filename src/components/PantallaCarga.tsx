@@ -71,7 +71,6 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
           };
         });
 
-        localStorage.setItem('velso_clientes', JSON.stringify(clientesFormateados));
         console.log('[PantallaCarga] Clientes cargados:', clientesFormateados.length);
       }
 
@@ -101,28 +100,6 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
           estado: c.estado,
           usuarioId: c.usuario_id,
         }));
-        localStorage.setItem('cotizaciones_cnc', JSON.stringify(cotizacionesFormateadas));
-
-        // Guardar datos completos para el dashboard (con procesos)
-        const cotizacionesCompletas: Record<string, any> = {};
-        cotizacionesData.forEach(c => {
-          cotizacionesCompletas[c.id] = {
-            id: c.id,
-            numero: c.numero,
-            fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-            usuario_id: c.usuario_id,
-            datosCliente: c.datos_cliente || {},
-            proyecto: { nombre: c.proyecto_nombre },
-            materiales: c.materiales || [],
-            procesos: c.procesos || [],
-            costosAdicionales: c.costos_adicionales || {},
-            subtotal: c.subtotal,
-            iva: c.iva,
-            total: c.total,
-            margenUtilidad: c.margen_utilidad,
-          };
-        });
-        localStorage.setItem('cotizaciones_completas', JSON.stringify(cotizacionesCompletas));
         console.log('[PantallaCarga] Cotizaciones cargadas:', cotizacionesFormateadas.length);
       }
 
@@ -165,8 +142,7 @@ export function PantallaCarga({ onCargaCompleta, onUsarOffline }: PantallaCargaP
           utilidadReal: p.utilidad_real,
         }));
 
-        localStorage.setItem('velso_proyectos', JSON.stringify(proyectosFormateados));
-        console.log('[PentallaCarga] Proyectos cargados:', proyectosFormateados.length);
+        console.log('[PantallaCarga] Proyectos cargados:', proyectosFormateados.length);
       }
 
       setEstado(prev => ({ ...prev, proyectos: 'completado' }));

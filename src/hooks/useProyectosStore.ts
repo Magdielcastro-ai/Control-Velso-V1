@@ -100,7 +100,23 @@ export const useProyectosStore = () => {
   }, [proyectos.length]);
 
   useEffect(() => {
+    // Escuchar cambios de autenticación para recargar datos
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        console.log('[useProyectosStore] Usuario autenticado, recargando...');
+        lastLoadTime.current = 0; // Reset debounce
+        cargarProyectos();
+      } else if (event === 'SIGNED_OUT') {
+        console.log('[useProyectosStore] Usuario desautenticado, limpiando...');
+        setProyectos([]);
+        lastLoadTime.current = 0;
+      }
+    });
+
+    // Carga inicial si ya hay sesión
     cargarProyectos();
+
+    return () => subscription.unsubscribe();
   }, [cargarProyectos]);
 
   // Helper para hacer update con fallback

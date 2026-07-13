@@ -14,6 +14,14 @@ export const useClientesStore = () => {
       console.log('[useClientesStore] Refrescando desde Supabase...');
       setLoading(true);
 
+      // Verificar que hay sesión activa antes de cargar
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('[useClientesStore] No hay sesión, saltando carga');
+        setClientes([]);
+        return false;
+      }
+
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
@@ -63,7 +71,22 @@ export const useClientesStore = () => {
   }, []);
 
   useEffect(() => {
+    // Escuchar cambios de autenticación para recargar datos
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        console.log('[useClientesStore] Usuario autenticado, recargando...');
+        refrescarDesdeSupabase().then(() => setCargado(true));
+      } else if (event === 'SIGNED_OUT') {
+        console.log('[useClientesStore] Usuario desautenticado, limpiando...');
+        setClientes([]);
+        setCargado(false);
+      }
+    });
+
+    // Carga inicial si ya hay sesión
     refrescarDesdeSupabase().then(() => setCargado(true));
+
+    return () => subscription.unsubscribe();
   }, [refrescarDesdeSupabase]);
 
   const agregarCliente = useCallback(async (cliente: Omit<Cliente, 'id' | 'fechaRegistro' | 'usuarios'>) => {

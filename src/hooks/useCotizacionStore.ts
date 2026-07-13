@@ -144,7 +144,22 @@ export const useCotizacionStore = () => {
   }, []);
 
   useEffect(() => {
+    // Escuchar cambios de autenticación para recargar datos
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        console.log('[useCotizacionStore] Usuario autenticado, recargando...');
+        refrescarDesdeSupabase().then(() => setCargado(true));
+      } else if (event === 'SIGNED_OUT') {
+        console.log('[useCotizacionStore] Usuario desautenticado, limpiando...');
+        setCotizacionesGuardadas([]);
+        setCargado(false);
+      }
+    });
+
+    // Carga inicial si ya hay sesión
     refrescarDesdeSupabase().then(() => setCargado(true));
+
+    return () => subscription.unsubscribe();
   }, [refrescarDesdeSupabase]);
 
   // ========== PIEZAS ==========

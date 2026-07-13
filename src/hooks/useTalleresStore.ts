@@ -52,7 +52,22 @@ export const useTalleresStore = () => {
   }, []);
 
   useEffect(() => {
+    // Escuchar cambios de autenticación para recargar datos
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        console.log('[useTalleresStore] Usuario autenticado, recargando...');
+        cargarDesdeSupabase();
+      } else if (event === 'SIGNED_OUT') {
+        console.log('[useTalleresStore] Usuario desautenticado, limpiando...');
+        setTalleres([]);
+        setCargado(false);
+      }
+    });
+
+    // Carga inicial si ya hay sesión
     cargarDesdeSupabase();
+
+    return () => subscription.unsubscribe();
   }, [cargarDesdeSupabase]);
 
   const agregarTaller = useCallback(async (taller: Omit<DatosTaller, 'id'>) => {
