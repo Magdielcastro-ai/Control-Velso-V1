@@ -206,9 +206,6 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
               <SelectValue placeholder="Selecciona un cliente" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">
-                <span className="text-slate-500">-- Selecciona un cliente --</span>
-              </SelectItem>
               <SelectItem value="nuevo">
                 <div className="flex items-center gap-2 text-blue-600 font-medium">
                   <Plus className="w-4 h-4" />
