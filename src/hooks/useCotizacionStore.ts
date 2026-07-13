@@ -546,6 +546,11 @@ export const useCotizacionStore = () => {
         }
 
         const datosCliente = data.datos_cliente || cotizacionVacia().datosCliente;
+        
+        // Restaurar clienteId desde la base de datos si existe
+        if (data.cliente_id && !datosCliente.clienteId) {
+          datosCliente.clienteId = data.cliente_id;
+        }
 
         if (contactosCliente.length > 0) {
           datosCliente.contactos = contactosCliente.map(c => ({
