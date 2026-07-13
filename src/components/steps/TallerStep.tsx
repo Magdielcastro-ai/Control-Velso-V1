@@ -127,7 +127,7 @@ export function TallerStep({ datos, onChange, talleresGuardados, onGuardarTaller
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={tallerSeleccionado} onValueChange={handleSeleccionarTaller}>
+            <Select value={tallerSeleccionado || undefined} onValueChange={handleSeleccionarTaller}>
               <SelectTrigger className="border-slate-300">
                 <SelectValue placeholder="Selecciona un taller guardado o crea uno nuevo" />
               </SelectTrigger>

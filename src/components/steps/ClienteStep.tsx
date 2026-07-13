@@ -201,7 +201,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Select value={clienteSeleccionado} onValueChange={handleSeleccionarCliente}>
+          <Select value={clienteSeleccionado || undefined} onValueChange={handleSeleccionarCliente}>
             <SelectTrigger className="border-slate-300">
               <SelectValue placeholder="Selecciona un cliente" />
             </SelectTrigger>
@@ -253,7 +253,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
                 <Users className="w-4 h-4 text-blue-600" />
                 Seleccionar Contacto
               </Label>
-              <Select value={contactoSeleccionado} onValueChange={handleSeleccionarContacto}>
+              <Select value={contactoSeleccionado || undefined} onValueChange={handleSeleccionarContacto}>
                 <SelectTrigger className="border-slate-300">
                   <SelectValue placeholder="Selecciona un contacto" />
                 </SelectTrigger>

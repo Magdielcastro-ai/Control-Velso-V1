@@ -492,7 +492,7 @@ function PiezaCard({
                     />
                     {/* Select solo como ayuda cuando hay tipos en catálogo */}
                     {tiposDisponibles.length > 0 && (
-                      <Select value={tipoSeleccionado} onValueChange={handleTipoChange}>
+                      <Select value={tipoSeleccionado || undefined} onValueChange={handleTipoChange}>
                         <SelectTrigger className="h-8 text-xs bg-white">
                           <SelectValue placeholder="Seleccionar del catálogo..." />
                         </SelectTrigger>
