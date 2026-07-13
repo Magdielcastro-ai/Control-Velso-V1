@@ -125,28 +125,33 @@ export const useClientesStore = () => {
 
   const actualizarCliente = useCallback(async (id: string, datos: Partial<Cliente>): Promise<boolean> => {
     try {
-      const updateData: any = {};
+      // Solo incluir campos que existen en la tabla de Supabase
+      const updateData: Record<string, any> = {};
       if (datos.nombreEmpresa !== undefined) updateData.nombre_empresa = datos.nombreEmpresa;
-      // Enviar null en lugar de string vacío para campos opcionales
       if (datos.direccion !== undefined) updateData.direccion = datos.direccion || null;
       if (datos.telefono !== undefined) updateData.telefono = datos.telefono || null;
       if (datos.rfc !== undefined) updateData.rfc = datos.rfc || null;
       if (datos.terminosPago !== undefined) updateData.terminos_pago = datos.terminosPago || null;
 
-      if (Object.keys(updateData).length > 0) {
-        console.log('[useClientesStore] Enviando a Supabase:', updateData);
-        const { error } = await supabase
-          .from('clientes')
-          .update(updateData)
-          .eq('id', id);
-
-        if (error) {
-          console.error('[useClientesStore] Error actualizando en Supabase:', JSON.stringify(error));
-          toast.error(`Error ${error.code}: ${error.message}`);
-          return false;
-        }
+      if (Object.keys(updateData).length === 0) {
+        console.log('[useClientesStore] No hay cambios para guardar');
+        return true;
       }
 
+      console.log('[useClientesStore] Enviando a Supabase:', JSON.stringify(updateData));
+      const { data, error } = await supabase
+        .from('clientes')
+        .update(updateData)
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        console.error('[useClientesStore] Error actualizando en Supabase:', JSON.stringify(error));
+        toast.error(`Error ${error.code}: ${error.message}`);
+        return false;
+      }
+
+      console.log('[useClientesStore] Update exitoso:', data);
       setClientes(prev => prev.map(c => c.id === id ? { ...c, ...datos } : c));
       toast.success('Cliente actualizado correctamente');
       return true;
@@ -210,7 +215,7 @@ export const useClientesStore = () => {
 
   const actualizarUsuario = useCallback(async (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>): Promise<boolean> => {
     try {
-      const updateData: any = {};
+      const updateData: Record<string, any> = {};
       if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
       if (datos.departamento !== undefined) updateData.departamento = datos.departamento || null;
       if (datos.email !== undefined) updateData.email = datos.email || null;
@@ -218,20 +223,24 @@ export const useClientesStore = () => {
       if (datos.celular !== undefined) updateData.celular = datos.celular || null;
       if (datos.esPrincipal !== undefined) updateData.es_principal = datos.esPrincipal;
 
-      if (Object.keys(updateData).length > 0) {
-        console.log('[useClientesStore] Enviando contacto a Supabase:', updateData);
-        const { error } = await supabase
-          .from('contactos')
-          .update(updateData)
-          .eq('id', usuarioId);
-
-        if (error) {
-          console.error('[useClientesStore] Error actualizando contacto:', error);
-          toast.error('Error al guardar contacto: ' + error.message);
-          return false;
-        }
+      if (Object.keys(updateData).length === 0) {
+        return true;
       }
 
+      console.log('[useClientesStore] Enviando contacto a Supabase:', JSON.stringify(updateData));
+      const { data, error } = await supabase
+        .from('contactos')
+        .update(updateData)
+        .eq('id', usuarioId)
+        .select();
+
+      if (error) {
+        console.error('[useClientesStore] Error actualizando contacto:', JSON.stringify(error));
+        toast.error('Error al guardar contacto: ' + error.message);
+        return false;
+      }
+
+      console.log('[useClientesStore] Contacto actualizado:', data);
       setClientes(prev => prev.map(c => {
         if (c.id !== clienteId) return c;
         return {
