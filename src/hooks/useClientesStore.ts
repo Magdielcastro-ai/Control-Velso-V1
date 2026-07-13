@@ -177,6 +177,39 @@ export const useClientesStore = () => {
     return nuevoUsuario;
   }, []);
 
+  const actualizarUsuario = useCallback(async (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>) => {
+    try {
+      const updateData: any = {};
+      if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
+      if (datos.departamento !== undefined) updateData.departamento = datos.departamento;
+      if (datos.email !== undefined) updateData.email = datos.email;
+      if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
+      if (datos.celular !== undefined) updateData.celular = datos.celular;
+      if (datos.esPrincipal !== undefined) updateData.es_principal = datos.esPrincipal;
+
+      if (Object.keys(updateData).length > 0) {
+        const { error } = await supabase
+          .from('contactos')
+          .update(updateData)
+          .eq('id', usuarioId);
+
+        if (error) {
+          console.error('[useClientesStore] Error actualizando contacto:', error);
+        }
+      }
+    } catch (err) {
+      console.error('[useClientesStore] Error:', err);
+    }
+
+    setClientes(prev => prev.map(c => {
+      if (c.id !== clienteId) return c;
+      return {
+        ...c,
+        usuarios: c.usuarios.map(u => u.id === usuarioId ? { ...u, ...datos } : u)
+      };
+    }));
+  }, []);
+
   const eliminarUsuario = useCallback(async (clienteId: string, usuarioId: string) => {
     try {
       const { error } = await supabase
@@ -229,6 +262,7 @@ export const useClientesStore = () => {
     actualizarCliente,
     eliminarCliente,
     agregarUsuario,
+    actualizarUsuario,
     eliminarUsuario,
     buscarCliente,
     getClienteById,

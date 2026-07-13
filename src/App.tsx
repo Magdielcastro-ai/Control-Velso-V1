@@ -265,6 +265,7 @@ function App() {
     actualizarCliente,
     eliminarCliente, 
     agregarUsuario, 
+    actualizarUsuario,
     eliminarUsuario,
     refrescarDesdeSupabase: refrescarClientes,
   } = useClientesStore();
@@ -798,6 +799,7 @@ function App() {
               onActualizarCliente={canManageClientes() ? actualizarCliente : undefined}
               onEliminarCliente={canDeleteClientes() ? eliminarCliente : undefined}
               onAgregarUsuario={agregarUsuario}
+              onActualizarUsuario={actualizarUsuario}
               onEliminarUsuario={eliminarUsuario}
             />
           </>

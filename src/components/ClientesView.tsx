@@ -29,6 +29,7 @@ interface ClientesViewProps {
   onActualizarCliente?: (id: string, datos: Partial<Cliente>) => void;
   onEliminarCliente?: (id: string) => void;
   onAgregarUsuario?: (clienteId: string, usuario: Omit<UsuarioCliente, 'id'>) => void;
+  onActualizarUsuario?: (clienteId: string, usuarioId: string, datos: Partial<UsuarioCliente>) => void;
   onEliminarUsuario?: (clienteId: string, usuarioId: string) => void;
 }
 
@@ -39,12 +40,14 @@ export function ClientesView({
   onActualizarCliente,
   onEliminarCliente,
   onAgregarUsuario,
+  onActualizarUsuario,
   onEliminarUsuario
 }: ClientesViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [clienteExpandido, setClienteExpandido] = useState<string | null>(null);
   const [dialogoNuevoCliente, setDialogoNuevoCliente] = useState(false);
   const [dialogoEditarCliente, setDialogoEditarCliente] = useState<string | null>(null);
+  const [dialogoEditarUsuario, setDialogoEditarUsuario] = useState<{clienteId: string, usuarioId: string} | null>(null);
   const [dialogoNuevoUsuario, setDialogoNuevoUsuario] = useState<string | null>(null);
 
   // Formulario nuevo cliente
@@ -73,6 +76,16 @@ export function ClientesView({
     telefono: '',
     rfc: '',
     terminosPago: '',
+  });
+
+  // Formulario editar contacto
+  const [usuarioEditando, setUsuarioEditando] = useState({
+    nombre: '',
+    departamento: '',
+    email: '',
+    telefono: '',
+    celular: '',
+    esPrincipal: false,
   });
 
   const clientesFiltrados = clientes.filter(c => 
@@ -122,6 +135,24 @@ export function ClientesView({
     if (!dialogoEditarCliente || !clienteEditando.nombreEmpresa || !clienteEditando.rfc || !onActualizarCliente) return;
     onActualizarCliente(dialogoEditarCliente, clienteEditando);
     setDialogoEditarCliente(null);
+  };
+
+  const abrirEditarUsuario = (clienteId: string, usuario: UsuarioCliente) => {
+    setUsuarioEditando({
+      nombre: usuario.nombre,
+      departamento: usuario.departamento,
+      email: usuario.email,
+      telefono: usuario.telefono,
+      celular: usuario.celular,
+      esPrincipal: usuario.esPrincipal,
+    });
+    setDialogoEditarUsuario({ clienteId, usuarioId: usuario.id });
+  };
+
+  const handleActualizarUsuario = () => {
+    if (!dialogoEditarUsuario || !usuarioEditando.nombre || !onActualizarUsuario) return;
+    onActualizarUsuario(dialogoEditarUsuario.clienteId, dialogoEditarUsuario.usuarioId, usuarioEditando);
+    setDialogoEditarUsuario(null);
   };
 
   return (
@@ -346,16 +377,28 @@ export function ClientesView({
                                 </div>
                               </TableCell>
                               <TableCell>
-                                {onEliminarUsuario && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => onEliminarUsuario(cliente.id, usuario.id)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
+                                <div className="flex gap-1">
+                                  {onActualizarUsuario && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => abrirEditarUsuario(cliente.id, usuario)}
+                                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {onEliminarUsuario && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => onEliminarUsuario(cliente.id, usuario.id)}
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -421,6 +464,75 @@ export function ClientesView({
             <Button
               onClick={handleActualizarCliente}
               disabled={!clienteEditando.nombreEmpresa || !clienteEditando.rfc}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              Guardar Cambios
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para editar contacto */}
+      <Dialog open={!!dialogoEditarUsuario} onOpenChange={() => setDialogoEditarUsuario(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Contacto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                value={usuarioEditando.nombre}
+                onChange={(e) => setUsuarioEditando(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Nombre completo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Departamento</Label>
+              <Input
+                value={usuarioEditando.departamento}
+                onChange={(e) => setUsuarioEditando(prev => ({ ...prev, departamento: e.target.value }))}
+                placeholder="Ej: Compras, Ingeniería"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Correo Electrónico</Label>
+              <Input
+                type="email"
+                value={usuarioEditando.email}
+                onChange={(e) => setUsuarioEditando(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="contacto@empresa.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Teléfono</Label>
+              <Input
+                value={usuarioEditando.telefono}
+                onChange={(e) => setUsuarioEditando(prev => ({ ...prev, telefono: e.target.value }))}
+                placeholder="(55) 1234-5678"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Celular</Label>
+              <Input
+                value={usuarioEditando.celular}
+                onChange={(e) => setUsuarioEditando(prev => ({ ...prev, celular: e.target.value }))}
+                placeholder="(55) 8765-4321"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="esPrincipalEdit"
+                checked={usuarioEditando.esPrincipal}
+                onChange={(e) => setUsuarioEditando(prev => ({ ...prev, esPrincipal: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="esPrincipalEdit" className="cursor-pointer">Contacto principal</Label>
+            </div>
+            <Button
+              onClick={handleActualizarUsuario}
+              disabled={!usuarioEditando.nombre}
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
               Guardar Cambios
