@@ -16,7 +16,7 @@ export const useCatalogoMateriales = () => {
       const { data, error } = await supabase
         .from('catalogo_materiales')
         .select('*')
-        .order('nombre');
+        .order('created_at', { ascending: false });
 
       console.log('[useCatalogoMateriales] Respuesta:', { data, error });
 
@@ -47,6 +47,7 @@ export const useCatalogoMateriales = () => {
           dimensiones_libre: m.dimensiones_libre,
           costoUnitario: m.costo_unitario ? Number(m.costo_unitario) : 0,
           unidadCosto: (m.unidad_costo || 'kg') as 'kg' | 'pieza' | 'metro',
+          created_at: m.created_at,
         }));
         console.log('[useCatalogoMateriales] Formateados:', materialesFormateados);
         setCatalogo(materialesFormateados);

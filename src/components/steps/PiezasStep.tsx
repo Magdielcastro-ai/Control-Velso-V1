@@ -34,32 +34,32 @@ type FormaId = typeof FORMAS[number]['id'];
 
 const getDimensionesConfig = (unidad: 'mm' | 'in'): Record<FormaId, { key: string; label: string; placeholder: string; type?: string }[]> => ({
   redondo: [
-    { key: 'diametro', label: 'Diámetro', placeholder: unidad },
-    { key: 'longitud', label: 'Longitud', placeholder: unidad },
+    { key: 'diametro', label: 'Diámetro', placeholder: `Diámetro (${unidad})` },
+    { key: 'longitud', label: 'Longitud', placeholder: `Longitud (${unidad})` },
   ],
   cuadrado: [
-    { key: 'lado', label: 'Lado', placeholder: unidad },
-    { key: 'longitud', label: 'Longitud', placeholder: unidad },
+    { key: 'lado', label: 'Lado', placeholder: `Lado (${unidad})` },
+    { key: 'longitud', label: 'Longitud', placeholder: `Longitud (${unidad})` },
   ],
   barra_hueca: [
-    { key: 'diametro_exterior', label: 'Diámetro Exterior', placeholder: unidad },
-    { key: 'diametro_interior', label: 'Diámetro Interior', placeholder: unidad },
-    { key: 'longitud', label: 'Longitud', placeholder: unidad },
+    { key: 'diametro_exterior', label: 'Diámetro Exterior', placeholder: `Diám. Ext. (${unidad})` },
+    { key: 'diametro_interior', label: 'Diámetro Interior', placeholder: `Diám. Int. (${unidad})` },
+    { key: 'longitud', label: 'Longitud', placeholder: `Longitud (${unidad})` },
   ],
   barra_cromada: [
-    { key: 'diametro', label: 'Diámetro', placeholder: unidad },
-    { key: 'longitud', label: 'Longitud', placeholder: unidad },
+    { key: 'diametro', label: 'Diámetro', placeholder: `Diámetro (${unidad})` },
+    { key: 'longitud', label: 'Longitud', placeholder: `Longitud (${unidad})` },
   ],
   placa: [
-    { key: 'largo', label: 'Largo', placeholder: unidad },
-    { key: 'ancho', label: 'Ancho', placeholder: unidad },
-    { key: 'espesor', label: 'Espesor', placeholder: unidad },
+    { key: 'largo', label: 'Largo', placeholder: `Largo (${unidad})` },
+    { key: 'ancho', label: 'Ancho', placeholder: `Ancho (${unidad})` },
+    { key: 'espesor', label: 'Espesor', placeholder: `Espesor (${unidad})` },
   ],
   angulo: [
-    { key: 'lado_a', label: 'Lado A', placeholder: unidad },
-    { key: 'lado_b', label: 'Lado B', placeholder: unidad },
-    { key: 'espesor', label: 'Espesor', placeholder: unidad },
-    { key: 'longitud', label: 'Longitud', placeholder: unidad },
+    { key: 'lado_a', label: 'Lado A', placeholder: `Lado A (${unidad})` },
+    { key: 'lado_b', label: 'Lado B', placeholder: `Lado B (${unidad})` },
+    { key: 'espesor', label: 'Espesor', placeholder: `Espesor (${unidad})` },
+    { key: 'longitud', label: 'Longitud', placeholder: `Longitud (${unidad})` },
   ],
   otro: [
     { key: 'descripcion', label: 'Descripción', placeholder: 'Describe el material...', type: 'text' },
@@ -199,9 +199,17 @@ function PiezaCard({
 
   const handleTipoChange = (tipo: string) => {
     setTipoSeleccionado(tipo);
-    const materialCat = catalogoMateriales.find(
+    // Buscar todos los materiales con la misma forma+tipo y usar el más reciente
+    const materialesMatch = catalogoMateriales.filter(
       m => m.forma === formaSeleccionada && m.tipo === tipo
     );
+    // Ordenar por created_at descendente (más reciente primero)
+    const materialCat = materialesMatch.sort((a, b) => {
+      if (!a.created_at && !b.created_at) return 0;
+      if (!a.created_at) return 1;
+      if (!b.created_at) return -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    })[0];
     if (materialCat) {
       setNombreMaterial(materialCat.nombre);
       setPrecioBase(materialCat.costoUnitario);
@@ -247,9 +255,16 @@ function PiezaCard({
       }
     }
 
-    const materialCat = catalogoMateriales.find(
+    // Buscar material existente en catálogo (más reciente)
+    const materialesMatch = catalogoMateriales.filter(
       m => m.forma === formaSeleccionada && m.tipo === tipoSeleccionado
     );
+    const materialCat = materialesMatch.sort((a, b) => {
+      if (!a.created_at && !b.created_at) return 0;
+      if (!a.created_at) return 1;
+      if (!b.created_at) return -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    })[0];
 
     const costoTotalMaterial = parseFloat(precioUnitario);
     const nombreFinal = nombreMaterial.trim() || tipoSeleccionado;
@@ -548,7 +563,7 @@ function PiezaCard({
                         {dimensionesConfig.map(dim => (
                           <div key={dim.key}>
                             <label className="block text-xs font-medium text-gray-600 mb-1">
-                              {dim.label} ({dim.placeholder})
+                              {dim.label}
                             </label>
                             <Input
                               type={dim.type || 'number'}
