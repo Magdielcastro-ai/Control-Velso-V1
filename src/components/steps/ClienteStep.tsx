@@ -184,7 +184,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
     }
   };
 
-  const hayClienteSeleccionado = clienteSeleccionado && clienteSeleccionado !== 'nuevo' && clienteSeleccionado !== '';
+  const hayClienteSeleccionado = clienteSeleccionado && clienteSeleccionado !== 'nuevo' && clienteSeleccionado !== '' && !clienteNoEncontrado;
 
   return (
     <div className="space-y-6">
