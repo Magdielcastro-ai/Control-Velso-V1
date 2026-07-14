@@ -598,17 +598,6 @@ export const useCotizacionStore = () => {
             console.warn('[cargarCotizacion] Error parseando piezas:', e);
           }
         }
-        if (data.piezas) {
-          try {
-            piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
-            piezas = piezas.map((p: any) => ({
-              ...p,
-              material: p.material || null,
-            }));
-          } catch (e) {
-            console.warn('[cargarCotizacion] Error parseando piezas:', e);
-          }
-        }
 
         if (piezas.length === 0 && (data.materiales?.length > 0 || data.procesos?.length > 0)) {
           piezas = [{
