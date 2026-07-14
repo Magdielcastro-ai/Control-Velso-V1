@@ -570,6 +570,37 @@ export const useCotizacionStore = () => {
         if (data.piezas) {
           try {
             piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
+            piezas = piezas.map((p: any) => {
+              // Migrar formato antiguo: materiales[] → material{}
+              let material = p.material || null;
+              if (!material && p.materiales && Array.isArray(p.materiales) && p.materiales.length > 0) {
+                material = p.materiales[0];
+              }
+              
+              // Asegurar que cada proceso tenga tiempoMinutosPorPieza
+              const procesos = (p.procesos || []).map((proc: any) => {
+                if (proc.tiempoMinutosPorPieza === undefined && proc.tiempoMinutos !== undefined) {
+                  return {
+                    ...proc,
+                    tiempoMinutosPorPieza: p.cantidad > 0 ? proc.tiempoMinutos / p.cantidad : proc.tiempoMinutos,
+                  };
+                }
+                return proc;
+              });
+              
+              return {
+                ...p,
+                material,
+                procesos,
+              };
+            });
+          } catch (e) {
+            console.warn('[cargarCotizacion] Error parseando piezas:', e);
+          }
+        }
+        if (data.piezas) {
+          try {
+            piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
             piezas = piezas.map((p: any) => ({
               ...p,
               material: p.material || null,
