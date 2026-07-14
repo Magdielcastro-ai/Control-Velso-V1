@@ -742,34 +742,34 @@ function PiezaCard({
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Procesos por pieza:</span>
                     <span className="font-medium">
-                      ${(pieza.procesos.filter((p: Proceso) => p.tipo !== 'otro').reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0) / pieza.cantidad).toFixed(2)}
+                      ${(pieza.procesos.filter((p: Proceso) => p.tipo !== 'otro').reduce((sum: number, p: Proceso) => sum + (p.costoTotal / pieza.cantidad), 0)).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Procesos externos por pieza:</span>
                     <span className="font-medium">
-                      ${(pieza.procesos.filter((p: Proceso) => p.tipo === 'otro').reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0) / pieza.cantidad).toFixed(2)}
+                      ${(pieza.procesos.filter((p: Proceso) => p.tipo === 'otro').reduce((sum: number, p: Proceso) => sum + (p.costoTotal / pieza.cantidad), 0)).toFixed(2)}
                     </span>
                   </div>
                   <div className="border-t border-slate-300 my-2 pt-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-700 font-medium">Subtotal por pieza:</span>
-                      <span className="font-semibold">${(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}</span>
+                      <span className="font-semibold">${pieza.subtotalPieza.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm mt-1">
                       <span className="text-slate-600">IVA (16%):</span>
                       <span className="font-medium">
-                        ${((pieza.totalPieza - pieza.subtotalPieza) / pieza.cantidad).toFixed(2)}
+                        ${pieza.ivaPieza.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between text-base mt-2 pt-2 border-t border-slate-300">
                       <span className="font-bold text-slate-900">TOTAL POR PIEZA:</span>
-                      <span className="font-bold text-blue-700">${(pieza.totalPieza / pieza.cantidad).toFixed(2)}</span>
+                      <span className="font-bold text-blue-700">${pieza.totalPieza.toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between text-base mt-3 pt-2 border-t-2 border-slate-400">
                     <span className="font-bold text-slate-900">TOTAL {pieza.cantidad} {pieza.cantidad === 1 ? 'PIEZA' : 'PIEZAS'}:</span>
-                    <span className="font-bold text-blue-700 text-lg">${pieza.totalPieza.toFixed(2)}</span>
+                    <span className="font-bold text-blue-700 text-lg">${(pieza.totalPieza * pieza.cantidad).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
