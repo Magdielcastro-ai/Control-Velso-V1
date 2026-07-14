@@ -359,13 +359,15 @@ export const useCotizacionStore = () => {
 
       // Material: costoTotal es el costo total ingresado por el usuario para TODAS las piezas
       // Se divide por la cantidad de piezas para obtener el costo unitario por pieza
-      const costoMateriales = pieza.material ? pieza.material.costoTotal / pieza.cantidad : 0;
+      // El margen del material se aplica como markup: costo * (1 + margen%)
+      const costoMaterialBase = pieza.material ? pieza.material.costoTotal / pieza.cantidad : 0;
+      const margenMaterial = pieza.material ? (pieza.material.margenPorcentaje || 30) : 30;
+      const costoMateriales = costoMaterialBase * (1 + margenMaterial / 100);
       const costoProcesos = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
 
       const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
-      // Margen financiero: utilidad sobre el precio de venta (no markup sobre costo)
-      // subtotal = costoDirecto / (1 - margen%) para que la utilidad sea exactamente el margen% del precio
+      // Margen financiero general: utilidad sobre el precio de venta
       const margenValido = Math.max(0, Math.min(99, c.margenUtilidad));
       const factorMargen = 1 - (margenValido / 100);
       const subtotalPieza = factorMargen > 0 ? costoDirectoPieza / factorMargen : costoDirectoPieza;

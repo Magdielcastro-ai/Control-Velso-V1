@@ -458,14 +458,31 @@ function PiezaCard({
                         <p className="text-xs text-slate-600">
                           <span className="font-medium">Costo del material por pieza (sin margen):</span> ${(pieza.material!.costoTotal / pieza.cantidad).toFixed(2)}
                         </p>
-                        <p className="text-sm font-semibold text-blue-700">
-                          <span className="font-medium">Costo del material por pieza (con 30% margen):</span> ${((pieza.material!.costoTotal / pieza.cantidad) / 0.70).toFixed(2)}
-                        </p>
-                        {pieza.material!.margenPorcentaje > 0 && (
-                          <p className="text-xs text-green-600">
-                            (+{pieza.material!.margenPorcentaje}% margen aplicado)
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-blue-700">
+                            <span className="font-medium">Costo del material por pieza (con {pieza.material!.margenPorcentaje || 30}% margen):</span> ${((pieza.material!.costoTotal / pieza.cantidad) * (1 + (pieza.material!.margenPorcentaje || 30) / 100)).toFixed(2)}
                           </p>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <label className="text-xs text-slate-600">Margen material:</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={pieza.material!.margenPorcentaje || 30}
+                            onChange={(e) => {
+                              const nuevoMargen = parseFloat(e.target.value) || 0;
+                              onActualizar(pieza.id, {
+                                material: {
+                                  ...pieza.material!,
+                                  margenPorcentaje: nuevoMargen,
+                                },
+                              });
+                            }}
+                            className="w-16 h-6 text-xs border rounded px-1"
+                          />
+                          <span className="text-xs text-slate-500">%</span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-1">
@@ -717,9 +734,9 @@ function PiezaCard({
                 </h4>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Material por pieza (con 30% margen):</span>
+                    <span className="text-slate-600">Material por pieza (con {pieza.material?.margenPorcentaje || 30}% margen):</span>
                     <span className="font-medium">
-                      ${pieza.material ? ((pieza.material.costoTotal / pieza.cantidad) / 0.70).toFixed(2) : '0.00'}
+                      ${pieza.material ? ((pieza.material.costoTotal / pieza.cantidad) * (1 + (pieza.material.margenPorcentaje || 30) / 100)).toFixed(2) : '0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
