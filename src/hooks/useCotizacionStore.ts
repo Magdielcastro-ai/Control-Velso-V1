@@ -570,7 +570,7 @@ export const useCotizacionStore = () => {
         if (data.piezas) {
           try {
             piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
-            piezas = piezas.map((p: any) => {
+            piezas = piezas.filter((p: any) => p !== null && p !== undefined).map((p: any) => {
               // Migrar formato antiguo: materiales[] → material{}
               let material = p.material || null;
               if (!material && p.materiales && Array.isArray(p.materiales) && p.materiales.length > 0) {
