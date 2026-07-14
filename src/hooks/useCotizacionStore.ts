@@ -375,10 +375,9 @@ export const useCotizacionStore = () => {
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0) / pieza.cantidad;
 
       const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
-      // Margen financiero general: utilidad sobre el precio de venta
-      const margenValido = Math.max(0, Math.min(99, c.margenUtilidad));
-      const factorMargen = 1 - (margenValido / 100);
-      const subtotalPieza = factorMargen > 0 ? costoDirectoPieza / factorMargen : costoDirectoPieza;
+      // El subtotal es la suma directa de los costos con sus márgenes aplicados
+      // NO se aplica margen adicional aquí - los márgenes ya están en material y procesos externos
+      const subtotalPieza = costoDirectoPieza;
       const ivaPieza = subtotalPieza * (c.ivaPorcentaje / 100);
       const totalPieza = subtotalPieza + ivaPieza;
 
