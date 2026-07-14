@@ -781,7 +781,15 @@ function ProcesosPieza({
                 <div className="flex justify-between items-center">
                   <span className="text-sm">{proc.nombre} ({proc.descripcion || proc.tiempoMinutos + ' min'})</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)}</span>
+                    {proc.tipo !== 'otro' && pieza.cantidad > 0 ? (
+                      <div className="text-right">
+                        <span className="text-slate-500 text-xs">${(proc.costoTotal / pieza.cantidad).toFixed(2)} por pieza</span>
+                        <span className="text-slate-400 text-xs mx-1">|</span>
+                        <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)} total</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)}</span>
+                    )}
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setEditandoProceso(proc.id)}>
                       <Pencil className="w-3 h-3" />
                     </Button>

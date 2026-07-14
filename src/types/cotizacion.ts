@@ -61,6 +61,7 @@ export interface CatalogoMaterial {
   dimensiones_libre?: string;
   costoUnitario: number;
   unidadCosto: 'kg' | 'pieza' | 'metro';
+  created_at?: string;
 }
 
 // MATERIAL ASIGNADO A UNA PIEZA (UNICO)
