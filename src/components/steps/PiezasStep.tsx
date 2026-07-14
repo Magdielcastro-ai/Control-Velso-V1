@@ -440,23 +440,33 @@ function PiezaCard({
               {tieneMaterial && !editandoMaterial ? (
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="space-y-1">
                       <p className="text-sm font-medium">{pieza.material!.nombre}</p>
                       <p className="text-xs text-slate-500">
                         {FORMAS.find(f => f.id === pieza.material!.forma)?.label} · {pieza.material!.tipo}
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-slate-500">
                         {formatearDimensiones(pieza.material!)}
                       </p>
-                      <p className="text-sm font-semibold text-blue-700 mt-1">
-                        Costo total: ${pieza.material!.costoTotal.toFixed(2)}
-                        <span className="text-xs text-slate-500 ml-1">
-                          (${(pieza.material!.costoTotal / pieza.cantidad).toFixed(2)} por pieza)
-                        </span>
+                      <div className="pt-2 space-y-1">
+                        <p className="text-xs text-slate-600">
+                          <span className="font-medium">Cantidad:</span> {pieza.cantidad} {pieza.cantidad === 1 ? 'pieza' : 'piezas'}
+                        </p>
+                        <p className="text-xs text-slate-600">
+                          <span className="font-medium">Costo total del material:</span> ${pieza.material!.costoTotal.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-slate-600">
+                          <span className="font-medium">Costo del material por pieza (sin margen):</span> ${(pieza.material!.costoTotal / pieza.cantidad).toFixed(2)}
+                        </p>
+                        <p className="text-sm font-semibold text-blue-700">
+                          <span className="font-medium">Costo del material por pieza (con 30% margen):</span> ${((pieza.material!.costoTotal / pieza.cantidad) / 0.70).toFixed(2)}
+                        </p>
                         {pieza.material!.margenPorcentaje > 0 && (
-                          <span className="text-xs text-green-600 ml-1">(+{pieza.material!.margenPorcentaje}% margen)</span>
+                          <p className="text-xs text-green-600">
+                            (+{pieza.material!.margenPorcentaje}% margen aplicado)
+                          </p>
                         )}
-                      </p>
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={iniciarEdicion}>
@@ -698,6 +708,55 @@ function PiezaCard({
               pieza={pieza}
               onActualizar={onActualizar}
             />
+
+            {/* Resumen de Costos por Pieza */}
+            {pieza.subtotalPieza > 0 && (
+              <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 className="text-sm font-semibold text-slate-900 mb-3 uppercase tracking-wide">
+                  Resumen de Costos por Pieza
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Material por pieza (con 30% margen):</span>
+                    <span className="font-medium">
+                      ${pieza.material ? ((pieza.material.costoTotal / pieza.cantidad) / 0.70).toFixed(2) : '0.00'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Procesos por pieza:</span>
+                    <span className="font-medium">
+                      ${(pieza.procesos.filter((p: Proceso) => p.tipo !== 'otro').reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0) / pieza.cantidad).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Procesos externos por pieza:</span>
+                    <span className="font-medium">
+                      ${(pieza.procesos.filter((p: Proceso) => p.tipo === 'otro').reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0) / pieza.cantidad).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="border-t border-slate-300 my-2 pt-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-700 font-medium">Subtotal por pieza:</span>
+                      <span className="font-semibold">${(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-slate-600">IVA (16%):</span>
+                      <span className="font-medium">
+                        ${((pieza.totalPieza - pieza.subtotalPieza) / pieza.cantidad).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-base mt-2 pt-2 border-t border-slate-300">
+                      <span className="font-bold text-slate-900">TOTAL POR PIEZA:</span>
+                      <span className="font-bold text-blue-700">${(pieza.totalPieza / pieza.cantidad).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-base mt-3 pt-2 border-t-2 border-slate-400">
+                    <span className="font-bold text-slate-900">TOTAL {pieza.cantidad} {pieza.cantidad === 1 ? 'PIEZA' : 'PIEZAS'}:</span>
+                    <span className="font-bold text-blue-700 text-lg">${pieza.totalPieza.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -794,17 +853,16 @@ function ProcesosPieza({
                 </div>
               ) : (
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">{proc.nombre} ({proc.descripcion || proc.tiempoMinutos + ' min'})</span>
+                  <div className="space-y-0.5">
+                    <span className="text-sm font-medium">{proc.nombre}</span>
+                    <p className="text-xs text-slate-500">
+                      Tiempo por pieza: {proc.tiempoMinutosPorPieza} min | Tiempo total: {proc.tiempoMinutos} min ({proc.tiempoMinutosPorPieza} min × {pieza.cantidad} {pieza.cantidad === 1 ? 'pieza' : 'piezas'})
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Costo por pieza: ${(proc.costoTotal / pieza.cantidad).toFixed(2)} | Costo total: ${proc.costoTotal.toFixed(2)}
+                    </p>
+                  </div>
                   <div className="flex items-center gap-2">
-                    {proc.tipo !== 'otro' && pieza.cantidad > 0 ? (
-                      <div className="text-right">
-                        <span className="text-slate-500 text-xs">${(proc.costoTotal / pieza.cantidad).toFixed(2)} por pieza</span>
-                        <span className="text-slate-400 text-xs mx-1">|</span>
-                        <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)} total</span>
-                      </div>
-                    ) : (
-                      <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)}</span>
-                    )}
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setEditandoProceso(proc.id)}>
                       <Pencil className="w-3 h-3" />
                     </Button>
