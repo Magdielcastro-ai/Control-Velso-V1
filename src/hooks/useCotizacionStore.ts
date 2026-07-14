@@ -338,10 +338,16 @@ export const useCotizacionStore = () => {
       // Recalcular procesos cuando cambia la cantidad de piezas
       const procesosRecalculados = pieza.procesos.map((proceso: Proceso) => {
         if (proceso.tipo === 'otro') {
-          // Proceso externo: el costoTotal es el costo total ingresado (no cambia con cantidad)
+          // Proceso externo: costoTotalIngresado es el costo POR PIEZA base
+          // Aplicar margen de seguridad y multiplicar por cantidad
+          const costoPorPiezaBase = proceso.costoTotalIngresado || 0;
+          const margenSeguridad = proceso.margenPorcentaje || 30;
+          const costoConMargenPorPieza = costoPorPiezaBase * (1 + margenSeguridad / 100);
+          const costoTotal = costoConMargenPorPieza * pieza.cantidad;
           return {
             ...proceso,
-            costoTotal: proceso.costoTotalIngresado || proceso.costoTotal,
+            costoTotal: costoTotal,
+            descripcion: `$${costoPorPiezaBase.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
           };
         }
         // Proceso de máquina: recalcular tiempo total y costo

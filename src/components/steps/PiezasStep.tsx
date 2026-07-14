@@ -981,14 +981,15 @@ function ProcesosExternosPieza({
   onActualizar: (id: string, datos: Partial<PiezaCotizacion>) => void;
 }) {
   const [nombreExterno, setNombreExterno] = useState('');
-  const [costoExterno, setCostoExterno] = useState(0);
-  const [margenExterno, setMargenExterno] = useState(30);
+  const [costoPorPieza, setCostoPorPieza] = useState(0);
+  const [margenSeguridad, setMargenSeguridad] = useState(30);
 
   const agregarProcesoExterno = () => {
-    if (!nombreExterno.trim() || costoExterno <= 0) return;
-    // El costo ingresado es el TOTAL para todas las piezas
-    const costoBaseTotal = costoExterno;
-    const costoConMargen = costoBaseTotal * (1 + margenExterno / 100);
+    if (!nombreExterno.trim() || costoPorPieza <= 0) return;
+    // El costo ingresado es POR PIEZA
+    // Aplicar margen de seguridad y financiamiento, luego multiplicar por cantidad
+    const costoConMargenPorPieza = costoPorPieza * (1 + margenSeguridad / 100);
+    const costoTotal = costoConMargenPorPieza * pieza.cantidad;
     const nuevo: Proceso = {
       id: crypto.randomUUID(),
       nombre: nombreExterno.trim(),
@@ -998,15 +999,16 @@ function ProcesosExternosPieza({
       costoPorHora: 0,
       costoManoObraPorHora: 0,
       costoManoObra: 0,
-      costoTotal: costoConMargen,
-      descripcion: `Proveedor: $${costoBaseTotal.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)} (total ${pieza.cantidad} pzas)`,
+      costoTotal: costoTotal,
+      descripcion: `$${costoPorPieza.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
       incluyeManoObra: false,
-      costoTotalIngresado: costoBaseTotal,
+      costoTotalIngresado: costoPorPieza, // Guardamos el costo por pieza base
+      margenPorcentaje: margenSeguridad, // Guardamos el margen aplicado
     };
     onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevo] });
     setNombreExterno('');
-    setCostoExterno(0);
-    setMargenExterno(30);
+    setCostoPorPieza(0);
+    setMargenSeguridad(30);
   };
 
   const eliminarProceso = (procesoId: string) => {
@@ -1049,34 +1051,41 @@ function ProcesosExternosPieza({
           placeholder="Nombre del proceso externo"
           className="flex-1 h-8 text-xs"
         />
-        <Input
-          type="number"
-          min={0.01}
-          step={0.01}
-          value={costoExterno}
-          onChange={(e) => setCostoExterno(parseFloat(e.target.value) || 0)}
-          placeholder="Costo total"
-          className="w-28 h-8 text-xs"
-        />
-        <Select value={String(margenExterno)} onValueChange={(v) => setMargenExterno(parseInt(v))}>
-          <SelectTrigger className="h-8 w-20 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="5" className="text-xs">5%</SelectItem>
-            <SelectItem value="15" className="text-xs">15%</SelectItem>
-            <SelectItem value="30" className="text-xs">30%</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={agregarProcesoExterno} disabled={!nombreExterno.trim() || costoExterno <= 0} className="h-8 bg-amber-600 hover:bg-amber-700">
+        <div className="flex flex-col">
+          <label className="text-xs text-slate-500 mb-0.5">Costo por pieza</label>
+          <Input
+            type="number"
+            min={0.01}
+            step={0.01}
+            value={costoPorPieza}
+            onChange={(e) => setCostoPorPieza(parseFloat(e.target.value) || 0)}
+            placeholder="$ por pieza"
+            className="w-28 h-8 text-xs"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-xs text-slate-500 mb-0.5">Margen seg.</label>
+          <Select value={String(margenSeguridad)} onValueChange={(v) => setMargenSeguridad(parseInt(v))}>
+            <SelectTrigger className="h-8 w-20 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5" className="text-xs">5%</SelectItem>
+              <SelectItem value="15" className="text-xs">15%</SelectItem>
+              <SelectItem value="30" className="text-xs">30%</SelectItem>
+              <SelectItem value="50" className="text-xs">50%</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={agregarProcesoExterno} disabled={!nombreExterno.trim() || costoPorPieza <= 0} className="h-8 bg-amber-600 hover:bg-amber-700">
           <Plus className="w-3 h-3" />
         </Button>
       </div>
-      {costoExterno > 0 && (
+      {costoPorPieza > 0 && (
         <p className="text-xs text-slate-500 mt-1">
-          Costo total: ${(costoExterno * (1 + margenExterno / 100)).toFixed(2)}
+          Costo por pieza con margen: ${(costoPorPieza * (1 + margenSeguridad / 100)).toFixed(2)}
           {' '}
-          (${((costoExterno * (1 + margenExterno / 100)) / pieza.cantidad).toFixed(2)} por pieza)
+          (Total {pieza.cantidad} piezas: ${(costoPorPieza * (1 + margenSeguridad / 100) * pieza.cantidad).toFixed(2)})
         </p>
       )}
     </div>

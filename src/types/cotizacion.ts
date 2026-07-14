@@ -213,7 +213,8 @@ export interface Proceso {
   descripcion?: string;
   incluyeManoObra: boolean;
   tipoManoObraSeleccionada?: 'mo_s' | 'mo_e';
-  costoTotalIngresado?: number;   // Para procesos externos: costo total ingresado por usuario
+  costoTotalIngresado?: number;   // Para procesos externos: costo POR PIEZA ingresado por usuario
+  margenPorcentaje?: number;      // Margen de seguridad/financiamiento para procesos externos
 }
 
 export interface CostosAdicionales {
