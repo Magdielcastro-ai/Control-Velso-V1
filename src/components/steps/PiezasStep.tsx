@@ -911,7 +911,9 @@ function ProcesosExternosPieza({
 
   const agregarProcesoExterno = () => {
     if (!nombreExterno.trim() || costoExterno <= 0) return;
-    const costoConMargen = costoExterno * (1 + margenExterno / 100);
+    // El costo ingresado es el TOTAL para todas las piezas
+    const costoBaseTotal = costoExterno;
+    const costoConMargen = costoBaseTotal * (1 + margenExterno / 100);
     const nuevo: Proceso = {
       id: crypto.randomUUID(),
       nombre: nombreExterno.trim(),
@@ -922,9 +924,9 @@ function ProcesosExternosPieza({
       costoManoObraPorHora: 0,
       costoManoObra: 0,
       costoTotal: costoConMargen,
-      descripcion: `Proveedor: $${costoExterno.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)} (total ${pieza.cantidad} pzas)`,
+      descripcion: `Proveedor: $${costoBaseTotal.toFixed(2)} + ${margenExterno}% = $${costoConMargen.toFixed(2)} (total ${pieza.cantidad} pzas)`,
       incluyeManoObra: false,
-      costoTotalIngresado: costoConMargen,
+      costoTotalIngresado: costoBaseTotal,
     };
     onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevo] });
     setNombreExterno('');
@@ -952,7 +954,11 @@ function ProcesosExternosPieza({
                 <span className="text-xs text-slate-500 ml-2">{proc.descripcion}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-slate-600">${proc.costoTotal.toFixed(2)}</span>
+                <div className="text-right">
+                  <span className="text-slate-500 text-xs">${(proc.costoTotal / pieza.cantidad).toFixed(2)} por pieza</span>
+                  <span className="text-slate-400 text-xs mx-1">|</span>
+                  <span className="text-slate-600 text-sm">${proc.costoTotal.toFixed(2)} total</span>
+                </div>
                 <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" onClick={() => eliminarProceso(proc.id)}>
                   <Trash2 className="w-3 h-3" />
                 </Button>

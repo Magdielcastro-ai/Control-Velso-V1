@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Building2, MapPin, Phone, Mail, Briefcase, Plus, Check, Users, ExternalLink, Save } from 'lucide-react';
+import { User, Building2, MapPin, Phone, Mail, Briefcase, Plus, Check, Users, ExternalLink, Save, AlertTriangle } from 'lucide-react';
 import type { DatosCliente } from '@/types/cotizacion';
 import type { Cliente, UsuarioCliente } from '@/types/ventas';
 
@@ -22,6 +22,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
   const [contactosDisponibles, setContactosDisponibles] = useState<UsuarioCliente[]>([]);
   const [modoNuevo, setModoNuevo] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [clienteNoEncontrado, setClienteNoEncontrado] = useState(false);
 
   // Sincronizar estado cuando cambian los datos externos
   useEffect(() => {
@@ -30,6 +31,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
       if (cliente) {
         // Cliente encontrado en la lista
         setClienteSeleccionado(datos.clienteId);
+        setClienteNoEncontrado(false);
         setModoNuevo(false);
         setContactosDisponibles(cliente.usuarios || []);
         
@@ -43,8 +45,9 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
       } else {
         // Cliente no encontrado (puede haber sido eliminado o renombrado)
         console.warn('[ClienteStep] Cliente no encontrado:', datos.clienteId);
-        // NO limpiar el clienteSeleccionado para evitar el crash del Select
-        // En su lugar, mantener el ID pero mostrar que no está disponible
+        // Establecer a undefined para evitar que el Select reciba un value inválido
+        setClienteSeleccionado(undefined);
+        setClienteNoEncontrado(true);
         setContactosDisponibles([]);
         setContactoSeleccionado(undefined);
         setModoNuevo(false);
@@ -52,6 +55,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
     } else if (!datos.nombre && !datos.empresa) {
       // No hay cliente seleccionado
       setClienteSeleccionado(undefined);
+      setClienteNoEncontrado(false);
       setContactoSeleccionado(undefined);
       setModoNuevo(false);
     }
@@ -60,6 +64,7 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
   const handleSeleccionarCliente = (clienteId: string) => {
     setClienteSeleccionado(clienteId);
     setContactoSeleccionado(undefined);
+    setClienteNoEncontrado(false);
     
     if (clienteId === 'nuevo') {
       // Modo nuevo cliente
@@ -254,6 +259,19 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
                     Ir a Clientes para agregar uno
                   </Button>
                 )}
+              </p>
+            </div>
+          )}
+
+          {/* Mensaje de advertencia cuando el cliente guardado ya no existe */}
+          {clienteNoEncontrado && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  El cliente anteriormente seleccionado ya no está disponible (puede haber sido eliminado o renombrado). 
+                  Por favor selecciona otro cliente de la lista.
+                </span>
               </p>
             </div>
           )}
