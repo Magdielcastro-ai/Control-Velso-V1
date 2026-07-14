@@ -571,7 +571,7 @@ function PiezaCard({
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Dimensiones</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {dimensionesConfig.map(dim => (
-                          <div key={dim.key}>
+                          <div key={`${dim.key}-${unidadMedida}`}>
                             <label className="block text-xs font-medium text-gray-600 mb-1">
                               {dim.label}
                             </label>

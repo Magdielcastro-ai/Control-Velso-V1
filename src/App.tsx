@@ -497,14 +497,18 @@ function App() {
   };
 
   // Cotización
-  const handleSiguiente = () => {
+  const handleSiguiente = async () => {
+    await guardarCotizacion('borrador');
+
     const indiceActual = pasos.findIndex(p => p.id === pasoActual);
     if (indiceActual < pasos.length - 1) {
       setPasoActual(pasos[indiceActual + 1].id);
     }
   };
 
-  const handleAnterior = () => {
+  const handleAnterior = async () => {
+    await guardarCotizacion('borrador');
+
     const indiceActual = pasos.findIndex(p => p.id === pasoActual);
     if (indiceActual > 0) {
       setPasoActual(pasos[indiceActual - 1].id);
@@ -997,12 +1001,15 @@ function App() {
                     return (
                       <button
                         key={paso.id}
-                        onClick={() => setPasoActual(paso.id)}
+                        onClick={async () => {
+                          await guardarCotizacion('borrador');
+                          setPasoActual(paso.id);
+                        }}
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                          isActive 
-                            ? 'bg-blue-600 text-white' 
-                            : isPast 
-                              ? 'bg-green-100 text-green-700' 
+                          isActive
+                            ? 'bg-blue-600 text-white'
+                            : isPast
+                              ? 'bg-green-100 text-green-700'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
