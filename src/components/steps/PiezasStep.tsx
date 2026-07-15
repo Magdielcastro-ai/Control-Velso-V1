@@ -95,10 +95,11 @@ export function PiezasStep({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        {piezas.map((pieza) => (
+        {piezas.map((pieza, index) => (
           <PiezaCard
             key={pieza.id}
             pieza={pieza}
+            index={index}
             expandida={piezaExpandida === pieza.id}
             catalogoMateriales={catalogoMateriales}
             onToggle={() => setPiezaExpandida(piezaExpandida === pieza.id ? '' : pieza.id)}
@@ -146,6 +147,7 @@ export function PiezasStep({
 
 function PiezaCard({
   pieza,
+  index,
   expandida,
   catalogoMateriales,
   onToggle,
@@ -157,6 +159,7 @@ function PiezaCard({
   onRecargarCatalogo,
 }: {
   pieza: PiezaCotizacion;
+  index?: number;
   expandida: boolean;
   catalogoMateriales: CatalogoMaterial[];
   onToggle: () => void;
@@ -365,7 +368,7 @@ function PiezaCard({
   const dimensionesConfig = getDimensionesConfig(unidadMedida)[formaSeleccionada] || [];
 
   return (
-    <Card className="border-slate-200">
+    <Card className={`border-slate-200 ${index !== undefined && index % 2 === 1 ? 'bg-slate-50' : 'bg-white'}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3 flex-1">
@@ -394,9 +397,9 @@ function PiezaCard({
                 <span className="text-xs text-slate-500">
                   {tieneMaterial ? '1 material' : 'Sin material'} · {pieza.procesos.length} procesos
                 </span>
-                {pieza.subtotalPieza > 0 && (
+                {pieza.totalPieza > 0 && (
                   <span className="text-xs font-medium text-blue-600">
-                    ${(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}/pieza · ${pieza.subtotalPieza.toFixed(2)} total
+                    ${pieza.totalPieza.toFixed(2)}/pieza · ${(pieza.totalPieza * pieza.cantidad).toFixed(2)} total
                   </span>
                 )}
               </div>
