@@ -80,10 +80,7 @@ export function PiezasStep({
 }: PiezasStepProps) {
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');
   const [nuevaPiezaCantidad, setNuevaPiezaCantidad] = useState(1);
-  // Permitir múltiples piezas expandidas (Set de IDs)
-  const [piezasExpandidas, setPiezasExpandidas] = useState<Set<string>>(
-    new Set(piezas[0]?.id ? [piezas[0].id] : [])
-  );
+  const [piezaExpandida, setPiezaExpandida] = useState<string>(piezas[0]?.id || '');
 
   const handleAgregarPieza = () => {
     if (!nuevaPiezaNombre.trim()) {
@@ -95,30 +92,16 @@ export function PiezasStep({
     setNuevaPiezaCantidad(1);
   };
 
-  const togglePieza = (piezaId: string) => {
-    setPiezasExpandidas(prev => {
-      const next = new Set(prev);
-      if (next.has(piezaId)) {
-        next.delete(piezaId);
-      } else {
-        next.add(piezaId);
-      }
-      return next;
-    });
-  };
-
   return (
     <div className="space-y-6">
-      {/* Lista de piezas colapsables */}
-      <div className="space-y-3">
-        {piezas.map((pieza, index) => (
+      <div className="space-y-4">
+        {piezas.map((pieza) => (
           <PiezaCard
             key={pieza.id}
             pieza={pieza}
-            index={index}
-            expandida={piezasExpandidas.has(pieza.id)}
+            expandida={piezaExpandida === pieza.id}
             catalogoMateriales={catalogoMateriales}
-            onToggle={() => togglePieza(pieza.id)}
+            onToggle={() => setPiezaExpandida(piezaExpandida === pieza.id ? '' : pieza.id)}
             onEliminar={() => {
               if (piezas.length > 1) onEliminarPieza(pieza.id);
               else toast.error('Debe haber al menos una pieza');
@@ -132,8 +115,7 @@ export function PiezasStep({
         ))}
       </div>
 
-      {/* Agregar nueva pieza */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex gap-2">
         <Input
           value={nuevaPiezaNombre}
           onChange={(e) => setNuevaPiezaNombre(e.target.value)}
@@ -141,33 +123,22 @@ export function PiezasStep({
           className="flex-1"
           onKeyDown={(e) => e.key === 'Enter' && handleAgregarPieza()}
         />
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            min={1}
-            value={nuevaPiezaCantidad}
-            onChange={(e) => setNuevaPiezaCantidad(parseInt(e.target.value) || 1)}
-            className="w-20"
-          />
-          <Button onClick={handleAgregarPieza} className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap">
-            <Plus className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Agregar</span>
-          </Button>
-        </div>
+        <Input
+          type="number"
+          min={1}
+          value={nuevaPiezaCantidad}
+          onChange={(e) => setNuevaPiezaCantidad(parseInt(e.target.value) || 1)}
+          className="w-20"
+        />
+        <Button onClick={handleAgregarPieza} className="bg-blue-600 hover:bg-blue-700">
+          <Plus className="w-4 h-4" />
+        </Button>
       </div>
 
-      {/* Resumen general */}
       <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-          <p className="text-sm text-slate-600">
-            <strong>{piezas.length}</strong> {piezas.length === 1 ? 'pieza' : 'piezas'} en total
-          </p>
-          {piezas.length > 1 && (
-            <p className="text-sm font-medium text-blue-700">
-              Total cotización: ${piezas.reduce((sum, p) => sum + (p.totalPieza * p.cantidad), 0).toFixed(2)}
-            </p>
-          )}
-        </div>
+        <p className="text-sm text-slate-600">
+          <strong>{piezas.length}</strong> {piezas.length === 1 ? 'pieza' : 'piezas'} en total
+        </p>
       </div>
     </div>
   );
@@ -175,7 +146,6 @@ export function PiezasStep({
 
 function PiezaCard({
   pieza,
-  index,
   expandida,
   catalogoMateriales,
   onToggle,
@@ -187,7 +157,6 @@ function PiezaCard({
   onRecargarCatalogo,
 }: {
   pieza: PiezaCotizacion;
-  index: number;
   expandida: boolean;
   catalogoMateriales: CatalogoMaterial[];
   onToggle: () => void;
@@ -213,11 +182,6 @@ function PiezaCard({
 
   const tieneMaterial = !!pieza.material;
 
-  // Calcular costo por pieza (incluyendo margen de material)
-  const costoPorPieza = pieza.totalPieza > 0 ? pieza.totalPieza : 0;
-  const totalPiezas = pieza.cantidad;
-  const costoTotal = costoPorPieza * totalPiezas;
-
   const tiposDisponibles = catalogoMateriales
     .filter(m => m.forma === formaSeleccionada)
     .map(m => m.tipo)
@@ -235,9 +199,11 @@ function PiezaCard({
 
   const handleTipoChange = (tipo: string) => {
     setTipoSeleccionado(tipo);
+    // Buscar todos los materiales con la misma forma+tipo y usar el más reciente
     const materialesMatch = catalogoMateriales.filter(
       m => m.forma === formaSeleccionada && m.tipo === tipo
     );
+    // Ordenar por created_at descendente (más reciente primero)
     const materialCat = materialesMatch.sort((a, b) => {
       if (!a.created_at && !b.created_at) return 0;
       if (!a.created_at) return 1;
@@ -289,6 +255,7 @@ function PiezaCard({
       }
     }
 
+    // Buscar material existente en catálogo (más reciente)
     const materialesMatch = catalogoMateriales.filter(
       m => m.forma === formaSeleccionada && m.tipo === tipoSeleccionado
     );
@@ -315,6 +282,7 @@ function PiezaCard({
       ...dimsNumericas,
     } as Omit<Material, 'id'>);
 
+    // Guardar en catálogo si es material nuevo y el usuario lo solicitó
     if (guardarEnCatalogo && onAgregarMaterialACatalogo && !materialCat) {
       onAgregarMaterialACatalogo({
         nombre: nombreFinal,
@@ -397,96 +365,60 @@ function PiezaCard({
   const dimensionesConfig = getDimensionesConfig(unidadMedida)[formaSeleccionada] || [];
 
   return (
-    <Card className={`border-slate-200 transition-shadow ${expandida ? 'shadow-md' : 'shadow-sm hover:shadow-md'}`}>
-      <CardContent className="p-0">
-        {/* HEADER COLAPSABLE - Siempre visible */}
-        <button
-          onClick={onToggle}
-          className="w-full p-4 flex items-center gap-3 text-left hover:bg-slate-50/50 transition-colors rounded-t-lg"
-        >
-          {/* Icono / número de pieza */}
-          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-            <Package className="w-5 h-5 text-blue-600" />
-          </div>
-
-          {/* Info principal */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-semibold text-slate-900 truncate">
-                {pieza.nombre || `Pieza ${index + 1}`}
-              </h3>
-              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                ×{pieza.cantidad}
-              </span>
+    <Card className="border-slate-200">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Package className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-slate-500">
-                {tieneMaterial ? '1 material' : 'Sin material'} · {pieza.procesos.length} procesos
-              </span>
-            </div>
-          </div>
-
-          {/* Precio por pieza - ÉNFASIS PRINCIPAL */}
-          <div className="text-right shrink-0">
-            {costoPorPieza > 0 ? (
-              <div className="flex flex-col items-end">
-                <span className="text-lg font-bold text-blue-700 leading-tight">
-                  ${costoPorPieza.toFixed(2)}
-                </span>
-                <span className="text-xs text-slate-500">por pieza</span>
-              </div>
-            ) : (
-              <span className="text-sm text-slate-400 italic">Sin costo</span>
-            )}
-          </div>
-
-          {/* Total (cantidad × precio por pieza) */}
-          {costoTotal > 0 && (
-            <div className="text-right shrink-0 hidden sm:flex flex-col items-end border-l border-slate-200 pl-3 ml-1">
-              <span className="text-sm font-semibold text-slate-700 leading-tight">
-                ${costoTotal.toFixed(2)}
-              </span>
-              <span className="text-xs text-slate-500">total</span>
-            </div>
-          )}
-
-          {/* Chevron */}
-          <div className="shrink-0 ml-1">
-            {expandida ? (
-              <ChevronUp className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            )}
-          </div>
-        </button>
-
-        {/* CONTENIDO EXPANDIDO */}
-        {expandida && (
-          <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-4">
-            {/* Edición de nombre y cantidad */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-slate-600 mb-1 block">Nombre de la pieza</label>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
                 <Input
                   value={pieza.nombre}
                   onChange={(e) => onActualizar(pieza.id, { nombre: e.target.value })}
-                  className="h-9 text-sm"
-                  placeholder="Nombre de la pieza..."
+                  className="h-8 text-sm font-medium flex-1"
                 />
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-slate-500">Cant:</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={pieza.cantidad}
+                    onChange={(e) => onActualizar(pieza.id, { cantidad: parseInt(e.target.value) || 1 })}
+                    className="h-8 w-16 text-sm"
+                  />
+                </div>
               </div>
-              <div className="w-full sm:w-24">
-                <label className="text-xs font-medium text-slate-600 mb-1 block">Cantidad</label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={pieza.cantidad}
-                  onChange={(e) => onActualizar(pieza.id, { cantidad: parseInt(e.target.value) || 1 })}
-                  className="h-9 text-sm"
-                />
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-slate-500">
+                  {tieneMaterial ? '1 material' : 'Sin material'} · {pieza.procesos.length} procesos
+                </span>
+                {pieza.subtotalPieza > 0 && (
+                  <span className="text-xs font-medium text-blue-600">
+                    ${(pieza.subtotalPieza / pieza.cantidad).toFixed(2)}/pieza · ${pieza.subtotalPieza.toFixed(2)} total
+                  </span>
+                )}
               </div>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onToggle}>
+              {expandida ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEliminar}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
 
-            {/* Material */}
+        {expandida && (
+          <div className="space-y-4 pt-2 border-t border-slate-100">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-slate-900 flex items-center gap-1">
@@ -593,12 +525,14 @@ function PiezaCard({
                     <label className="text-xs font-medium text-slate-700 mb-1 block">
                       Tipo de Material ({FORMAS.find(f => f.id === formaSeleccionada)?.label})
                     </label>
+                    {/* Input de tipo siempre visible */}
                     <Input
                       value={tipoSeleccionado}
                       onChange={(e) => handleTipoChange(e.target.value)}
                       placeholder="Escribe o selecciona el tipo (ej: Acero H13)"
                       className="h-8 text-xs mb-2"
                     />
+                    {/* Select solo como ayuda cuando hay tipos en catálogo */}
                     {tiposDisponibles.length > 0 && (
                       <Select value={tipoSeleccionado || undefined} onValueChange={handleTipoChange}>
                         <SelectTrigger className="h-8 text-xs bg-white">
@@ -620,6 +554,7 @@ function PiezaCard({
                     )}
                   </div>
 
+                  {/* Nombre del material (editable) */}
                   <div>
                     <label className="text-xs font-medium text-slate-700 mb-1 block">
                       Nombre del Material
@@ -632,6 +567,7 @@ function PiezaCard({
                     />
                   </div>
 
+                  {/* Guardar en catálogo */}
                   {guardarEnCatalogo && onAgregarMaterialACatalogo && (
                     <div className="flex items-center gap-2">
                       <input
@@ -672,6 +608,7 @@ function PiezaCard({
 
                   {tipoSeleccionado && (
                     <div className="space-y-3">
+                      {/* Selector mm / in */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium text-slate-700">Unidad de medida:</span>
                         <button
@@ -831,19 +768,6 @@ function PiezaCard({
                 </div>
               </div>
             )}
-
-            {/* Botón eliminar pieza */}
-            <div className="flex justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onEliminar}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Eliminar pieza
-              </Button>
-            </div>
           </div>
         )}
       </CardContent>
@@ -990,7 +914,7 @@ function ProcesosPieza({
         </div>
         {procesoSeleccionado && (
           <div className="space-y-2">
-            <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex gap-2 items-end">
               <div>
                 <label className="text-xs text-slate-500">Tiempo por pieza</label>
                 <Input
@@ -1056,6 +980,8 @@ function ProcesosExternosPieza({
 
   const agregarProcesoExterno = () => {
     if (!nombreExterno.trim() || costoPorPieza <= 0) return;
+    // El costo ingresado es POR PIEZA
+    // Aplicar margen de seguridad y financiamiento, luego multiplicar por cantidad
     const costoConMargenPorPieza = costoPorPieza * (1 + margenSeguridad / 100);
     const costoTotal = costoConMargenPorPieza * pieza.cantidad;
     const nuevo: Proceso = {
@@ -1070,8 +996,8 @@ function ProcesosExternosPieza({
       costoTotal: costoTotal,
       descripcion: `$${costoPorPieza.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
       incluyeManoObra: false,
-      costoTotalIngresado: costoPorPieza,
-      margenPorcentaje: margenSeguridad,
+      costoTotalIngresado: costoPorPieza, // Guardamos el costo por pieza base
+      margenPorcentaje: margenSeguridad, // Guardamos el margen aplicado
     };
     onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevo] });
     setNombreExterno('');
@@ -1112,12 +1038,12 @@ function ProcesosExternosPieza({
           ))}
         </div>
       )}
-      <div className="flex flex-wrap gap-2 items-end">
+      <div className="flex gap-2 items-end">
         <Input
           value={nombreExterno}
           onChange={(e) => setNombreExterno(e.target.value)}
           placeholder="Nombre del proceso externo"
-          className="flex-1 min-w-[150px] h-8 text-xs"
+          className="flex-1 h-8 text-xs"
         />
         <div className="flex flex-col">
           <label className="text-xs text-slate-500 mb-0.5">Costo por pieza</label>
