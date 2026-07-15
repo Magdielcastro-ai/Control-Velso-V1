@@ -269,7 +269,8 @@ function PiezaCard({
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     })[0];
 
-    const costoTotalMaterial = parseFloat(precioUnitario);
+    const costoPorPieza = parseFloat(precioUnitario);
+    const costoTotalMaterial = costoPorPieza * pieza.cantidad;
     const nombreFinal = nombreMaterial.trim() || tipoSeleccionado;
 
     onAsignarMaterial(pieza.id, {
@@ -277,7 +278,7 @@ function PiezaCard({
       tipo: tipoSeleccionado,
       forma: formaSeleccionada,
       cantidad: pieza.cantidad,
-      costoUnitario: costoTotalMaterial / pieza.cantidad,
+      costoUnitario: costoPorPieza,
       unidadMedida: unidadMedida,
       unidad: unidadCosto,
       margenPorcentaje: margen,
@@ -292,7 +293,7 @@ function PiezaCard({
         tipo: tipoSeleccionado,
         forma: formaSeleccionada,
         unidadMedida: unidadMedida,
-        costoUnitario: costoTotalMaterial / pieza.cantidad,
+        costoUnitario: costoPorPieza,
         unidadCosto: unidadCosto,
         ...dimsNumericas,
       } as Omit<CatalogoMaterial, 'id'>).then(() => {
@@ -456,14 +457,14 @@ function PiezaCard({
                           <span className="font-medium">Cantidad:</span> {pieza.cantidad} {pieza.cantidad === 1 ? 'pieza' : 'piezas'}
                         </p>
                         <p className="text-xs text-slate-600">
-                          <span className="font-medium">Costo total del material:</span> ${pieza.material!.costoTotal.toFixed(2)}
+                          <span className="font-medium">Costo del material por pieza:</span> ${pieza.material!.costoUnitario.toFixed(2)}
                         </p>
                         <p className="text-xs text-slate-600">
-                          <span className="font-medium">Costo del material por pieza (sin margen):</span> ${(pieza.material!.costoTotal / pieza.cantidad).toFixed(2)}
+                          <span className="font-medium">Costo total del material ({pieza.cantidad} piezas):</span> ${pieza.material!.costoTotal.toFixed(2)}
                         </p>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-blue-700">
-                            <span className="font-medium">Costo del material por pieza (con {pieza.material!.margenPorcentaje || 30}% margen):</span> ${((pieza.material!.costoTotal / pieza.cantidad) * (1 + (pieza.material!.margenPorcentaje || 30) / 100)).toFixed(2)}
+                            <span className="font-medium">Costo del material por pieza (con {pieza.material!.margenPorcentaje || 30}% margen):</span> ${(pieza.material!.costoUnitario * (1 + (pieza.material!.margenPorcentaje || 30) / 100)).toFixed(2)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 pt-1">
@@ -631,7 +632,7 @@ function PiezaCard({
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Costo Total del Material
+                            Costo del Material por Pieza
                           </label>
                           <div className="relative">
                             <Input
@@ -676,12 +677,12 @@ function PiezaCard({
                         </div>
 
                         <div className="bg-blue-50 rounded-lg p-3 text-center">
-                          <p className="text-xs text-blue-600 font-medium">Costo Total Material</p>
+                          <p className="text-xs text-blue-600 font-medium">Costo por Pieza</p>
                           <p className="text-xl font-bold text-blue-800">
                             ${(parseFloat(precioUnitario) || 0).toFixed(2)}
                           </p>
                           <p className="text-xs text-blue-500 mt-1">
-                            ${((parseFloat(precioUnitario) || 0) / pieza.cantidad).toFixed(2)} por pieza
+                            ${((parseFloat(precioUnitario) || 0) * pieza.cantidad).toFixed(2)} total ({pieza.cantidad} piezas)
                           </p>
                         </div>
                       </div>
@@ -739,7 +740,7 @@ function PiezaCard({
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Material por pieza (con {pieza.material?.margenPorcentaje || 30}% margen):</span>
                     <span className="font-medium">
-                      ${pieza.material ? ((pieza.material.costoTotal / pieza.cantidad) * (1 + (pieza.material.margenPorcentaje || 30) / 100)).toFixed(2) : '0.00'}
+                      ${pieza.material ? (pieza.material.costoUnitario * (1 + (pieza.material.margenPorcentaje || 30) / 100)).toFixed(2) : '0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
