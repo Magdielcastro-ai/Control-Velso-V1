@@ -591,6 +591,17 @@ export const useCotizacionStore = () => {
                 material = p.materiales[0];
               }
               
+              // Migrar datos antiguos de material: antes costoUnitario = costoTotal / cantidad
+              // Ahora costoUnitario es el precio por pieza y costoTotal = unitario * cantidad
+              if (material && (material.costoUnitario === undefined || material.costoUnitario === null || material.costoUnitario === 0)) {
+                if (material.costoTotal > 0 && p.cantidad > 0) {
+                  material = {
+                    ...material,
+                    costoUnitario: material.costoTotal / p.cantidad,
+                  };
+                }
+              }
+              
               // Asegurar que cada proceso tenga tiempoMinutosPorPieza
               const procesos = (p.procesos || []).map((proc: any) => {
                 if (proc.tiempoMinutosPorPieza === undefined && proc.tiempoMinutos !== undefined) {
