@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -81,6 +81,17 @@ export function PiezasStep({
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');
   const [nuevaPiezaCantidad, setNuevaPiezaCantidad] = useState(1);
   const [piezaExpandida, setPiezaExpandida] = useState<string>(piezas[0]?.id || '');
+
+  // Expandir automáticamente la última pieza cuando se agrega una nueva
+  useEffect(() => {
+    if (piezas.length > 0) {
+      const ultimaPieza = piezas[piezas.length - 1];
+      // Solo expandir si la última pieza no tiene material (es nueva)
+      if (!ultimaPieza.material && ultimaPieza.procesos.length === 0) {
+        setPiezaExpandida(ultimaPieza.id);
+      }
+    }
+  }, [piezas.length]);
 
   const handleAgregarPieza = () => {
     if (!nuevaPiezaNombre.trim()) {
@@ -182,6 +193,21 @@ function PiezaCard({
   const [nombreMaterial, setNombreMaterial] = useState('');
   const [guardarEnCatalogo, setGuardarEnCatalogo] = useState(false);
   const [unidadCosto, setUnidadCosto] = useState<'kg' | 'pieza' | 'metro'>('kg');
+
+  // Resetear estado interno cuando cambia la pieza (nueva pieza agregada)
+  useEffect(() => {
+    setEditandoMaterial(false);
+    setFormaSeleccionada('redondo');
+    setTipoSeleccionado('');
+    setDimensiones({});
+    setPrecioUnitario('');
+    setPrecioBase(0);
+    setMargen(0);
+    setUnidadMedida('mm');
+    setNombreMaterial('');
+    setGuardarEnCatalogo(false);
+    setUnidadCosto('kg');
+  }, [pieza.id]);
 
   const tieneMaterial = !!pieza.material;
 
