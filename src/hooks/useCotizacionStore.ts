@@ -678,7 +678,9 @@ export const useCotizacionStore = () => {
           margenUtilidad: data.margen_utilidad || 30,
         };
 
-        setCotizacion(cotizacionCargada);
+        // Recalcular totales para asegurar que subtotalPieza, utilidadPieza, totalPieza sean correctos
+        const cotizacionRecalculada = recalcularTotales(cotizacionCargada);
+        setCotizacion(cotizacionRecalculada);
         return true;
       }
     } catch (err) {
