@@ -248,8 +248,23 @@ export interface PiezaCotizacion {
   totalPieza: number;
 }
 
-export interface Cotizacion {
+export interface PiezaCatalogo {
   id: string;
+  codigo: string;
+  nombre: string;
+  cantidad: number;
+  material: Material | null;
+  procesos: Proceso[];
+  costosAdicionales: CostosAdicionales;
+  subtotalPieza: number;
+  utilidadPieza: number;
+  ivaPieza: number;
+  totalPieza: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Cotizacion {  id: string;
   numero: string;
   fecha: string;
   tipo: TipoCotizacion;

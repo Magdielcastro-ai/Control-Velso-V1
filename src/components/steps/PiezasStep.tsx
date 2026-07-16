@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check, RotateCcw, Circle, Square, LayoutGrid, Hexagon, Octagon, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PiezaCotizacion, Material, CatalogoMaterial, Proceso } from '@/types/cotizacion';
+import type { PiezaCotizacion, Material, CatalogoMaterial, Proceso, PiezaCatalogo } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 
 interface PiezasStepProps {
@@ -18,6 +18,9 @@ interface PiezasStepProps {
   onEliminarMaterial: (piezaId: string) => void;
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
+  // Catálogo de piezas
+  onBuscarPiezaPorCodigo?: (codigo: string) => Promise<PiezaCatalogo | null>;
+  onGuardarPiezaEnCatalogo?: (pieza: PiezaCotizacion, codigo: string) => Promise<boolean>;
 }
 
 const FORMAS = [
@@ -77,6 +80,8 @@ export function PiezasStep({
   onEliminarMaterial,
   onAgregarMaterialACatalogo,
   onRecargarCatalogo,
+  onBuscarPiezaPorCodigo,
+  onGuardarPiezaEnCatalogo,
 }: PiezasStepProps) {
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');
   const [nuevaPiezaCantidad, setNuevaPiezaCantidad] = useState(1);
@@ -123,6 +128,8 @@ export function PiezasStep({
             onEliminarMaterial={onEliminarMaterial}
             onAgregarMaterialACatalogo={onAgregarMaterialACatalogo}
             onRecargarCatalogo={onRecargarCatalogo}
+            onBuscarPiezaPorCodigo={onBuscarPiezaPorCodigo}
+            onGuardarPiezaEnCatalogo={onGuardarPiezaEnCatalogo}
           />
         ))}
       </div>
@@ -168,6 +175,8 @@ function PiezaCard({
   onEliminarMaterial,
   onAgregarMaterialACatalogo,
   onRecargarCatalogo,
+  onBuscarPiezaPorCodigo,
+  onGuardarPiezaEnCatalogo,
 }: {
   pieza: PiezaCotizacion;
   index?: number;
@@ -180,6 +189,8 @@ function PiezaCard({
   onEliminarMaterial: (piezaId: string) => void;
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
+  onBuscarPiezaPorCodigo?: (codigo: string) => Promise<PiezaCatalogo | null>;
+  onGuardarPiezaEnCatalogo?: (pieza: PiezaCotizacion, codigo: string) => Promise<boolean>;
 }) {
   const [editandoMaterial, setEditandoMaterial] = useState(false);
 
@@ -193,6 +204,10 @@ function PiezaCard({
   const [nombreMaterial, setNombreMaterial] = useState('');
   const [guardarEnCatalogo, setGuardarEnCatalogo] = useState(false);
   const [unidadCosto, setUnidadCosto] = useState<'kg' | 'pieza' | 'metro'>('kg');
+  
+  // Código de pieza para catálogo
+  const [codigoPieza, setCodigoPieza] = useState('');
+  const [buscandoPieza, setBuscandoPieza] = useState(false);
 
   // Resetear estado interno cuando cambia la pieza (nueva pieza agregada)
   useEffect(() => {
@@ -207,6 +222,8 @@ function PiezaCard({
     setNombreMaterial('');
     setGuardarEnCatalogo(false);
     setUnidadCosto('kg');
+    setCodigoPieza('');
+    setBuscandoPieza(false);
   }, [pieza.id]);
 
   const tieneMaterial = !!pieza.material;
@@ -215,6 +232,44 @@ function PiezaCard({
     .filter(m => m.forma === formaSeleccionada)
     .map(m => m.tipo)
     .filter((v, i, a) => a.indexOf(v) === i);
+
+  const handleBuscarPiezaPorCodigo = async () => {
+    if (!codigoPieza.trim() || !onBuscarPiezaPorCodigo) return;
+    setBuscandoPieza(true);
+    try {
+      const piezaEncontrada = await onBuscarPiezaPorCodigo(codigoPieza.trim());
+      if (piezaEncontrada) {
+        // Cargar datos de la pieza encontrada
+        onActualizar(pieza.id, {
+          nombre: piezaEncontrada.nombre,
+          cantidad: piezaEncontrada.cantidad,
+          material: piezaEncontrada.material,
+          procesos: piezaEncontrada.procesos,
+          costosAdicionales: piezaEncontrada.costosAdicionales,
+          subtotalPieza: piezaEncontrada.subtotalPieza,
+          utilidadPieza: piezaEncontrada.utilidadPieza,
+          ivaPieza: piezaEncontrada.ivaPieza,
+          totalPieza: piezaEncontrada.totalPieza,
+        });
+        toast.success(`Pieza ${codigoPieza} cargada del catálogo`);
+      } else {
+        toast.info(`No se encontró pieza con código ${codigoPieza}`);
+      }
+    } catch (err) {
+      toast.error('Error buscando pieza');
+    } finally {
+      setBuscandoPieza(false);
+    }
+  };
+
+  const handleGuardarPieza = async () => {
+    if (!onGuardarPiezaEnCatalogo) return;
+    if (!codigoPieza.trim()) {
+      toast.error('Ingresa un código para guardar la pieza');
+      return;
+    }
+    await onGuardarPiezaEnCatalogo(pieza, codigoPieza.trim());
+  };
 
   const handleFormaChange = (forma: FormaId) => {
     setFormaSeleccionada(forma);
@@ -408,6 +463,7 @@ function PiezaCard({
                   value={pieza.nombre}
                   onChange={(e) => onActualizar(pieza.id, { nombre: e.target.value })}
                   className="h-8 text-sm font-medium flex-1"
+                  placeholder="Nombre de la pieza..."
                 />
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-slate-500">Cant:</span>
@@ -418,6 +474,42 @@ function PiezaCard({
                     onChange={(e) => onActualizar(pieza.id, { cantidad: parseInt(e.target.value) || 1 })}
                     className="h-8 w-16 text-sm"
                   />
+                </div>
+              </div>
+              {/* Input de código de pieza */}
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-1 flex-1">
+                  <span className="text-xs text-slate-500">Código:</span>
+                  <Input
+                    type="text"
+                    value={codigoPieza}
+                    onChange={(e) => setCodigoPieza(e.target.value)}
+                    placeholder="Ej: PZA-001"
+                    className="h-7 text-xs flex-1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleBuscarPiezaPorCodigo()}
+                  />
+                  {onBuscarPiezaPorCodigo && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={handleBuscarPiezaPorCodigo}
+                      disabled={buscandoPieza || !codigoPieza.trim()}
+                    >
+                      {buscandoPieza ? '...' : 'Buscar'}
+                    </Button>
+                  )}
+                  {onGuardarPiezaEnCatalogo && pieza.totalPieza > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2 text-green-600 border-green-300 hover:bg-green-50"
+                      onClick={handleGuardarPieza}
+                      disabled={!codigoPieza.trim()}
+                    >
+                      Guardar
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-1">

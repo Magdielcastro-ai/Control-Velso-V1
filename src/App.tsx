@@ -33,6 +33,7 @@ import { useTalleresStore } from '@/hooks/useTalleresStore';
 import { useAuth, type AuthUser } from '@/hooks/useAuth';
 import { usePendientesStore } from '@/hooks/usePendientesStore';
 import { useCobranzaStore } from '@/hooks/useCobranzaStore';
+import { usePiezasCatalogoStore } from '@/hooks/usePiezasCatalogoStore';
 
 // Componentes de pasos
 import { TallerStep } from '@/components/steps/TallerStep';
@@ -258,6 +259,7 @@ function App() {
   } = useCotizacionStore();
 
   const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
+  const { buscarPiezaPorCodigo, guardarPiezaEnCatalogo } = usePiezasCatalogoStore();
 
   const { 
     clientes, 
@@ -1074,6 +1076,8 @@ function App() {
                       return nuevo;
                     }}
                     onRecargarCatalogo={recargarCatalogo}
+                    onBuscarPiezaPorCodigo={buscarPiezaPorCodigo}
+                    onGuardarPiezaEnCatalogo={guardarPiezaEnCatalogo}
                   />
                 )}
 
