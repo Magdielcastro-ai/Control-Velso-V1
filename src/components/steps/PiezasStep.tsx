@@ -839,10 +839,23 @@ function ProcesosPieza({
     });
   };
 
-  const actualizarProceso = (procesoId: string, campo: string, valor: any) => {
+  const actualizarTiempoPorPieza = (procesoId: string, nuevoTiempoPorPieza: number) => {
     const procs = pieza.procesos.map((p: Proceso) => {
       if (p.id !== procesoId) return p;
-      return { ...p, [campo]: valor };
+      // Recalcular tiempo total y costos basado en el nuevo tiempo por pieza
+      const tiempoMinutosPorPieza = nuevoTiempoPorPieza;
+      const tiempoMinutos = tiempoMinutosPorPieza * pieza.cantidad;
+      const tiempoHoras = tiempoMinutos / 60;
+      const costoMaquina = tiempoHoras * p.costoPorHora;
+      const costoManoObra = tiempoHoras * (p.costoManoObraPorHora || 0);
+      const costoTotal = costoMaquina + costoManoObra;
+      return {
+        ...p,
+        tiempoMinutosPorPieza,
+        tiempoMinutos,
+        costoManoObra,
+        costoTotal,
+      };
     });
     onActualizar(pieza.id, { procesos: procs });
   };
@@ -861,11 +874,11 @@ function ProcesosPieza({
                   <span className="text-sm flex-1">{proc.nombre}</span>
                   <Input
                     type="number"
-                    value={proc.tiempoMinutos}
-                    onChange={(e) => actualizarProceso(proc.id, 'tiempoMinutos', parseFloat(e.target.value) || 0)}
+                    value={proc.tiempoMinutosPorPieza}
+                    onChange={(e) => actualizarTiempoPorPieza(proc.id, parseFloat(e.target.value) || 0)}
                     className="w-20 h-7 text-xs"
                   />
-                  <span className="text-xs">min</span>
+                  <span className="text-xs">min/pieza</span>
                   <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditandoProceso(null)}>
                     <Check className="w-3 h-3" />
                   </Button>
