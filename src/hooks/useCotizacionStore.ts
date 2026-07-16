@@ -606,6 +606,11 @@ export const useCotizacionStore = () => {
                 ...p,
                 material,
                 procesos,
+                // Asegurar campos nuevos con valores por defecto
+                subtotalPieza: p.subtotalPieza || 0,
+                utilidadPieza: p.utilidadPieza || 0,
+                ivaPieza: p.ivaPieza || 0,
+                totalPieza: p.totalPieza || 0,
               };
             });
           } catch (e) {
