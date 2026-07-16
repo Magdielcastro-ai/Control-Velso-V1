@@ -243,6 +243,7 @@ export interface PiezaCotizacion {
   procesos: Proceso[];
   costosAdicionales: CostosAdicionales;
   subtotalPieza: number;
+  utilidadPieza: number;
   ivaPieza: number;
   totalPieza: number;
 }

@@ -760,6 +760,10 @@ function PiezaCard({
                       <span className="text-slate-700 font-medium">Subtotal por pieza:</span>
                       <span className="font-semibold">${pieza.subtotalPieza.toFixed(2)}</span>
                     </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-green-600 font-medium">Utilidad (30%):</span>
+                      <span className="font-semibold text-green-700">${pieza.utilidadPieza.toFixed(2)}</span>
+                    </div>
                     <div className="flex justify-between text-base mt-2 pt-2 border-t border-slate-300">
                       <span className="font-bold text-slate-900">TOTAL POR PIEZA:</span>
                       <span className="font-bold text-blue-700">${pieza.totalPieza.toFixed(2)}</span>

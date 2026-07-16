@@ -41,6 +41,7 @@ const piezaVacia = (): PiezaCotizacion => ({
     otro: 0,
   },
   subtotalPieza: 0,
+  utilidadPieza: 0,
   ivaPieza: 0,
   totalPieza: 0,
 });
@@ -363,10 +364,10 @@ export const useCotizacionStore = () => {
         };
       });
 
-      // Material: costoTotal es el costo total ingresado por el usuario para TODAS las piezas
-      // Se divide por la cantidad de piezas para obtener el costo unitario por pieza
-      // El margen del material se aplica como markup: costo * (1 + margen%)
-      const costoMaterialBase = pieza.material ? pieza.material.costoTotal / pieza.cantidad : 0;
+      // Material: costoUnitario es el costo POR PIEZA ingresado por el usuario
+      // costoTotal es costoUnitario * cantidad (calculado en PiezasStep)
+      // El margen del material se aplica como markup: costoUnitario * (1 + margen%)
+      const costoMaterialBase = pieza.material ? pieza.material.costoUnitario : 0;
       const margenMaterial = pieza.material ? (pieza.material.margenPorcentaje || 30) : 30;
       const costoMateriales = costoMaterialBase * (1 + margenMaterial / 100);
       // Procesos: costoTotal es para TODAS las piezas, dividir por cantidad para obtener por pieza
@@ -378,13 +379,17 @@ export const useCotizacionStore = () => {
       // El subtotal es la suma directa de los costos con sus márgenes aplicados
       // NO se aplica margen adicional aquí - los márgenes ya están en material y procesos externos
       const subtotalPieza = costoDirectoPieza;
-      const ivaPieza = subtotalPieza * (c.ivaPorcentaje / 100);
-      const totalPieza = subtotalPieza + ivaPieza;
+      // La utilidad del 30% se calcula: subtotal / 0.7 = total con utilidad
+      // Utilidad = total - subtotal
+      const totalPieza = subtotalPieza / 0.7;
+      const utilidadPieza = totalPieza - subtotalPieza;
+      const ivaPieza = totalPieza * (c.ivaPorcentaje / 100);
 
       return {
         ...pieza,
         procesos: procesosRecalculados,
         subtotalPieza,
+        utilidadPieza,
         ivaPieza,
         totalPieza,
       };
@@ -623,6 +628,7 @@ export const useCotizacionStore = () => {
               otro: 0,
             },
             subtotalPieza: 0,
+            utilidadPieza: 0,
             ivaPieza: 0,
             totalPieza: 0,
           }];
