@@ -711,6 +711,45 @@ export const useCotizacionStore = () => {
     setCotizacion(cotizacionVacia(tipo));
   }, []);
 
+  // ========== CLONAR / CREAR VARIANTE ==========
+
+  const clonarCotizacion = useCallback((cotizacionOrigen: Cotizacion): Cotizacion => {
+    const nuevaId = crypto.randomUUID();
+    const nuevoNumero = generarNumeroCotizacion();
+    const nuevaFecha = new Date().toISOString().split('T')[0];
+
+    // Clonar piezas con nuevos IDs para evitar conflictos
+    const piezasClonadas: PiezaCotizacion[] = cotizacionOrigen.piezas.map(pieza => ({
+      ...pieza,
+      id: crypto.randomUUID(),
+      material: pieza.material ? {
+        ...pieza.material,
+        id: crypto.randomUUID(),
+      } : null,
+      procesos: pieza.procesos.map(proceso => ({
+        ...proceso,
+        id: crypto.randomUUID(),
+      })),
+    }));
+
+    const cotizacionClonada: Cotizacion = {
+      ...cotizacionOrigen,
+      id: nuevaId,
+      numero: nuevoNumero,
+      fecha: nuevaFecha,
+      piezas: piezasClonadas,
+      // Resetear estado a borrador
+      subtotal: 0,
+      iva: 0,
+      total: 0,
+    };
+
+    // Recalcular totales
+    const recalculada = recalcularTotales(cotizacionClonada);
+    setCotizacion(recalculada);
+    return recalculada;
+  }, []);
+
   return {
     cotizacion,
     cotizacionesGuardadas,
@@ -740,6 +779,7 @@ export const useCotizacionStore = () => {
     cargarCotizacion,
     eliminarCotizacionGuardada,
     nuevaCotizacion,
+    clonarCotizacion,
     refrescarDesdeSupabase,
   };
 };

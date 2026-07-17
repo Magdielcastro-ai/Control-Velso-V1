@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowLeft, FileText, Calendar, Building2, Search, CheckCircle, Clock, Trash2, FolderKanban, Eye, User } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Calendar, Building2, Search, CheckCircle, Clock, Trash2, FolderKanban, Eye, User, GitBranch } from 'lucide-react';
 import { useSupabaseCotizaciones } from '@/hooks/useSupabaseCotizaciones';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ interface CotizacionesViewProps {
   userRol?: string;
   onCargarCotizacion: (id: string) => void;
   onConvertirAVenta?: (cotizacion: any, ordenCompra: string) => void;
+  onCrearVariante?: (id: string) => void;
 }
 
 interface Vendedor {
@@ -29,11 +30,12 @@ const estadosConfig: Record<string, { label: string; color: string; icon: any }>
   rechazada: { label: 'Rechazada', color: 'bg-red-500', icon: Trash2 },
 };
 
-export function CotizacionesView({ 
-  onVolver, 
+export function CotizacionesView({
+  onVolver,
   userRol = 'vendedor',
   onCargarCotizacion,
-  onConvertirAVenta
+  onConvertirAVenta,
+  onCrearVariante
 }: CotizacionesViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
@@ -347,7 +349,19 @@ export function CotizacionesView({
                           <Eye className="w-4 h-4 mr-1" />
                           Ver
                         </Button>
-                        
+
+                        {onCrearVariante && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onCrearVariante(cot.id)}
+                            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                          >
+                            <GitBranch className="w-4 h-4 mr-1" />
+                            Variante
+                          </Button>
+                        )}
+
                         {!comprada && cot.estado !== 'rechazada' && onConvertirAVenta && (
                           <Dialog open={dialogoConvertir && cotizacionSeleccionada?.id === cot.id} 
                                  onOpenChange={(open) => {

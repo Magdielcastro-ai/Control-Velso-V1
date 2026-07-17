@@ -268,7 +268,11 @@ function PiezaCard({
       toast.error('Ingresa un código para guardar la pieza');
       return;
     }
-    await onGuardarPiezaEnCatalogo(pieza, codigoPieza.trim());
+    const exito = await onGuardarPiezaEnCatalogo(pieza, codigoPieza.trim());
+    if (exito) {
+      // Actualizar el código en la pieza de la cotización
+      onActualizar(pieza.id, { codigo: codigoPieza.trim() });
+    }
   };
 
   const handleFormaChange = (forma: FormaId) => {

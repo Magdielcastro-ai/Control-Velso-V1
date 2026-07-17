@@ -323,6 +323,15 @@ export function useAuth() {
     return user?.rol === 'admin' || user?.rol === 'superadmin';
   }, [user]);
 
+  const canViewPiezasCatalogo = useCallback(() => {
+    if (!user) return false;
+    return user.rol !== 'produccion';
+  }, [user]);
+
+  const canManagePiezasCatalogo = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
   return {
     user,
     loading,
@@ -356,5 +365,7 @@ export function useAuth() {
     canManageProcesos,
     canViewProcesos,
     canDeleteProyectos,
+    canViewPiezasCatalogo,
+    canManagePiezasCatalogo,
   };
 }

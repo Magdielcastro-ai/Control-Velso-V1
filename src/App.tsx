@@ -25,7 +25,7 @@ import {
 
 // Hooks
 import { useCotizacionStore } from '@/hooks/useCotizacionStore';
-import type { PiezaCotizacion } from '@/types/cotizacion';
+import type { PiezaCotizacion, Cotizacion } from '@/types/cotizacion';
 import { useCatalogoMateriales } from '@/hooks/useCatalogoMateriales';
 import { useClientesStore } from '@/hooks/useClientesStore';
 import { useProyectosStore } from '@/hooks/useProyectosStore';
@@ -34,6 +34,7 @@ import { useAuth, type AuthUser } from '@/hooks/useAuth';
 import { usePendientesStore } from '@/hooks/usePendientesStore';
 import { useCobranzaStore } from '@/hooks/useCobranzaStore';
 import { usePiezasCatalogoStore } from '@/hooks/usePiezasCatalogoStore';
+import { supabase } from '@/lib/supabase';
 
 // Componentes de pasos
 import { TallerStep } from '@/components/steps/TallerStep';
@@ -68,6 +69,9 @@ import { PendientesView } from '@/components/PendientesView';
 import { CobranzaView } from '@/components/CobranzaView';
 import { DashboardEjecutivo } from '@/components/DashboardEjecutivo';
 
+// VISTA CATÁLOGO DE PIEZAS
+import { CatalogoPiezasView } from '@/components/CatalogoPiezasView';
+
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 import type { ProyectoVenta } from '@/types/ventas';
@@ -82,10 +86,10 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
   { id: 'resumen', label: 'Resumen', icon: CheckCircle },
 ];
 
-type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' | 
-                      'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' | 
+type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' |
+                      'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion';
+                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion' | 'piezas-catalogo';
 
 // Horas disponibles por defecto
 const HORAS_DEFAULT: Record<string, number> = {
@@ -196,6 +200,8 @@ function App() {
     canManageProcesos,
     canViewProcesos,
     canDeleteProyectos,
+    canViewPiezasCatalogo,
+    canManagePiezasCatalogo,
   } = useAuth();
 
   // NUEVOS STORES VELSO OS v2
@@ -255,11 +261,12 @@ function App() {
     guardarCotizacion,
     cargarCotizacion,
     nuevaCotizacion,
+    clonarCotizacion,
     refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
 
   const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
-  const { buscarPiezaPorCodigo, guardarPiezaEnCatalogo } = usePiezasCatalogoStore();
+  const { piezasCatalogo, buscarPiezaPorCodigo, guardarPiezaEnCatalogo } = usePiezasCatalogoStore();
 
   const { 
     clientes, 
@@ -380,6 +387,14 @@ function App() {
       setVistaActual('procesos');
     } else {
       toast.error('No tienes permiso para ver procesos');
+    }
+  };
+
+  const irAPiezasCatalogo = () => {
+    if (canViewPiezasCatalogo()) {
+      setVistaActual('piezas-catalogo');
+    } else {
+      toast.error('No tienes permiso para ver el catálogo de piezas');
     }
   };
 
@@ -568,6 +583,98 @@ function App() {
     toast.success('Nueva cotización iniciada');
   };
 
+  // Crear variante de cotización existente
+  const handleCrearVariante = async (id: string) => {
+    if (!canCreateCotizacion()) {
+      toast.error('No tienes permiso para crear cotizaciones');
+      return;
+    }
+
+    try {
+      // Cargar la cotización original desde Supabase
+      const { data, error } = await supabase
+        .from('cotizaciones')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        toast.error('No se pudo cargar la cotización original');
+        return;
+      }
+
+      // Construir objeto Cotizacion desde los datos de Supabase
+      let piezas: PiezaCotizacion[] = [];
+      if (data.piezas) {
+        try {
+          piezas = typeof data.piezas === 'string' ? JSON.parse(data.piezas) : data.piezas;
+          piezas = piezas.filter((p: any) => p !== null && p !== undefined).map((p: any) => {
+            let material = p.material || null;
+            if (!material && p.materiales && Array.isArray(p.materiales) && p.materiales.length > 0) {
+              material = p.materiales[0];
+            }
+            return {
+              ...p,
+              material,
+              subtotalPieza: p.subtotalPieza || 0,
+              utilidadPieza: p.utilidadPieza || 0,
+              ivaPieza: p.ivaPieza || 0,
+              totalPieza: p.totalPieza || 0,
+            };
+          });
+        } catch (e) {
+          console.warn('Error parseando piezas:', e);
+        }
+      }
+
+      const cotizacionOrigen: Cotizacion = {
+        id: data.id,
+        numero: data.numero,
+        fecha: data.fecha || new Date().toISOString().split('T')[0],
+        tipo: data.tipo || 'pieza_unica',
+        datosTaller: data.datos_taller || { nombre: '', direccion: '', telefono: '', email: '' },
+        datosCliente: data.datos_cliente || { nombre: '', empresa: '', direccion: '', telefono: '', email: '' },
+        proyecto: data.proyecto || { nombre: data.proyecto_nombre || '', descripcion: '', cantidad: 1 },
+        piezas: piezas.length > 0 ? piezas : [{
+          id: crypto.randomUUID(),
+          nombre: data.proyecto_nombre || 'Pieza',
+          cantidad: 1,
+          material: null,
+          procesos: data.procesos || [],
+          costosAdicionales: { disenoCAD: 0, programacionCNC: 0, setup: 0, transporte: 0, otro: 0 },
+          subtotalPieza: 0,
+          utilidadPieza: 0,
+          ivaPieza: 0,
+          totalPieza: 0,
+        }],
+        materiales: data.materiales || [],
+        procesos: data.procesos || [],
+        costosAdicionales: data.costos_adicionales || { disenoCAD: 0, programacionCNC: 0, setup: 0, transporte: 0, otro: 0 },
+        condiciones: data.condiciones || {
+          validezDias: 15,
+          tiempoEntregaDias: 7,
+          formaPago: '50% anticipo, 50% contra entrega',
+          anticipoPorcentaje: 50,
+          garantia: '30 días contra defectos de fabricación',
+        },
+        subtotal: data.subtotal || 0,
+        ivaPorcentaje: data.iva_porcentaje || 16,
+        iva: (data.subtotal || 0) * (data.iva_porcentaje || 16) / 100,
+        total: data.total || 0,
+        margenUtilidad: data.margen_utilidad || 30,
+      };
+
+      // Clonar y navegar a edición
+      clonarCotizacion(cotizacionOrigen);
+      setPasoActual('taller');
+      setVistaActual('cotizacion');
+      toast.success('Variante creada. Puedes modificarla y guardarla.');
+    } catch (err) {
+      console.error('Error creando variante:', err);
+      toast.error('Error al crear la variante');
+    }
+  };
+
   // Verificar si el paso actual está completo
   const pasoCompleto = () => {
     switch (pasoActual) {
@@ -649,6 +756,7 @@ function App() {
               onCobranza={irACobranza}
               onDashboardEjecutivo={irADashboardEjecutivo}
               onProduccion={irAProduccion}
+              onPiezasCatalogo={irAPiezasCatalogo}
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
               cobranzaVencidaCount={getVencidos().length}
@@ -882,8 +990,8 @@ function App() {
       case 'procesos':
         return (
           <>
-            <UserHeader 
-              user={user} 
+            <UserHeader
+              user={user}
               onLogout={handleLogout}
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
@@ -892,6 +1000,26 @@ function App() {
               onVolver={irAHome}
               horasDisponibles={horasDisponibles}
               onActualizarHoras={canManageProcesos() ? actualizarHorasDisponibles : undefined}
+            />
+          </>
+        );
+
+      case 'piezas-catalogo':
+        return (
+          <>
+            <UserHeader
+              user={user}
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <CatalogoPiezasView
+              onVolver={irAHome}
+              piezas={piezasCatalogo}
+              onEliminar={canManagePiezasCatalogo() ? (_id) => {
+                // TODO: implementar eliminación en usePiezasCatalogoStore
+                toast.info('Eliminación de piezas desde catálogo próximamente');
+              } : undefined}
             />
           </>
         );
@@ -910,6 +1038,7 @@ function App() {
               userRol={user.rol}
               onCargarCotizacion={handleCargarCotizacion}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
+              onCrearVariante={canCreateCotizacion() ? handleCrearVariante : undefined}
             />
           </>
         );
@@ -1132,9 +1261,16 @@ function App() {
 
       case 'cotizacion-final':
         return (
-          <CotizacionFinalStep 
+          <CotizacionFinalStep
             cotizacion={cotizacion}
             onNuevaCotizacion={handleNuevaCotizacion}
+            onCrearVariante={canCreateCotizacion() ? () => {
+              // Crear variante a partir de la cotización actual en memoria
+              clonarCotizacion(cotizacion);
+              setPasoActual('taller');
+              setVistaActual('cotizacion');
+              toast.success('Variante creada. Puedes modificarla y guardarla.');
+            } : undefined}
           />
         );
 
