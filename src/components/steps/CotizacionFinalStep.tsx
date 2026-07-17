@@ -13,17 +13,15 @@ import {
   Phone,
   Mail,
   MapPin,
-  GitBranch,
 } from 'lucide-react';
 import type { Cotizacion } from '@/types/cotizacion';
 
 interface CotizacionFinalStepProps {
   cotizacion: Cotizacion;
   onNuevaCotizacion: () => void;
-  onCrearVariante?: () => void;
 }
 
-export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion, onCrearVariante }: CotizacionFinalStepProps) {
+export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: CotizacionFinalStepProps) {
   const cotizacionRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
@@ -58,12 +56,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion, onCrearVari
           <Download className="w-4 h-4 mr-2" />
           Guardar PDF
         </Button>
-        {onCrearVariante && (
-          <Button onClick={onCrearVariante} variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50">
-            <GitBranch className="w-4 h-4 mr-2" />
-            Crear Variante
-          </Button>
-        )}
         <Button onClick={onNuevaCotizacion} className="bg-blue-600 hover:bg-blue-700">
           <Share2 className="w-4 h-4 mr-2" />
           Nueva Cotización
