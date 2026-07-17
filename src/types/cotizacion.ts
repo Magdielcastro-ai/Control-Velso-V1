@@ -237,6 +237,7 @@ export interface CondicionesComerciales {
 // PIEZA CON MATERIAL UNICO (NO ARRAY)
 export interface PiezaCotizacion {
   id: string;
+  codigo?: string;  // Código del catálogo de piezas
   nombre: string;
   cantidad: number;
   material: Material | null;  // ← UN SOLO MATERIAL POR PIEZA

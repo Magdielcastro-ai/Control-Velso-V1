@@ -222,7 +222,8 @@ function PiezaCard({
     setNombreMaterial('');
     setGuardarEnCatalogo(false);
     setUnidadCosto('kg');
-    setCodigoPieza('');
+    // Cargar código si la pieza ya tiene uno
+    setCodigoPieza(pieza.codigo || '');
     setBuscandoPieza(false);
   }, [pieza.id]);
 
@@ -239,10 +240,9 @@ function PiezaCard({
     try {
       const piezaEncontrada = await onBuscarPiezaPorCodigo(codigoPieza.trim());
       if (piezaEncontrada) {
-        // Cargar datos de la pieza encontrada
+        // Cargar SOLO material y procesos del catálogo, mantener nombre y cantidad actuales
         onActualizar(pieza.id, {
-          nombre: piezaEncontrada.nombre,
-          cantidad: piezaEncontrada.cantidad,
+          codigo: piezaEncontrada.codigo,
           material: piezaEncontrada.material,
           procesos: piezaEncontrada.procesos,
           costosAdicionales: piezaEncontrada.costosAdicionales,
@@ -459,6 +459,12 @@ function PiezaCard({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
+                {/* Mostrar código si existe */}
+                {pieza.codigo && (
+                  <span className="text-xs font-mono bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                    {pieza.codigo}
+                  </span>
+                )}
                 <Input
                   value={pieza.nombre}
                   onChange={(e) => onActualizar(pieza.id, { nombre: e.target.value })}
@@ -476,7 +482,7 @@ function PiezaCard({
                   />
                 </div>
               </div>
-              {/* Input de código de pieza */}
+              {/* Input de código de pieza - siempre visible */}
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex items-center gap-1 flex-1">
                   <span className="text-xs text-slate-500">Código:</span>
