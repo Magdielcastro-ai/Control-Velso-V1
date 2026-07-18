@@ -864,6 +864,53 @@ function PiezaCard({
                 <h4 className="text-sm font-semibold text-slate-900 mb-3 uppercase tracking-wide">
                   Resumen de Costos por Pieza
                 </h4>
+                {/* Tabla de resumen tipo catálogo */}
+                <div className="overflow-x-auto mb-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-300 text-slate-600">
+                        <th className="text-left py-2 px-2 font-medium">Código</th>
+                        <th className="text-left py-2 px-2 font-medium">Nombre</th>
+                        <th className="text-center py-2 px-2 font-medium">Cant.</th>
+                        <th className="text-left py-2 px-2 font-medium">Material</th>
+                        <th className="text-left py-2 px-2 font-medium">Procesos</th>
+                        <th className="text-right py-2 px-2 font-medium">Subtotal</th>
+                        <th className="text-right py-2 px-2 font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-slate-200">
+                        <td className="py-2 px-2">
+                          {pieza.codigo ? (
+                            <span className="font-mono text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                              {pieza.codigo}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 font-medium text-slate-900">{pieza.nombre}</td>
+                        <td className="py-2 px-2 text-center">{pieza.cantidad}</td>
+                        <td className="py-2 px-2 text-slate-600">
+                          {pieza.material ? (
+                            <span>{pieza.material.nombre} ({pieza.material.tipo})</span>
+                          ) : (
+                            <span className="text-slate-400">Sin material</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-slate-600">
+                          {pieza.procesos.length > 0 ? (
+                            <span>{pieza.procesos.length} procesos</span>
+                          ) : (
+                            <span className="text-slate-400">Sin procesos</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-right font-medium">${pieza.subtotalPieza.toFixed(2)}</td>
+                        <td className="py-2 px-2 text-right font-bold text-blue-700">${pieza.totalPieza.toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Material por pieza (con {pieza.material?.margenPorcentaje || 30}% margen):</span>

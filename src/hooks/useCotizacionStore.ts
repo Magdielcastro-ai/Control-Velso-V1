@@ -29,6 +29,7 @@ const generarNumeroCotizacion = () => {
 
 const piezaVacia = (): PiezaCotizacion => ({
   id: crypto.randomUUID(),
+  codigo: undefined,
   nombre: 'Pieza 1',
   cantidad: 1,
   material: null,  // ← MATERIAL UNICO
@@ -615,6 +616,7 @@ export const useCotizacionStore = () => {
               
               return {
                 ...p,
+                codigo: p.codigo || undefined,
                 material,
                 procesos,
                 // Asegurar campos nuevos con valores por defecto
