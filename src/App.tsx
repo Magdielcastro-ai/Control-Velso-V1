@@ -264,7 +264,7 @@ function App() {
   } = useCotizacionStore();
 
   const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
-  const { piezasCatalogo, buscarPiezaPorCodigo, guardarPiezaEnCatalogo } = usePiezasCatalogoStore();
+  const { piezasCatalogo, cargando: cargandoPiezasCatalogo, buscarPiezaPorCodigo, guardarPiezaEnCatalogo } = usePiezasCatalogoStore();
 
   const { 
     clientes, 
@@ -1110,6 +1110,8 @@ function App() {
                       return nuevo;
                     }}
                     onRecargarCatalogo={recargarCatalogo}
+                    piezasCatalogo={piezasCatalogo}
+                    cargandoPiezasCatalogo={cargandoPiezasCatalogo}
                     onBuscarPiezaPorCodigo={buscarPiezaPorCodigo}
                     onGuardarPiezaEnCatalogo={guardarPiezaEnCatalogo}
                   />

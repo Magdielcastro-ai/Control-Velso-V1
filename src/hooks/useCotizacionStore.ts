@@ -634,6 +634,7 @@ export const useCotizacionStore = () => {
         if (piezas.length === 0 && (data.materiales?.length > 0 || data.procesos?.length > 0)) {
           piezas = [{
             id: crypto.randomUUID(),
+            codigo: undefined,
             nombre: data.proyecto_nombre || 'Pieza',
             cantidad: 1,
             material: null,

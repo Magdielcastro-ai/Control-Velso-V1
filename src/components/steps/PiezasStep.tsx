@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check, RotateCcw, Circle, Square, LayoutGrid, Hexagon, Octagon, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, Package, Settings, ExternalLink, ChevronDown, ChevronUp, Pencil, RefreshCw, Check, RotateCcw, Circle, Square, LayoutGrid, Hexagon, Octagon, HelpCircle, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PiezaCotizacion, Material, CatalogoMaterial, Proceso, PiezaCatalogo } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
+import { BuscarPiezaModal } from '@/components/BuscarPiezaModal';
 
 interface PiezasStepProps {
   piezas: PiezaCotizacion[];
@@ -19,6 +20,8 @@ interface PiezasStepProps {
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
   // Catálogo de piezas
+  piezasCatalogo?: PiezaCatalogo[];
+  cargandoPiezasCatalogo?: boolean;
   onBuscarPiezaPorCodigo?: (codigo: string) => Promise<PiezaCatalogo | null>;
   onGuardarPiezaEnCatalogo?: (pieza: PiezaCotizacion, codigo: string) => Promise<boolean>;
 }
@@ -80,12 +83,16 @@ export function PiezasStep({
   onEliminarMaterial,
   onAgregarMaterialACatalogo,
   onRecargarCatalogo,
+  piezasCatalogo = [],
+  cargandoPiezasCatalogo = false,
   onBuscarPiezaPorCodigo,
   onGuardarPiezaEnCatalogo,
 }: PiezasStepProps) {
   const [nuevaPiezaNombre, setNuevaPiezaNombre] = useState('');
   const [nuevaPiezaCantidad, setNuevaPiezaCantidad] = useState(1);
   const [piezaExpandida, setPiezaExpandida] = useState<string>(piezas[0]?.id || '');
+  const [modalBuscarOpen, setModalBuscarOpen] = useState(false);
+  const [piezaIdParaBuscar, setPiezaIdParaBuscar] = useState<string | null>(null);
 
   // Expandir automáticamente la última pieza cuando se agrega una nueva
   useEffect(() => {
@@ -108,6 +115,27 @@ export function PiezasStep({
     setNuevaPiezaCantidad(1);
   };
 
+  const handleAbrirModalBuscar = (piezaId: string) => {
+    setPiezaIdParaBuscar(piezaId);
+    setModalBuscarOpen(true);
+  };
+
+  const handleSeleccionarPiezaCatalogo = (piezaCatalogo: PiezaCatalogo) => {
+    if (!piezaIdParaBuscar) return;
+    onActualizarPieza(piezaIdParaBuscar, {
+      codigo: piezaCatalogo.codigo,
+      material: piezaCatalogo.material,
+      procesos: piezaCatalogo.procesos,
+      costosAdicionales: piezaCatalogo.costosAdicionales,
+      subtotalPieza: piezaCatalogo.subtotalPieza,
+      utilidadPieza: piezaCatalogo.utilidadPieza,
+      ivaPieza: piezaCatalogo.ivaPieza,
+      totalPieza: piezaCatalogo.totalPieza,
+    });
+    toast.success(`Pieza ${piezaCatalogo.codigo} cargada del catálogo`);
+    setPiezaIdParaBuscar(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -128,6 +156,7 @@ export function PiezasStep({
             onEliminarMaterial={onEliminarMaterial}
             onAgregarMaterialACatalogo={onAgregarMaterialACatalogo}
             onRecargarCatalogo={onRecargarCatalogo}
+            onAbrirModalBuscar={handleAbrirModalBuscar}
             onBuscarPiezaPorCodigo={onBuscarPiezaPorCodigo}
             onGuardarPiezaEnCatalogo={onGuardarPiezaEnCatalogo}
           />
@@ -159,6 +188,14 @@ export function PiezasStep({
           <strong>{piezas.length}</strong> {piezas.length === 1 ? 'pieza' : 'piezas'} en total
         </p>
       </div>
+
+      <BuscarPiezaModal
+        open={modalBuscarOpen}
+        onOpenChange={setModalBuscarOpen}
+        piezas={piezasCatalogo}
+        onSeleccionar={handleSeleccionarPiezaCatalogo}
+        cargando={cargandoPiezasCatalogo}
+      />
     </div>
   );
 }
@@ -175,6 +212,7 @@ function PiezaCard({
   onEliminarMaterial,
   onAgregarMaterialACatalogo,
   onRecargarCatalogo,
+  onAbrirModalBuscar,
   onBuscarPiezaPorCodigo,
   onGuardarPiezaEnCatalogo,
 }: {
@@ -189,6 +227,7 @@ function PiezaCard({
   onEliminarMaterial: (piezaId: string) => void;
   onAgregarMaterialACatalogo?: (material: Omit<CatalogoMaterial, 'id'>) => Promise<CatalogoMaterial | null>;
   onRecargarCatalogo?: () => void;
+  onAbrirModalBuscar?: (piezaId: string) => void;
   onBuscarPiezaPorCodigo?: (codigo: string) => Promise<PiezaCatalogo | null>;
   onGuardarPiezaEnCatalogo?: (pieza: PiezaCotizacion, codigo: string) => Promise<boolean>;
 }) {
@@ -501,6 +540,17 @@ function PiezaCard({
                         className="h-7 text-xs flex-1"
                         onKeyDown={(e) => e.key === 'Enter' && handleBuscarPiezaPorCodigo()}
                       />
+                      {onAbrirModalBuscar && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => onAbrirModalBuscar(pieza.id)}
+                        >
+                          <Search className="w-3 h-3 mr-1" />
+                          Buscar
+                        </Button>
+                      )}
                       {onBuscarPiezaPorCodigo && (
                         <Button
                           variant="outline"
@@ -509,7 +559,7 @@ function PiezaCard({
                           onClick={handleBuscarPiezaPorCodigo}
                           disabled={buscandoPieza || !codigoPieza.trim()}
                         >
-                          {buscandoPieza ? '...' : 'Buscar'}
+                          {buscandoPieza ? '...' : 'Cargar'}
                         </Button>
                       )}
                       {onGuardarPiezaEnCatalogo && pieza.totalPieza > 0 && (
