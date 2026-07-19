@@ -462,66 +462,71 @@ function PiezaCard({
               <Package className="w-4 h-4 text-blue-600" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                {/* Mostrar código si existe */}
-                {pieza.codigo && (
-                  <span className="text-xs font-mono bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                    {pieza.codigo}
-                  </span>
-                )}
-                <Input
-                  value={pieza.nombre}
-                  onChange={(e) => onActualizar(pieza.id, { nombre: e.target.value })}
-                  className="h-8 text-sm font-medium flex-1"
-                  placeholder="Nombre de la pieza..."
-                />
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-slate-500">Cant:</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={pieza.cantidad}
-                    onChange={(e) => onActualizar(pieza.id, { cantidad: parseInt(e.target.value) || 1 })}
-                    className="h-8 w-16 text-sm"
-                  />
-                </div>
-              </div>
-              {/* Input de código de pieza - siempre visible */}
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex items-center gap-1 flex-1">
-                  <span className="text-xs text-slate-500">Código:</span>
-                  <Input
-                    type="text"
-                    value={codigoPieza}
-                    onChange={(e) => setCodigoPieza(e.target.value)}
-                    placeholder="Ej: PZA-001"
-                    className="h-7 text-xs flex-1"
-                    onKeyDown={(e) => e.key === 'Enter' && handleBuscarPiezaPorCodigo()}
-                  />
-                  {onBuscarPiezaPorCodigo && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs px-2"
-                      onClick={handleBuscarPiezaPorCodigo}
-                      disabled={buscandoPieza || !codigoPieza.trim()}
-                    >
-                      {buscandoPieza ? '...' : 'Buscar'}
-                    </Button>
-                  )}
-                  {onGuardarPiezaEnCatalogo && pieza.totalPieza > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs px-2 text-green-600 border-green-300 hover:bg-green-50"
-                      onClick={handleGuardarPieza}
-                      disabled={!codigoPieza.trim()}
-                    >
-                      Guardar
-                    </Button>
-                  )}
-                </div>
-              </div>
+              {expandida ? (
+                <>
+                  {/* Inputs solo cuando está expandida */}
+                  <div className="flex items-center gap-2">
+                    {/* Mostrar código si existe */}
+                    {pieza.codigo && (
+                      <span className="text-xs font-mono bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                        {pieza.codigo}
+                      </span>
+                    )}
+                    <Input
+                      value={pieza.nombre}
+                      onChange={(e) => onActualizar(pieza.id, { nombre: e.target.value })}
+                      className="h-8 text-sm font-medium flex-1"
+                      placeholder="Nombre de la pieza..."
+                    />
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-500">Cant:</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={pieza.cantidad}
+                        onChange={(e) => onActualizar(pieza.id, { cantidad: parseInt(e.target.value) || 1 })}
+                        className="h-8 w-16 text-sm"
+                      />
+                    </div>
+                  </div>
+                  {/* Input de código de pieza */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-1 flex-1">
+                      <span className="text-xs text-slate-500">Código:</span>
+                      <Input
+                        type="text"
+                        value={codigoPieza}
+                        onChange={(e) => setCodigoPieza(e.target.value)}
+                        placeholder="Ej: PZA-001"
+                        className="h-7 text-xs flex-1"
+                        onKeyDown={(e) => e.key === 'Enter' && handleBuscarPiezaPorCodigo()}
+                      />
+                      {onBuscarPiezaPorCodigo && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={handleBuscarPiezaPorCodigo}
+                          disabled={buscandoPieza || !codigoPieza.trim()}
+                        >
+                          {buscandoPieza ? '...' : 'Buscar'}
+                        </Button>
+                      )}
+                      {onGuardarPiezaEnCatalogo && pieza.totalPieza > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2 text-green-600 border-green-300 hover:bg-green-50"
+                          onClick={handleGuardarPieza}
+                          disabled={!codigoPieza.trim()}
+                        >
+                          Guardar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
               {/* Resumen tipo catálogo - siempre visible */}
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full text-xs">
