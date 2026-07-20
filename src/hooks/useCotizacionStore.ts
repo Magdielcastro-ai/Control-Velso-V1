@@ -8,6 +8,7 @@ import type {
   Material,
   Proceso,
   CostosAdicionales,
+  CostosAdicionalesProyecto,
   CondicionesComerciales,
   CotizacionGuardada,
   TipoProcesoVelso,
@@ -307,7 +308,7 @@ export const useCotizacionStore = () => {
 
   // ========== COSTOS ADICIONALES POR PIEZA ==========
 
-  const actualizarCostosAdicionalesPieza = useCallback((piezaId: string, datos: Partial<CostosAdicionales>) => {
+  const actualizarCostosAdicionalesPieza = useCallback((piezaId: string, datos: Partial<CostosAdicionalesProyecto>) => {
     setCotizacion(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
@@ -378,7 +379,9 @@ export const useCotizacionStore = () => {
       // Procesos: costoTotal es para TODAS las piezas, dividir por cantidad para obtener por pieza
       const costoProcesosTotal = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
       const costoProcesos = costoProcesosTotal / pieza.cantidad;
-      const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0) / pieza.cantidad;
+      const costosAdicionalesPieza = Object.values(pieza.costosAdicionales)
+          .filter((item: any) => !item.incluidoGratis)
+          .reduce((sum: number, item: any) => sum + (item.costo || 0), 0) / pieza.cantidad;
 
       const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
       // Usar margen específico de la pieza si existe, sino usar el margen global
@@ -402,7 +405,9 @@ export const useCotizacionStore = () => {
       };
     });
 
-    const costosGenerales = Object.values(c.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
+    const costosGenerales = Object.values(c.costosAdicionales)
+      .filter((item: any) => !item.incluidoGratis)
+      .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
     const subtotal = piezasRecalculadas.reduce((sum, p) => sum + p.subtotalPieza, 0) + costosGenerales;
     const iva = subtotal * (c.ivaPorcentaje / 100);
     const total = subtotal + iva;
@@ -646,11 +651,9 @@ export const useCotizacionStore = () => {
             material: null,
             procesos: data.procesos || [],
             costosAdicionales: data.costos_adicionales || {
-              disenoCAD: 0,
-              programacionCNC: 0,
-              setup: 0,
-              transporte: 0,
-              otro: 0,
+              envio: { costo: 0, incluidoGratis: false },
+              diseno: { costo: 0, incluidoGratis: false },
+              estudioMaterial: { costo: 0, incluidoGratis: false },
             },
             subtotalPieza: 0,
             utilidadPieza: 0,

@@ -34,7 +34,9 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
   const costoMateriales = cotizacion.piezas.reduce((sum, pieza) => 
     sum + (pieza.material ? pieza.material.costoTotal : 0), 0
   );
-  const costosAdicionales = Object.values(cotizacion.costosAdicionales).reduce((sum, v) => sum + v, 0);
+  const costosAdicionales = Object.values(cotizacion.costosAdicionales)
+    .filter((item: any) => !item.incluidoGratis)
+    .reduce((sum, item: any) => sum + (item.costo || 0), 0);
   const costoDirecto = costoMateriales + costoProcesos + costosAdicionales;
 
   return (
@@ -267,34 +269,40 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
                 Costos Adicionales
               </h3>
               <div className="space-y-1">
-                {cotizacion.costosAdicionales.disenoCAD > 0 && (
+                {!cotizacion.costosAdicionales.envio.incluidoGratis && cotizacion.costosAdicionales.envio.costo > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Envío/Entrega</span>
+                    <span>${cotizacion.costosAdicionales.envio.costo.toFixed(2)}</span>
+                  </div>
+                )}
+                {cotizacion.costosAdicionales.envio.incluidoGratis && (
+                  <div className="flex justify-between text-sm">
+                    <span>Envío/Entrega</span>
+                    <span className="text-green-600">Incluido gratis</span>
+                  </div>
+                )}
+                {!cotizacion.costosAdicionales.diseno.incluidoGratis && cotizacion.costosAdicionales.diseno.costo > 0 && (
                   <div className="flex justify-between text-sm">
                     <span>Diseño CAD/CAM</span>
-                    <span>${cotizacion.costosAdicionales.disenoCAD.toFixed(2)}</span>
+                    <span>${cotizacion.costosAdicionales.diseno.costo.toFixed(2)}</span>
                   </div>
                 )}
-                {cotizacion.costosAdicionales.programacionCNC > 0 && (
+                {cotizacion.costosAdicionales.diseno.incluidoGratis && (
                   <div className="flex justify-between text-sm">
-                    <span>Programación CNC</span>
-                    <span>${cotizacion.costosAdicionales.programacionCNC.toFixed(2)}</span>
+                    <span>Diseño CAD/CAM</span>
+                    <span className="text-green-600">Incluido gratis</span>
                   </div>
                 )}
-                {cotizacion.costosAdicionales.setup > 0 && (
+                {!cotizacion.costosAdicionales.estudioMaterial.incluidoGratis && cotizacion.costosAdicionales.estudioMaterial.costo > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span>Setup y Preparación</span>
-                    <span>${cotizacion.costosAdicionales.setup.toFixed(2)}</span>
+                    <span>Estudio de Material y Prueba de Dureza</span>
+                    <span>${cotizacion.costosAdicionales.estudioMaterial.costo.toFixed(2)}</span>
                   </div>
                 )}
-                {cotizacion.costosAdicionales.transporte > 0 && (
+                {cotizacion.costosAdicionales.estudioMaterial.incluidoGratis && (
                   <div className="flex justify-between text-sm">
-                    <span>Transporte/Envío</span>
-                    <span>${cotizacion.costosAdicionales.transporte.toFixed(2)}</span>
-                  </div>
-                )}
-                {cotizacion.costosAdicionales.otro > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Otros Costos</span>
-                    <span>${cotizacion.costosAdicionales.otro.toFixed(2)}</span>
+                    <span>Estudio de Material y Prueba de Dureza</span>
+                    <span className="text-green-600">Incluido gratis</span>
                   </div>
                 )}
               </div>
