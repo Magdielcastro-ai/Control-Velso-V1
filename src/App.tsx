@@ -25,7 +25,7 @@ import {
 
 // Hooks
 import { useCotizacionStore } from '@/hooks/useCotizacionStore';
-import type { PiezaCotizacion } from '@/types/cotizacion';
+import type { PiezaCotizacion, CostosAdicionalesProyecto } from '@/types/cotizacion';
 import { useCatalogoMateriales } from '@/hooks/useCatalogoMateriales';
 import { useClientesStore } from '@/hooks/useClientesStore';
 import { useProyectosStore } from '@/hooks/useProyectosStore';
@@ -1119,13 +1119,9 @@ function App() {
 
                 {pasoActual === 'costos' && (
                   <CostosStep
-                    piezas={cotizacion.piezas}
-                    costosGenerales={cotizacion.costosAdicionales}
+                    costosAdicionales={cotizacion.costosAdicionales as CostosAdicionalesProyecto}
                     margenUtilidad={cotizacion.margenUtilidad}
-                    onChangeCostosPieza={(piezaId, datos) => {
-                      console.log('Costos por pieza:', piezaId, datos);
-                    }}
-                    onChangeCostosGenerales={actualizarCostosAdicionales}
+                    onChangeCostosAdicionales={actualizarCostosAdicionales}
                     onChangeMargen={actualizarMargenUtilidad}
                   />
                 )}

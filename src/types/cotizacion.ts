@@ -225,6 +225,18 @@ export interface CostosAdicionales {
   otro: number;
 }
 
+// NUEVO: Costos adicionales a nivel de PROYECTO (pestaña Costos)
+export interface CostoAdicionalItem {
+  costo: number;
+  incluidoGratis: boolean;
+}
+
+export interface CostosAdicionalesProyecto {
+  envio: CostoAdicionalItem;
+  diseno: CostoAdicionalItem;
+  estudioMaterial: CostoAdicionalItem;
+}
+
 export interface CondicionesComerciales {
   validezDias: number;
   tiempoEntregaDias: number;
@@ -242,11 +254,13 @@ export interface PiezaCotizacion {
   cantidad: number;
   material: Material | null;  // ← UN SOLO MATERIAL POR PIEZA
   procesos: Proceso[];
-  costosAdicionales: CostosAdicionales;
+  costosAdicionales: CostosAdicionalesProyecto;
   subtotalPieza: number;
   utilidadPieza: number;
   ivaPieza: number;
   totalPieza: number;
+  // Campos para costos por pieza en la pestaña Costos
+  margenPieza?: number;        // Margen de utilidad específico por pieza (sobrescribe el global)
 }
 
 export interface PiezaCatalogo {
@@ -256,7 +270,7 @@ export interface PiezaCatalogo {
   cantidad: number;
   material: Material | null;
   procesos: Proceso[];
-  costosAdicionales: CostosAdicionales;
+  costosAdicionales: CostosAdicionalesProyecto;
   subtotalPieza: number;
   utilidadPieza: number;
   ivaPieza: number;
@@ -275,7 +289,7 @@ export interface Cotizacion {  id: string;
   piezas: PiezaCotizacion[];
   materiales: Material[];  // Legacy - mantenido para compatibilidad
   procesos: Proceso[];     // Legacy
-  costosAdicionales: CostosAdicionales;
+  costosAdicionales: CostosAdicionalesProyecto;
   condiciones: CondicionesComerciales;
   subtotal: number;
   ivaPorcentaje: number;

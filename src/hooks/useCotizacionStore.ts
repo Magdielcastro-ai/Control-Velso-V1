@@ -35,12 +35,10 @@ const piezaVacia = (): PiezaCotizacion => ({
   material: null,  // ← MATERIAL UNICO
   procesos: [],
   costosAdicionales: {
-    disenoCAD: 0,
-    programacionCNC: 0,
-    setup: 0,
-    transporte: 0,
-    otro: 0,
-  },
+    envio: { costo: 0, incluidoGratis: false },
+    diseno: { costo: 0, incluidoGratis: false },
+    estudioMaterial: { costo: 0, incluidoGratis: false },
+  } as CostosAdicionalesProyecto,
   subtotalPieza: 0,
   utilidadPieza: 0,
   ivaPieza: 0,
@@ -74,12 +72,10 @@ const cotizacionVacia = (tipo: TipoCotizacion = 'proyecto'): Cotizacion => ({
   materiales: [],
   procesos: [],
   costosAdicionales: {
-    disenoCAD: 0,
-    programacionCNC: 0,
-    setup: 0,
-    transporte: 0,
-    otro: 0,
-  },
+    envio: { costo: 0, incluidoGratis: false },
+    diseno: { costo: 0, incluidoGratis: false },
+    estudioMaterial: { costo: 0, incluidoGratis: false },
+  } as CostosAdicionalesProyecto,
   condiciones: {
     validezDias: 15,
     tiempoEntregaDias: 7,
@@ -323,17 +319,25 @@ export const useCotizacionStore = () => {
 
   // ========== COSTOS ADICIONALES GENERALES ==========
 
-  const actualizarCostosAdicionales = useCallback((datos: Partial<CostosAdicionales>) => {
+  const actualizarCostosAdicionales = useCallback((datos: Partial<CostosAdicionalesProyecto>) => {
     setCotizacion(prev => {
       const nueva = {
         ...prev,
-        costosAdicionales: { ...prev.costosAdicionales, ...datos },
+        costosAdicionales: { ...prev.costosAdicionales, ...datos } as CostosAdicionalesProyecto,
       };
       return recalcularTotales(nueva);
     });
   }, []);
 
-  // ========== CALCULOS ==========
+  const actualizarMargenPieza = useCallback((piezaId: string, margen: number) => {
+    setCotizacion(prev => {
+      const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
+        if (p.id !== piezaId) return p;
+        return { ...p, margenPieza: margen };
+      });
+      return recalcularTotales({ ...prev, piezas: nuevasPiezas });
+    });
+  }, []);
 
   const recalcularTotales = (c: Cotizacion): Cotizacion => {
     const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
@@ -377,12 +381,14 @@ export const useCotizacionStore = () => {
       const costosAdicionalesPieza = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0) / pieza.cantidad;
 
       const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
+      // Usar margen específico de la pieza si existe, sino usar el margen global
+      const margenAplicar = pieza.margenPieza !== undefined ? pieza.margenPieza : c.margenUtilidad;
+      const factorMargen = 1 - (margenAplicar / 100);
       // El subtotal es la suma directa de los costos con sus márgenes aplicados
-      // NO se aplica margen adicional aquí - los márgenes ya están en material y procesos externos
       const subtotalPieza = costoDirectoPieza;
-      // La utilidad del 30% se calcula: subtotal / 0.7 = total con utilidad
+      // La utilidad se calcula: subtotal / (1 - margen%) = total con utilidad
       // Utilidad = total - subtotal
-      const totalPieza = subtotalPieza / 0.7;
+      const totalPieza = factorMargen > 0 ? subtotalPieza / factorMargen : subtotalPieza;
       const utilidadPieza = totalPieza - subtotalPieza;
       const ivaPieza = totalPieza * (c.ivaPorcentaje / 100);
 
@@ -770,6 +776,7 @@ export const useCotizacionStore = () => {
     eliminarProcesoDePieza,
     // Costos por pieza
     actualizarCostosAdicionalesPieza,
+    actualizarMargenPieza,
     // Generales
     actualizarDatosTaller,
     actualizarDatosCliente,
