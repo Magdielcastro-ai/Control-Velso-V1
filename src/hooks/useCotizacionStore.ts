@@ -26,7 +26,55 @@ const generarNumeroCotizacion = () => {
   return `CNC-${anio}${mes}-${random}`;
 };
 
-// Funciones de cálculo ahora integradas en recalcularTotales y agregarProcesoAPieza
+// Función helper para migrar costos adicionales del formato viejo al nuevo
+const migrarCostosAdicionales = (costos: any): CostosAdicionalesProyecto => {
+  if (!costos) {
+    return {
+      envio: { costo: 0, incluidoGratis: false },
+      diseno: { costo: 0, incluidoGratis: false },
+      estudioMaterial: { costo: 0, incluidoGratis: false },
+    };
+  }
+
+  // Detectar formato viejo: propiedades son números planos
+  // Formato viejo: { disenoCAD, programacionCNC, setup, transporte, otro }
+  // Formato nuevo: { envio: {costo, incluidoGratis}, diseno: {costo, incluidoGratis}, estudioMaterial: {costo, incluidoGratis} }
+  const isFormatoViejo = typeof costos.disenoCAD === 'number' || 
+                         typeof costos.programacionCNC === 'number' ||
+                         typeof costos.setup === 'number' ||
+                         typeof costos.transporte === 'number' ||
+                         typeof costos.otro === 'number';
+
+  if (isFormatoViejo) {
+    return {
+      envio: { 
+        costo: (costos.transporte || 0) + (costos.otro || 0), 
+        incluidoGratis: false 
+      },
+      diseno: { 
+        costo: (costos.disenoCAD || 0) + (costos.programacionCNC || 0) + (costos.setup || 0), 
+        incluidoGratis: false 
+      },
+      estudioMaterial: { costo: 0, incluidoGratis: false },
+    };
+  }
+
+  // Formato nuevo o mixto: asegurar que cada propiedad tenga la estructura correcta
+  return {
+    envio: {
+      costo: typeof costos.envio === 'object' ? (costos.envio.costo || 0) : (typeof costos.envio === 'number' ? costos.envio : 0),
+      incluidoGratis: typeof costos.envio === 'object' ? (costos.envio.incluidoGratis || false) : false,
+    },
+    diseno: {
+      costo: typeof costos.diseno === 'object' ? (costos.diseno.costo || 0) : (typeof costos.diseno === 'number' ? costos.diseno : 0),
+      incluidoGratis: typeof costos.diseno === 'object' ? (costos.diseno.incluidoGratis || false) : false,
+    },
+    estudioMaterial: {
+      costo: typeof costos.estudioMaterial === 'object' ? (costos.estudioMaterial.costo || 0) : (typeof costos.estudioMaterial === 'number' ? costos.estudioMaterial : 0),
+      incluidoGratis: typeof costos.estudioMaterial === 'object' ? (costos.estudioMaterial.incluidoGratis || false) : false,
+    },
+  };
+};
 
 const piezaVacia = (): PiezaCotizacion => ({
   id: crypto.randomUUID(),
@@ -630,6 +678,8 @@ export const useCotizacionStore = () => {
                 codigo: p.codigo || undefined,
                 material,
                 procesos,
+                // Migrar costos adicionales del formato viejo al nuevo
+                costosAdicionales: migrarCostosAdicionales(p.costosAdicionales),
                 // Asegurar campos nuevos con valores por defecto
                 subtotalPieza: p.subtotalPieza || 0,
                 utilidadPieza: p.utilidadPieza || 0,
@@ -681,7 +731,7 @@ export const useCotizacionStore = () => {
           piezas,
           materiales: data.materiales || [],
           procesos: data.procesos || [],
-          costosAdicionales: data.costos_adicionales || cotizacionVacia().costosAdicionales,
+          costosAdicionales: migrarCostosAdicionales(data.costos_adicionales) || cotizacionVacia().costosAdicionales,
           condiciones: data.condiciones || cotizacionVacia().condiciones,
           subtotal: data.subtotal || 0,
           ivaPorcentaje: data.iva_porcentaje || 16,
