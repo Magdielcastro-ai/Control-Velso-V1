@@ -579,16 +579,14 @@ function PiezaCard({
               ) : (
                 /* Resumen tipo catálogo - solo cuando está plegada */
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs table-fixed">
                     <thead>
                       <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-1 px-1 text-left font-medium">Código</th>
+                        <th className="py-1 px-1 text-left font-medium w-[100px]">Código</th>
                         <th className="py-1 px-1 text-left font-medium">Nombre</th>
-                        <th className="py-1 px-1 text-center font-medium">Cant.</th>
-                        <th className="py-1 px-1 text-left font-medium">Material</th>
-                        <th className="py-1 px-1 text-center font-medium">Proc.</th>
-                        <th className="py-1 px-1 text-right font-medium">Subtotal</th>
-                        <th className="py-1 px-1 text-right font-medium">Total</th>
+                        <th className="py-1 px-1 text-center font-medium w-[60px]">Cant.</th>
+                        <th className="py-1 px-1 text-right font-medium w-[100px]">Total por pieza</th>
+                        <th className="py-1 px-1 text-right font-medium w-[100px]">Total de piezas</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -604,19 +602,11 @@ function PiezaCard({
                         </td>
                         <td className="py-1 px-1 font-medium text-slate-700">{pieza.nombre}</td>
                         <td className="py-1 px-1 text-center text-slate-600">{pieza.cantidad}</td>
-                        <td className="py-1 px-1 text-slate-600">
-                          {pieza.material ? (
-                            <span>{pieza.material.nombre || pieza.material.tipo}</span>
-                          ) : (
-                            <span className="text-slate-300">Sin material</span>
-                          )}
-                        </td>
-                        <td className="py-1 px-1 text-center text-slate-600">{pieza.procesos.length}</td>
                         <td className="py-1 px-1 text-right font-medium text-slate-700">
-                          ${pieza.subtotalPieza.toFixed(2)}
+                          ${pieza.totalPieza.toFixed(2)}
                         </td>
                         <td className="py-1 px-1 text-right font-bold text-blue-700">
-                          ${pieza.totalPieza.toFixed(2)}
+                          ${(pieza.totalPieza * pieza.cantidad).toFixed(2)}
                         </td>
                       </tr>
                     </tbody>
