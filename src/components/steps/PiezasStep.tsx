@@ -616,7 +616,7 @@ function PiezaCard({
                           ${pieza.subtotalPieza.toFixed(2)}
                         </td>
                         <td className="py-1 px-1 text-right font-bold text-blue-700">
-                          ${(pieza.totalPieza * pieza.cantidad).toFixed(2)}
+                          ${pieza.totalPieza.toFixed(2)}
                         </td>
                       </tr>
                     </tbody>
