@@ -256,7 +256,6 @@ function App() {
     eliminarMaterialDePieza,
     actualizarCostosAdicionales,
     actualizarCondiciones,
-    actualizarMargenUtilidad,
     guardarCotizacion,
     cargarCotizacion,
     nuevaCotizacion,
@@ -1118,9 +1117,7 @@ function App() {
                 {pasoActual === 'costos' && (
                   <CostosStep
                     costosAdicionales={cotizacion.costosAdicionales as CostosAdicionalesProyecto}
-                    margenUtilidad={cotizacion.margenUtilidad}
                     onChangeCostosAdicionales={actualizarCostosAdicionales}
-                    onChangeMargen={actualizarMargenUtilidad}
                   />
                 )}
                 {pasoActual === 'condiciones' && (

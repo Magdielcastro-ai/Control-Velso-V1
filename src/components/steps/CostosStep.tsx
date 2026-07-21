@@ -6,9 +6,7 @@ import type { CostosAdicionalesProyecto } from '@/types/cotizacion';
 
 interface CostosStepProps {
   costosAdicionales: CostosAdicionalesProyecto;
-  margenUtilidad: number;
   onChangeCostosAdicionales: (datos: Partial<CostosAdicionalesProyecto>) => void;
-  onChangeMargen: (margen: number) => void;
 }
 
 const ITEMS_CONFIG = [
@@ -19,11 +17,8 @@ const ITEMS_CONFIG = [
 
 export function CostosStep({
   costosAdicionales,
-  margenUtilidad,
   onChangeCostosAdicionales,
-  onChangeMargen,
 }: CostosStepProps) {
-  // Normalizar costos adicionales para asegurar que tengan el formato correcto
   // Normalizar costos adicionales para asegurar que tengan el formato correcto
   const normalizedCostos = {
     envio: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.envio),
@@ -39,22 +34,6 @@ export function CostosStep({
 
   return (
     <div className="space-y-6">
-      {/* Margen de utilidad */}
-      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <label className="block text-sm font-medium text-blue-900 mb-2">
-          Margen de Utilidad (%)
-        </label>
-        <Input
-          type="number"
-          min={0}
-          max={100}
-          value={margenUtilidad}
-          onChange={(e) => onChangeMargen(parseFloat(e.target.value) || 0)}
-          className="w-32 bg-white"
-        />
-        <p className="text-xs text-blue-600 mt-1">Actual: {margenUtilidad}%</p>
-      </div>
-
       {/* Costos adicionales del proyecto */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-slate-900">Valores Agregados del Proyecto</h3>
