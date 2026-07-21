@@ -11,12 +11,22 @@ import type { Cliente, UsuarioCliente } from '@/types/ventas';
 interface ClienteStepProps {
   datos: DatosCliente;
   onChange: (datos: Partial<DatosCliente>) => void;
+  onChangeCondiciones?: (condiciones: Partial<{ formaPago: string; anticipoPorcentaje: number }>) => void;
   clientesGuardados: Cliente[];
   onGuardarCliente?: (datos: DatosCliente) => Promise<Cliente | null>;
   onIrAClientes?: () => void;
 }
 
-export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarCliente, onIrAClientes }: ClienteStepProps) {
+export function ClienteStep({ datos, onChange, onChangeCondiciones, clientesGuardados, onGuardarCliente, onIrAClientes }: ClienteStepProps) {
+  // Helper para calcular anticipo basado en términos de pago
+  const calcularAnticipo = (terminos: string): number => {
+    if (terminos.includes('Net 15') || terminos.includes('Net 30') || 
+        terminos.includes('Net 45') || terminos.includes('Net 60') || 
+        terminos.includes('Net 90')) return 0;
+    if (terminos.includes('50% anticipo')) return 50;
+    return 50; // default
+  };
+
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string | undefined>(undefined);
   const [contactoSeleccionado, setContactoSeleccionado] = useState<string | undefined>(undefined);
   const [contactosDisponibles, setContactosDisponibles] = useState<UsuarioCliente[]>([]);
@@ -124,6 +134,14 @@ export function ClienteStep({ datos, onChange, clientesGuardados, onGuardarClien
             email: '',
             rfc: cliente.rfc || '',
             clienteId: cliente.id,
+          });
+        }
+        
+        // Actualizar términos de pago en condiciones
+        if (onChangeCondiciones && cliente.terminosPago) {
+          onChangeCondiciones({
+            formaPago: cliente.terminosPago,
+            anticipoPorcentaje: calcularAnticipo(cliente.terminosPago),
           });
         }
       }

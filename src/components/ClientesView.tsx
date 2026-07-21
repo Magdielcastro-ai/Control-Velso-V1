@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   ArrowLeft, 
   Plus, 
@@ -230,11 +231,23 @@ export function ClientesView({
                 </div>
                 <div className="space-y-2">
                   <Label>Términos de Pago</Label>
-                  <Input
-                    value={nuevoCliente.terminosPago}
-                    onChange={(e) => setNuevoCliente(prev => ({ ...prev, terminosPago: e.target.value }))}
-                    placeholder="Ej: 50% anticipo, 50% contra entrega"
-                  />
+                  <Select 
+                    value={nuevoCliente.terminosPago} 
+                    onValueChange={(value) => setNuevoCliente(prev => ({ ...prev, terminosPago: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar términos de pago..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="50% anticipo, 50% contra entrega">50% anticipo, 50% contra entrega</SelectItem>
+                      <SelectItem value="Net 15">Net 15</SelectItem>
+                      <SelectItem value="Net 30">Net 30</SelectItem>
+                      <SelectItem value="Net 45">Net 45</SelectItem>
+                      <SelectItem value="Net 60">Net 60</SelectItem>
+                      <SelectItem value="Net 90">Net 90</SelectItem>
+                      <SelectItem value="50% anticipo Net 15">50% anticipo Net 15</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button 
                   onClick={handleAgregarCliente}
@@ -470,11 +483,23 @@ export function ClientesView({
             </div>
             <div className="space-y-2">
               <Label>Términos de Pago</Label>
-              <Input
-                value={clienteEditando.terminosPago}
-                onChange={(e) => setClienteEditando(prev => ({ ...prev, terminosPago: e.target.value }))}
-                placeholder="Ej: 50% anticipo, 50% contra entrega"
-              />
+              <Select 
+                value={clienteEditando.terminosPago} 
+                onValueChange={(value) => setClienteEditando(prev => ({ ...prev, terminosPago: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar términos de pago..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50% anticipo, 50% contra entrega">50% anticipo, 50% contra entrega</SelectItem>
+                  <SelectItem value="Net 15">Net 15</SelectItem>
+                  <SelectItem value="Net 30">Net 30</SelectItem>
+                  <SelectItem value="Net 45">Net 45</SelectItem>
+                  <SelectItem value="Net 60">Net 60</SelectItem>
+                  <SelectItem value="Net 90">Net 90</SelectItem>
+                  <SelectItem value="50% anticipo Net 15">50% anticipo Net 15</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button
               onClick={handleActualizarCliente}

@@ -1077,6 +1077,7 @@ function App() {
                   <ClienteStep key={pasoActual} 
                     datos={cotizacion.datosCliente} 
                     onChange={actualizarDatosCliente}
+                    onChangeCondiciones={(cond) => actualizarCondiciones(cond)}
                     clientesGuardados={clientes}
                     onGuardarCliente={canManageClientes() ? async (datos) => {
                       const clienteData = {
