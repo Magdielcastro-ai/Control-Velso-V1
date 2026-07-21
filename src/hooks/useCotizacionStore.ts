@@ -33,12 +33,13 @@ const migrarCostosAdicionales = (costos: any): CostosAdicionalesProyecto => {
       envio: { costo: 0, incluidoGratis: false },
       diseno: { costo: 0, incluidoGratis: false },
       estudioMaterial: { costo: 0, incluidoGratis: false },
+      pruebaDureza: { costo: 0, incluidoGratis: false },
     };
   }
 
   // Detectar formato viejo: propiedades son números planos
   // Formato viejo: { disenoCAD, programacionCNC, setup, transporte, otro }
-  // Formato nuevo: { envio: {costo, incluidoGratis}, diseno: {costo, incluidoGratis}, estudioMaterial: {costo, incluidoGratis} }
+  // Formato nuevo: { envio: {costo, incluidoGratis}, diseno: {costo, incluidoGratis}, estudioMaterial: {costo, incluidoGratis}, pruebaDureza: {costo, incluidoGratis} }
   const isFormatoViejo = typeof costos.disenoCAD === 'number' || 
                          typeof costos.programacionCNC === 'number' ||
                          typeof costos.setup === 'number' ||
@@ -56,6 +57,7 @@ const migrarCostosAdicionales = (costos: any): CostosAdicionalesProyecto => {
         incluidoGratis: false 
       },
       estudioMaterial: { costo: 0, incluidoGratis: false },
+      pruebaDureza: { costo: 0, incluidoGratis: false },
     };
   }
 
@@ -73,6 +75,10 @@ const migrarCostosAdicionales = (costos: any): CostosAdicionalesProyecto => {
       costo: typeof costos.estudioMaterial === 'object' ? (costos.estudioMaterial.costo || 0) : (typeof costos.estudioMaterial === 'number' ? costos.estudioMaterial : 0),
       incluidoGratis: typeof costos.estudioMaterial === 'object' ? (costos.estudioMaterial.incluidoGratis || false) : false,
     },
+    pruebaDureza: {
+      costo: typeof costos.pruebaDureza === 'object' ? (costos.pruebaDureza.costo || 0) : (typeof costos.pruebaDureza === 'number' ? costos.pruebaDureza : 0),
+      incluidoGratis: typeof costos.pruebaDureza === 'object' ? (costos.pruebaDureza.incluidoGratis || false) : false,
+    },
   };
 };
 
@@ -87,6 +93,7 @@ const piezaVacia = (): PiezaCotizacion => ({
     envio: { costo: 0, incluidoGratis: false },
     diseno: { costo: 0, incluidoGratis: false },
     estudioMaterial: { costo: 0, incluidoGratis: false },
+    pruebaDureza: { costo: 0, incluidoGratis: false },
   } as CostosAdicionalesProyecto,
   subtotalPieza: 0,
   utilidadPieza: 0,
@@ -124,6 +131,7 @@ const cotizacionVacia = (tipo: TipoCotizacion = 'proyecto'): Cotizacion => ({
     envio: { costo: 0, incluidoGratis: false },
     diseno: { costo: 0, incluidoGratis: false },
     estudioMaterial: { costo: 0, incluidoGratis: false },
+    pruebaDureza: { costo: 0, incluidoGratis: false },
   } as CostosAdicionalesProyecto,
   condiciones: {
     validezDias: 15,

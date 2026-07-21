@@ -235,6 +235,7 @@ export interface CostosAdicionalesProyecto {
   envio: CostoAdicionalItem;
   diseno: CostoAdicionalItem;
   estudioMaterial: CostoAdicionalItem;
+  pruebaDureza: CostoAdicionalItem;
 }
 
 export interface CondicionesComerciales {

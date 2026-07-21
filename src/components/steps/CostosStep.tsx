@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Truck, Pencil, FlaskConical } from 'lucide-react';
+import { Truck, Pencil, FlaskConical, ShieldCheck } from 'lucide-react';
 import type { CostosAdicionalesProyecto } from '@/types/cotizacion';
 
 interface CostosStepProps {
@@ -12,7 +12,8 @@ interface CostosStepProps {
 const ITEMS_CONFIG = [
   { key: 'envio' as const, label: 'Envío / Entrega', icon: Truck },
   { key: 'diseno' as const, label: 'Diseño CAD / CAM', icon: Pencil },
-  { key: 'estudioMaterial' as const, label: 'Estudio de Material y Prueba de Dureza', icon: FlaskConical },
+  { key: 'estudioMaterial' as const, label: 'Estudio de Material', icon: FlaskConical },
+  { key: 'pruebaDureza' as const, label: 'Prueba de Dureza', icon: ShieldCheck },
 ];
 
 export function CostosStep({
@@ -24,6 +25,7 @@ export function CostosStep({
     envio: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.envio),
     diseno: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.diseno),
     estudioMaterial: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.estudioMaterial),
+    pruebaDureza: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.pruebaDureza),
   };
 
   const handleCostoChange = (key: keyof CostosAdicionalesProyecto, field: 'costo' | 'incluidoGratis', value: number | boolean) => {

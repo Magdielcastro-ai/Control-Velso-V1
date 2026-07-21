@@ -459,6 +459,7 @@ function App() {
         envio: { costo: 0, incluidoGratis: false },
         diseno: { costo: 0, incluidoGratis: false },
         estudioMaterial: { costo: 0, incluidoGratis: false },
+    pruebaDureza: { costo: 0, incluidoGratis: false },
       },
     });
     toast.success('Cotización convertida a venta exitosamente');
