@@ -23,9 +23,17 @@ export function CostosStep({
   onChangeCostosAdicionales,
   onChangeMargen,
 }: CostosStepProps) {
+  // Normalizar costos adicionales para asegurar que tengan el formato correcto
+  // Normalizar costos adicionales para asegurar que tengan el formato correcto
+  const normalizedCostos = {
+    envio: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.envio),
+    diseno: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.diseno),
+    estudioMaterial: Object.assign({ costo: 0, incluidoGratis: false }, costosAdicionales?.estudioMaterial),
+  };
+
   const handleCostoChange = (key: keyof CostosAdicionalesProyecto, field: 'costo' | 'incluidoGratis', value: number | boolean) => {
     onChangeCostosAdicionales({
-      [key]: { ...costosAdicionales[key], [field]: value },
+      [key]: { ...normalizedCostos[key], [field]: value },
     } as Partial<CostosAdicionalesProyecto>);
   };
 
@@ -66,17 +74,17 @@ export function CostosStep({
                         type="number"
                         min={0}
                         step={0.01}
-                        value={costosAdicionales[key].costo}
+                        value={normalizedCostos[key].costo}
                         onChange={(e) => handleCostoChange(key, 'costo', parseFloat(e.target.value) || 0)}
                         className="h-8 text-sm"
                         placeholder="Costo..."
-                        disabled={costosAdicionales[key].incluidoGratis}
+                        disabled={normalizedCostos[key].incluidoGratis}
                       />
                     </div>
                     <div className="flex items-center gap-2">
                       <Checkbox
                         id={`${key}-gratis`}
-                        checked={costosAdicionales[key].incluidoGratis}
+                        checked={normalizedCostos[key].incluidoGratis}
                         onCheckedChange={(checked) => handleCostoChange(key, 'incluidoGratis', checked === true)}
                       />
                       <label htmlFor={`${key}-gratis`} className="text-xs text-slate-600 cursor-pointer">
@@ -84,9 +92,9 @@ export function CostosStep({
                       </label>
                     </div>
                   </div>
-                  {costosAdicionales[key].incluidoGratis && costosAdicionales[key].costo > 0 && (
+                  {normalizedCostos[key].incluidoGratis && normalizedCostos[key].costo > 0 && (
                     <p className="text-xs text-green-600 mt-1">
-                      Valor mostrado al cliente: ${costosAdicionales[key].costo.toFixed(2)} (sin costo real)
+                      Valor mostrado al cliente: ${normalizedCostos[key].costo.toFixed(2)} (sin costo real)
                     </p>
                   )}
                 </div>

@@ -8,7 +8,9 @@ interface ResumenStepProps {
 export function ResumenStep({ cotizacion }: ResumenStepProps) {
   const { piezas, costosAdicionales, subtotal, iva, total, margenUtilidad, ivaPorcentaje } = cotizacion;
 
-  const costosGenerales = Object.values(costosAdicionales).reduce((sum, v) => sum + v, 0);
+  const costosGenerales = Object.values(costosAdicionales)
+    .filter((item: any) => !item.incluidoGratis)
+    .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -27,7 +29,9 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
         {piezas.map((pieza: PiezaCotizacion, index: number) => {
           const costoMats = pieza.material ? pieza.material.costoTotal : 0;
           const costoProcs = pieza.procesos.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
-          const costosAdic = Object.values(pieza.costosAdicionales).reduce((sum: number, v: number) => sum + v, 0);
+          const costosAdic = Object.values(pieza.costosAdicionales)
+            .filter((item: any) => !item.incluidoGratis)
+            .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
           const costoDirecto = costoMats + costoProcs + costosAdic;
 
           return (
@@ -150,7 +154,9 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
               const costoDirectoGlobal = piezas.reduce((sum, p) => {
                 const mats = p.material ? p.material.costoTotal : 0;
                 const procs = p.procesos.reduce((s, pr) => s + pr.costoTotal, 0);
-                const adic = Object.values(p.costosAdicionales).reduce((s, v) => s + v, 0);
+                const adic = Object.values(p.costosAdicionales)
+                  .filter((item: any) => !item.incluidoGratis)
+                  .reduce((s: number, item: any) => s + (item.costo || 0), 0);
                 return sum + mats + procs + adic;
               }, 0);
               const margenGlobal = subtotal - costoDirectoGlobal - costosGenerales;

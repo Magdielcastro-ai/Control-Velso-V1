@@ -700,11 +700,7 @@ export const useCotizacionStore = () => {
             cantidad: 1,
             material: null,
             procesos: data.procesos || [],
-            costosAdicionales: data.costos_adicionales || {
-              envio: { costo: 0, incluidoGratis: false },
-              diseno: { costo: 0, incluidoGratis: false },
-              estudioMaterial: { costo: 0, incluidoGratis: false },
-            },
+            costosAdicionales: migrarCostosAdicionales(data.costos_adicionales),
             subtotalPieza: 0,
             utilidadPieza: 0,
             ivaPieza: 0,
