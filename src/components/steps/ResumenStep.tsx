@@ -21,6 +21,11 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
     if (m.espesor) partes.push(`E:${m.espesor}${m.unidadMedida || 'mm'}`);
     if (m.diametro) partes.push(`Ø:${m.diametro}${m.unidadMedida || 'mm'}`);
     if (m.lado) partes.push(`${m.lado}${m.unidadMedida || 'mm'}`);
+    if (m.diametro_exterior) partes.push(`Øext:${m.diametro_exterior}${m.unidadMedida || 'mm'}`);
+    if (m.diametro_interior) partes.push(`Øint:${m.diametro_interior}${m.unidadMedida || 'mm'}`);
+    if (m.lado_a) partes.push(`La:${m.lado_a}${m.unidadMedida || 'mm'}`);
+    if (m.lado_b) partes.push(`Lb:${m.lado_b}${m.unidadMedida || 'mm'}`);
+    if (m.dimensiones_libre) partes.push(m.dimensiones_libre);
     return partes.join(' × ');
   };
 
@@ -60,6 +65,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           
           const costoDirectoPieza = costoMaterial + costoProcesos + costosAdicPieza;
           const utilidadPieza = pieza.totalPieza - pieza.subtotalPieza;
+          const totalConIvaPieza = pieza.totalPieza + pieza.ivaPieza;
 
           return (
             <Card key={pieza.id} className="border-slate-200">
@@ -132,21 +138,21 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                     <span>${utilidadPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm font-semibold text-slate-900">
-                    <span>Subtotal por pieza</span>
-                    <span>${pieza.subtotalPieza.toFixed(2)}</span>
+                    <span>Subtotal por pieza (con utilidad)</span>
+                    <span>${pieza.totalPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-slate-500">
                     <span>IVA ({ivaPorcentaje}%)</span>
                     <span>${pieza.ivaPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-blue-700 pt-1 border-t border-slate-100">
-                    <span>Total por pieza</span>
-                    <span>${pieza.totalPieza.toFixed(2)}</span>
+                    <span>Total por pieza (con IVA)</span>
+                    <span>${totalConIvaPieza.toFixed(2)}</span>
                   </div>
                   {pieza.cantidad > 1 && (
                     <div className="flex justify-between text-sm text-slate-500">
-                      <span>Total {pieza.cantidad} piezas</span>
-                      <span>${(pieza.totalPieza * pieza.cantidad).toFixed(2)}</span>
+                      <span>Total {pieza.cantidad} piezas (con IVA)</span>
+                      <span>${(totalConIvaPieza * pieza.cantidad).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -184,8 +190,8 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           <h3 className="text-sm font-semibold text-blue-900 uppercase tracking-wide mb-3">Resumen General</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-slate-600">
-              <span>Subtotal piezas</span>
-              <span>${piezas.reduce((sum, p) => sum + p.subtotalPieza * p.cantidad, 0).toFixed(2)}</span>
+              <span>Subtotal piezas (con utilidad)</span>
+              <span>${piezas.reduce((sum, p) => sum + p.totalPieza * p.cantidad, 0).toFixed(2)}</span>
             </div>
             {costosGenerales > 0 && (
               <div className="flex justify-between text-sm text-slate-600">
