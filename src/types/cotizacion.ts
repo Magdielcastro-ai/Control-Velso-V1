@@ -51,6 +51,7 @@ export interface CatalogoMaterial {
   diametro?: number;
   lado?: number;
   largo?: number;
+  longitud?: number;
   ancho?: number;
   espesor?: number;
   diametro_exterior?: number;
@@ -75,6 +76,7 @@ export interface Material {
   diametro?: number;
   lado?: number;
   largo?: number;
+  longitud?: number;
   ancho?: number;
   espesor?: number;
   diametro_exterior?: number;

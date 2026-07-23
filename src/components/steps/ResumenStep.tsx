@@ -17,16 +17,17 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
     const m = pieza.material;
     const partes: string[] = [];
     if (m.largo) partes.push(`L:${m.largo}${m.unidadMedida || 'mm'}`);
+    if (m.longitud) partes.push(`Long:${m.longitud}${m.unidadMedida || 'mm'}`);
     if (m.ancho) partes.push(`A:${m.ancho}${m.unidadMedida || 'mm'}`);
     if (m.espesor) partes.push(`E:${m.espesor}${m.unidadMedida || 'mm'}`);
-    if (m.diametro) partes.push(`Ø:${m.diametro}${m.unidadMedida || 'mm'}`);
+    if (m.diametro) partes.push(`\u00D8:${m.diametro}${m.unidadMedida || 'mm'}`);
     if (m.lado) partes.push(`${m.lado}${m.unidadMedida || 'mm'}`);
-    if (m.diametro_exterior) partes.push(`Øext:${m.diametro_exterior}${m.unidadMedida || 'mm'}`);
-    if (m.diametro_interior) partes.push(`Øint:${m.diametro_interior}${m.unidadMedida || 'mm'}`);
+    if (m.diametro_exterior) partes.push(`\u00D8ext:${m.diametro_exterior}${m.unidadMedida || 'mm'}`);
+    if (m.diametro_interior) partes.push(`\u00D8int:${m.diametro_interior}${m.unidadMedida || 'mm'}`);
     if (m.lado_a) partes.push(`La:${m.lado_a}${m.unidadMedida || 'mm'}`);
     if (m.lado_b) partes.push(`Lb:${m.lado_b}${m.unidadMedida || 'mm'}`);
     if (m.dimensiones_libre) partes.push(m.dimensiones_libre);
-    return partes.join(' × ');
+    return partes.join(' \u00D7 ');
   };
 
   const formatearTiempo = (minutos: number) => {
@@ -41,7 +42,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
     <div className="space-y-6">
       {/* Encabezado */}
       <div className="border-b border-slate-200 pb-4">
-        <h2 className="text-xl font-bold text-slate-900">{proyecto.nombre || 'Cotización'}</h2>
+        <h2 className="text-xl font-bold text-slate-900">{proyecto.nombre || 'Cotizaci\u00F3n'}</h2>
         <p className="text-sm text-slate-600">Cliente: {datosCliente.nombre || datosCliente.empresa || 'Sin cliente'}</p>
       </div>
 
@@ -169,8 +170,8 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           {Object.entries(costosAdicionales).map(([key, item]: [string, any]) => {
             if (item.incluidoGratis || item.costo === 0) return null;
             const labels: Record<string, string> = {
-              envio: 'Envío / Entrega',
-              diseno: 'Diseño CAD / CAM',
+              envio: 'Env\u00EDo / Entrega',
+              diseno: 'Dise\u00F1o CAD / CAM',
               estudioMaterial: 'Estudio de Material',
               pruebaDureza: 'Prueba de Dureza',
             };
@@ -191,7 +192,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-slate-600">
               <span>Subtotal piezas (con utilidad)</span>
-              <span>${piezas.reduce((sum, p) => sum + p.totalPieza * p.cantidad, 0).toFixed(2)}</span>
+              <span>${piezas.reduce((sum, p) => sum + p.totalPieza, 0).toFixed(2)}</span>
             </div>
             {costosGenerales > 0 && (
               <div className="flex justify-between text-sm text-slate-600">
@@ -218,10 +219,10 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
       {/* Condiciones comerciales */}
       <div className="text-sm text-slate-500 space-y-1">
         <p><strong>Condiciones:</strong></p>
-        <p>Validez: {condiciones.validezDias} días</p>
-        <p>Tiempo de entrega: {condiciones.tiempoEntregaDias} días hábiles</p>
+        <p>Validez: {condiciones.validezDias} d\u00EDas</p>
+        <p>Tiempo de entrega: {condiciones.tiempoEntregaDias} d\u00EDas h\u00E1biles</p>
         <p>Forma de pago: {condiciones.formaPago}</p>
-        <p>Garantía: {condiciones.garantia}</p>
+        <p>Garant\u00EDa: {condiciones.garantia}</p>
       </div>
     </div>
   );
