@@ -192,7 +192,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-slate-600">
               <span>Subtotal piezas (con utilidad)</span>
-              <span>${piezas.reduce((sum, p) => sum + p.totalPieza, 0).toFixed(2)}</span>
+              <span>${piezas.reduce((sum, p) => sum + (p.totalPieza * p.cantidad), 0).toFixed(2)}</span>
             </div>
             {costosGenerales > 0 && (
               <div className="flex justify-between text-sm text-slate-600">
