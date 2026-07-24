@@ -464,7 +464,8 @@ export const useCotizacionStore = () => {
     const costosGenerales = Object.values(c.costosAdicionales)
       .filter((item: any) => !item.incluidoGratis)
       .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
-    const subtotal = piezasRecalculadas.reduce((sum, p) => sum + p.subtotalPieza, 0) + costosGenerales;
+    // subtotalPieza es el costo directo por pieza, multiplicar por cantidad
+    const subtotal = piezasRecalculadas.reduce((sum, p) => sum + (p.subtotalPieza * p.cantidad), 0) + costosGenerales;
     const iva = subtotal * (c.ivaPorcentaje / 100);
     const total = subtotal + iva;
 
