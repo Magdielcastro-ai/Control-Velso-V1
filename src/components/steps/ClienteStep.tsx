@@ -34,6 +34,7 @@ export function ClienteStep({ datos, onChange, onChangeCondiciones, clientesGuar
   const [guardando, setGuardando] = useState(false);
   const [clienteNoEncontrado, setClienteNoEncontrado] = useState(false);
   const inicializadoRef = useRef(false);
+  const condicionesActualizadasRef = useRef(false);
 
   // Sincronizar estado SOLO UNA VEZ al montar el componente
   useEffect(() => {
@@ -141,8 +142,10 @@ export function ClienteStep({ datos, onChange, onChangeCondiciones, clientesGuar
           });
         }
         
-        // Actualizar términos de pago en condiciones
-        if (onChangeCondiciones && cliente.terminosPago) {
+        // Actualizar términos de pago en condiciones SOLO si es una selección manual del usuario
+        // y no la carga inicial de una cotización existente
+        if (onChangeCondiciones && cliente.terminosPago && !condicionesActualizadasRef.current) {
+          condicionesActualizadasRef.current = true;
           onChangeCondiciones({
             formaPago: cliente.terminosPago,
             anticipoPorcentaje: calcularAnticipo(cliente.terminosPago),

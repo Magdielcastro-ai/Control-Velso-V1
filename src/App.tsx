@@ -1083,7 +1083,7 @@ function App() {
                   />
                 )}
                 {pasoActual === 'cliente' && (
-                  <ClienteStep key={pasoActual} 
+                  <ClienteStep 
                     datos={cotizacion.datosCliente} 
                     onChange={actualizarDatosCliente}
                     onChangeCondiciones={(cond) => actualizarCondiciones(cond)}
