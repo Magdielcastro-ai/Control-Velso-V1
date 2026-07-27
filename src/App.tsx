@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -295,6 +295,15 @@ function App() {
   } = useTalleresStore();
 
   // NUEVO: Generar pendientes y cobranzas automáticamente cuando cargan los datos
+  // Usar ref para prevenir ejecuciones múltiples
+  const pendientesGeneradosRef = useRef(false);
+  useEffect(() => {
+    if (datosCargados && proyectos.length > 0 && !pendientesGeneradosRef.current) {
+      pendientesGeneradosRef.current = true;
+      generarPendientesDesdeProyectos(proyectos, cotizacionesGuardadas);
+      generarCobranzas(proyectos);
+    }
+  }, [datosCargados, proyectos.length, cotizacionesGuardadas.length, generarPendientesDesdeProyectos, generarCobranzas]);
   useEffect(() => {
     if (datosCargados && proyectos.length > 0) {
       generarPendientesDesdeProyectos(proyectos, cotizacionesGuardadas);

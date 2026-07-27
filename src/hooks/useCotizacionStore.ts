@@ -396,87 +396,99 @@ export const useCotizacionStore = () => {
     });
   }, []);
 
-  const recalcularTotales = (c: Cotizacion): Cotizacion => {
-    const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
-      // Recalcular procesos cuando cambia la cantidad de piezas
-      const procesosRecalculados = pieza.procesos.map((proceso: Proceso) => {
-        if (proceso.tipo === 'otro') {
-          // Proceso externo: costoTotalIngresado es el costo POR PIEZA base
-          // Aplicar margen de seguridad y multiplicar por cantidad
-          const costoPorPiezaBase = proceso.costoTotalIngresado || 0;
-          const margenSeguridad = proceso.margenPorcentaje || 30;
-          const costoConMargenPorPieza = costoPorPiezaBase * (1 + margenSeguridad / 100);
-          const costoTotal = costoConMargenPorPieza * pieza.cantidad;
+  const recalcularTotales = useCallback((c: Cotizacion): Cotizacion => {
+    // Prevenir re-renders recursivos con un ref estático
+    const recalcularTotalesRef = { current: false };
+    if (recalcularTotalesRef.current) {
+      console.warn('[recalcularTotales] Previniendo recálculo recursivo');
+      return c;
+    }
+    recalcularTotalesRef.current = true;
+
+    try {
+      const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
+        // Recalcular procesos cuando cambia la cantidad de piezas
+        const procesosRecalculados = pieza.procesos.map((proceso: Proceso) => {
+          if (proceso.tipo === 'otro') {
+            // Proceso externo: costoTotalIngresado es el costo POR PIEZA base
+            // Aplicar margen de seguridad y multiplicar por cantidad
+            const costoPorPiezaBase = proceso.costoTotalIngresado || 0;
+            const margenSeguridad = proceso.margenPorcentaje || 30;
+            const costoConMargenPorPieza = costoPorPiezaBase * (1 + margenSeguridad / 100);
+            const costoTotal = costoConMargenPorPieza * pieza.cantidad;
+            return {
+              ...proceso,
+              costoTotal: costoTotal,
+              descripcion: `$${costoPorPiezaBase.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
+            };
+          }
+          // Proceso de máquina: recalcular tiempo total y costo
+          const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
+          const tiempoHoras = tiempoMinutos / 60;
+          const costoMaquina = tiempoHoras * proceso.costoPorHora;
+          const costoManoObra = tiempoHoras * (proceso.costoManoObraPorHora || 0);
+          const costoTotal = costoMaquina + costoManoObra;
           return {
             ...proceso,
-            costoTotal: costoTotal,
-            descripcion: `$${costoPorPiezaBase.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
+            tiempoMinutos,
+            costoTotal,
           };
-        }
-        // Proceso de máquina: recalcular tiempo total y costo
-        const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
-        const tiempoHoras = tiempoMinutos / 60;
-        const costoMaquina = tiempoHoras * proceso.costoPorHora;
-        const costoManoObra = tiempoHoras * (proceso.costoManoObraPorHora || 0);
-        const costoTotal = costoMaquina + costoManoObra;
+        });
+
+        // Material: costoUnitario es el costo POR PIEZA ingresado por el usuario
+        // costoTotal es costoUnitario * cantidad (calculado en PiezasStep)
+        // El margen del material se aplica como markup: costoUnitario * (1 + margen%)
+        const costoMaterialBase = pieza.material ? pieza.material.costoUnitario : 0;
+        const margenMaterial = pieza.material ? (pieza.material.margenPorcentaje || 30) : 30;
+        const costoMateriales = costoMaterialBase * (1 + margenMaterial / 100);
+        // Procesos: costoTotal es para TODAS las piezas, dividir por cantidad para obtener por pieza
+        const costoProcesosTotal = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
+        const costoProcesos = costoProcesosTotal / pieza.cantidad;
+        const costosAdicionalesPieza = Object.values(pieza.costosAdicionales)
+            .filter((item: any) => !item.incluidoGratis)
+            .reduce((sum: number, item: any) => sum + (item.costo || 0), 0) / pieza.cantidad;
+
+        const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
+        // Usar margen específico de la pieza si existe, sino usar el margen global
+        const margenAplicar = pieza.margenPieza !== undefined ? pieza.margenPieza : c.margenUtilidad;
+        const factorMargen = 1 - (margenAplicar / 100);
+        // El subtotal es la suma directa de los costos con sus márgenes aplicados
+        const subtotalPieza = costoDirectoPieza;
+        // La utilidad se calcula: subtotal / (1 - margen%) = total con utilidad
+        // Utilidad = total - subtotal
+        const totalPieza = factorMargen > 0 ? subtotalPieza / factorMargen : subtotalPieza;
+        const utilidadPieza = totalPieza - subtotalPieza;
+        const ivaPieza = totalPieza * (c.ivaPorcentaje / 100);
+
         return {
-          ...proceso,
-          tiempoMinutos,
-          costoTotal,
+          ...pieza,
+          procesos: procesosRecalculados,
+          subtotalPieza,
+          utilidadPieza,
+          ivaPieza,
+          totalPieza,
         };
       });
 
-      // Material: costoUnitario es el costo POR PIEZA ingresado por el usuario
-      // costoTotal es costoUnitario * cantidad (calculado en PiezasStep)
-      // El margen del material se aplica como markup: costoUnitario * (1 + margen%)
-      const costoMaterialBase = pieza.material ? pieza.material.costoUnitario : 0;
-      const margenMaterial = pieza.material ? (pieza.material.margenPorcentaje || 30) : 30;
-      const costoMateriales = costoMaterialBase * (1 + margenMaterial / 100);
-      // Procesos: costoTotal es para TODAS las piezas, dividir por cantidad para obtener por pieza
-      const costoProcesosTotal = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
-      const costoProcesos = costoProcesosTotal / pieza.cantidad;
-      const costosAdicionalesPieza = Object.values(pieza.costosAdicionales)
-          .filter((item: any) => !item.incluidoGratis)
-          .reduce((sum: number, item: any) => sum + (item.costo || 0), 0) / pieza.cantidad;
-
-      const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
-      // Usar margen específico de la pieza si existe, sino usar el margen global
-      const margenAplicar = pieza.margenPieza !== undefined ? pieza.margenPieza : c.margenUtilidad;
-      const factorMargen = 1 - (margenAplicar / 100);
-      // El subtotal es la suma directa de los costos con sus márgenes aplicados
-      const subtotalPieza = costoDirectoPieza;
-      // La utilidad se calcula: subtotal / (1 - margen%) = total con utilidad
-      // Utilidad = total - subtotal
-      const totalPieza = factorMargen > 0 ? subtotalPieza / factorMargen : subtotalPieza;
-      const utilidadPieza = totalPieza - subtotalPieza;
-      const ivaPieza = totalPieza * (c.ivaPorcentaje / 100);
+      const costosGenerales = Object.values(c.costosAdicionales)
+        .filter((item: any) => !item.incluidoGratis)
+        .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
+      // subtotalPieza es el costo directo por pieza, multiplicar por cantidad
+      const subtotal = piezasRecalculadas.reduce((sum, p) => sum + (p.subtotalPieza * p.cantidad), 0) + costosGenerales;
+      const iva = subtotal * (c.ivaPorcentaje / 100);
+      const total = subtotal + iva;
 
       return {
-        ...pieza,
-        procesos: procesosRecalculados,
-        subtotalPieza,
-        utilidadPieza,
-        ivaPieza,
-        totalPieza,
+        ...c,
+        piezas: piezasRecalculadas,
+        subtotal,
+        iva,
+        total,
       };
-    });
-
-    const costosGenerales = Object.values(c.costosAdicionales)
-      .filter((item: any) => !item.incluidoGratis)
-      .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
-    // subtotalPieza es el costo directo por pieza, multiplicar por cantidad
-    const subtotal = piezasRecalculadas.reduce((sum, p) => sum + (p.subtotalPieza * p.cantidad), 0) + costosGenerales;
-    const iva = subtotal * (c.ivaPorcentaje / 100);
-    const total = subtotal + iva;
-
-    return {
-      ...c,
-      piezas: piezasRecalculadas,
-      subtotal,
-      iva,
-      total,
-    };
-  };
+    } finally {
+      recalcularTotalesRef.current = false;
+    }
+  }, []);
 
   // ========== DATOS GENERALES ==========
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,9 +33,13 @@ export function ClienteStep({ datos, onChange, onChangeCondiciones, clientesGuar
   const [modoNuevo, setModoNuevo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [clienteNoEncontrado, setClienteNoEncontrado] = useState(false);
+  const inicializadoRef = useRef(false);
 
-  // Sincronizar estado cuando cambian los datos externos
+  // Sincronizar estado SOLO UNA VEZ al montar el componente
   useEffect(() => {
+    if (inicializadoRef.current) return;
+    inicializadoRef.current = true;
+
     if (datos.clienteId) {
       const cliente = clientesGuardados.find(c => c.id === datos.clienteId);
       if (cliente) {
@@ -69,7 +73,7 @@ export function ClienteStep({ datos, onChange, onChangeCondiciones, clientesGuar
       setContactoSeleccionado(undefined);
       setModoNuevo(false);
     }
-  }, [datos.clienteId, datos.nombre, datos.empresa, clientesGuardados]);
+  }, []); // Solo al montar
 
   const handleSeleccionarCliente = (clienteId: string) => {
     setClienteSeleccionado(clienteId);
