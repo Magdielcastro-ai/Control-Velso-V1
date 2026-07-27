@@ -569,6 +569,7 @@ export const useCotizacionStore = () => {
           materiales: nuevaCotizacion.materiales,
           procesos: nuevaCotizacion.procesos,
           costos_adicionales: nuevaCotizacion.costosAdicionales,
+          condiciones: nuevaCotizacion.condiciones,
           margen_utilidad: nuevaCotizacion.margenUtilidad,
           iva_porcentaje: nuevaCotizacion.ivaPorcentaje,
           subtotal: nuevaCotizacion.subtotal,
@@ -600,7 +601,6 @@ export const useCotizacionStore = () => {
 
     return id;
   }, [cotizacion]);
-
   const cargarCotizacion = useCallback(async (id: string): Promise<boolean> => {
     try {
       console.log('[cargarCotizacion] Intentando cargar desde Supabase:', id);
