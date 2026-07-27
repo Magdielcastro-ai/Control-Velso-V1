@@ -36,14 +36,19 @@ export interface PerfilUsuario {
 export interface CotizacionDB {
   id: string;
   numero: string;
+  tipo: string;
   usuario_id: string;
+  cliente_id?: string;
   cliente_nombre: string;
   proyecto_nombre: string;
+  proyecto: any;
   datos_taller: any;
   datos_cliente: any;
+  piezas: any[];
   materiales: any[];
   procesos: any[];
   costos_adicionales: any;
+  condiciones?: any;
   margen_utilidad: number;
   iva_porcentaje: number;
   subtotal: number;
