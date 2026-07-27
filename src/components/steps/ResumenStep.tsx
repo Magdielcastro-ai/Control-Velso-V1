@@ -219,12 +219,26 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
       </Card>
 
       {/* Condiciones comerciales */}
-      <div className="text-sm text-slate-500 space-y-1">
-        <p><strong>Condiciones:</strong></p>
-        <p>Validez: {condiciones.validezDias} d\u00EDas</p>
-        <p>Tiempo de entrega: {condiciones.tiempoEntregaDias} d\u00EDas h\u00E1biles</p>
-        <p>Forma de pago: {condiciones.formaPago}</p>
-        <p>Garant\u00EDa: {condiciones.garantia}</p>
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
+        <h4 className="text-sm font-semibold text-slate-800">Condiciones Comerciales</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700">
+          <div className="flex justify-between">
+            <span className="text-slate-500">Validez de oferta:</span>
+            <span className="font-medium">{condiciones.validezDias} d\u00EDas</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">Tiempo de entrega:</span>
+            <span className="font-medium">{condiciones.tiempoEntregaDias} d\u00EDas h\u00E1biles</span>
+          </div>
+          <div className="flex justify-between col-span-2">
+            <span className="text-slate-500">Forma de pago:</span>
+            <span className="font-medium">{condiciones.formaPago}</span>
+          </div>
+          <div className="flex justify-between col-span-2">
+            <span className="text-slate-500">Garant\u00EDa:</span>
+            <span className="font-medium">{condiciones.garantia}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
