@@ -473,8 +473,9 @@ export const useCotizacionStore = () => {
       const costosGenerales = Object.values(c.costosAdicionales)
         .filter((item: any) => !item.incluidoGratis)
         .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
-      // subtotalPieza es el costo directo por pieza, multiplicar por cantidad
-      const subtotal = piezasRecalculadas.reduce((sum, p) => sum + (p.subtotalPieza * p.cantidad), 0) + costosGenerales;
+      // El subtotal de la cotización es la suma de (totalPieza * cantidad) de todas las piezas + costos generales
+      // totalPieza ya incluye la utilidad
+      const subtotal = piezasRecalculadas.reduce((sum, p) => sum + (p.totalPieza * p.cantidad), 0) + costosGenerales;
       const iva = subtotal * (c.ivaPorcentaje / 100);
       const total = subtotal + iva;
 
@@ -534,8 +535,10 @@ export const useCotizacionStore = () => {
   // ========== GUARDAR / CARGAR ==========
 
   const guardarCotizacion = useCallback(async (estado: CotizacionGuardada['estado'] = 'borrador') => {
-    const id = cotizacion.id || crypto.randomUUID();
-    const nuevaCotizacion = { ...cotizacion, id };
+    // Recalcular totales antes de guardar para asegurar que subtotal, iva y total sean correctos
+    const cotizacionRecalculada = recalcularTotales(cotizacion);
+    const id = cotizacionRecalculada.id || crypto.randomUUID();
+    const nuevaCotizacion = { ...cotizacionRecalculada, id };
 
     setCotizacion(nuevaCotizacion);
 
