@@ -13,6 +13,12 @@ import {
   Phone,
   Mail,
   MapPin,
+  Clock,
+  CreditCard,
+  Percent,
+  ShieldCheck,
+  StickyNote,
+  CalendarDays,
 } from 'lucide-react';
 import type { Cotizacion } from '@/types/cotizacion';
 
@@ -27,17 +33,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
   const handlePrint = () => {
     window.print();
   };
-
-  const costoProcesos = cotizacion.piezas.reduce((sum, pieza) => 
-    sum + pieza.procesos.reduce((s, p) => s + p.costoTotal, 0), 0
-  );
-  const costoMateriales = cotizacion.piezas.reduce((sum, pieza) => 
-    sum + (pieza.material ? pieza.material.costoTotal : 0), 0
-  );
-  const costosAdicionales = Object.values(cotizacion.costosAdicionales)
-    .filter((item: any) => !item.incluidoGratis)
-    .reduce((sum, item: any) => sum + (item.costo || 0), 0);
-  const costoDirecto = costoMateriales + costoProcesos + costosAdicionales;
 
   return (
     <div className="space-y-6">
@@ -156,219 +151,257 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
             </div>
           </div>
 
-          {cotizacion.piezas.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Piezas y Materiales
-              </h3>
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="text-left p-2">Pieza</th>
-                    <th className="text-left p-2">Material</th>
-                    <th className="text-left p-2">Dimensiones</th>
-                    <th className="text-right p-2">Cant</th>
-                    <th className="text-right p-2">Precio Unit</th>
-                    <th className="text-right p-2">Total</th>
+          {/* ─── TABLA DE PARTIDAS ─── */}
+          <div className="mb-8 print:mb-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3 print:mb-2">
+              Conceptos y Partidas
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 print:bg-slate-100">
+                    <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-10">
+                      #
+                    </th>
+                    <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2">
+                      Código / Descripción
+                    </th>
+                    <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2">
+                      Material
+                    </th>
+                    <th className="text-right p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-16">
+                      Cant.
+                    </th>
+                    <th className="text-right p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-28">
+                      Precio Unit.
+                    </th>
+                    <th className="text-right p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-28">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cotizacion.piezas.map((pieza) => {
-                    const material = pieza.material;
+                  {cotizacion.piezas.map((pieza, idx) => {
+                    const unitPrice = pieza.totalPieza;
+                    const lineTotal = unitPrice * pieza.cantidad;
                     return (
-                      <tr key={pieza.id} className="border-b">
-                        <td className="p-2 font-medium">{pieza.nombre}</td>
-                        <td className="p-2">
-                          {material ? (
-                            <div>
-                              <span className="font-medium">{material.nombre}</span>
-                              <span className="text-xs text-slate-500 block">{material.tipo}</span>
+                      <tr
+                        key={pieza.id}
+                        className="border-b border-slate-200 hover:bg-slate-50 print:hover:bg-transparent"
+                      >
+                        <td className="p-2.5 text-slate-500 align-top print:p-2">
+                          {idx + 1}
+                        </td>
+                        <td className="p-2.5 align-top print:p-2">
+                          <div className="font-semibold text-slate-900">
+                            {pieza.codigo || pieza.nombre}
+                          </div>
+                          {pieza.codigo && pieza.nombre !== pieza.codigo && (
+                            <div className="text-slate-600 text-xs mt-0.5">
+                              {pieza.nombre}
                             </div>
-                          ) : (
-                            <span className="text-slate-400 italic">Sin material</span>
+                          )}
+                          {pieza.procesos.length > 0 && (
+                            <div className="text-xs text-slate-500 mt-1">
+                              Procesos: {pieza.procesos.map(p => p.nombre).join(', ')}
+                            </div>
                           )}
                         </td>
-                        <td className="p-2 text-xs">
-                          {material && formatearDimensiones(material)}
+                        <td className="p-2.5 align-top print:p-2">
+                          {pieza.material ? (
+                            <div>
+                              <div className="font-medium text-slate-800">
+                                {pieza.material.nombre}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {pieza.material.tipo}
+                                {pieza.material.forma && ` · ${pieza.material.forma}`}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">Sin material</span>
+                          )}
                         </td>
-                        <td className="p-2 text-right">{pieza.cantidad}</td>
-                        <td className="p-2 text-right">
-                          {material ? `$${material.costoUnitario.toFixed(2)}/${material.unidad}` : '-'}
+                        <td className="p-2.5 text-right align-top font-medium print:p-2">
+                          {pieza.cantidad}
                         </td>
-                        <td className="p-2 text-right font-medium">
-                          {material ? `$${material.costoTotal.toFixed(2)}` : '-'}
+                        <td className="p-2.5 text-right align-top print:p-2">
+                          <span className="font-medium">${unitPrice.toFixed(2)}</span>
+                        </td>
+                        <td className="p-2.5 text-right align-top print:p-2">
+                          <span className="font-semibold text-slate-900">
+                            ${lineTotal.toFixed(2)}
+                          </span>
                         </td>
                       </tr>
                     );
                   })}
+
+                  {/* ─── Costos Adicionales como filas de partida ─── */}
+                  {renderCostoAdicionalRow(
+                    cotizacion.piezas.length + 1,
+                    'Envío / Entrega',
+                    cotizacion.costosAdicionales.envio
+                  )}
+                  {renderCostoAdicionalRow(
+                    cotizacion.piezas.length + 2,
+                    'Diseño CAD/CAM',
+                    cotizacion.costosAdicionales.diseno
+                  )}
+                  {renderCostoAdicionalRow(
+                    cotizacion.piezas.length + 3,
+                    'Estudio de Material',
+                    cotizacion.costosAdicionales.estudioMaterial
+                  )}
+                  {renderCostoAdicionalRow(
+                    cotizacion.piezas.length + 4,
+                    'Prueba de Dureza',
+                    cotizacion.costosAdicionales.pruebaDureza
+                  )}
                 </tbody>
-                <tfoot>
-                  <tr className="bg-slate-50">
-                    <td colSpan={5} className="p-2 text-right font-medium">Subtotal Materiales:</td>
-                    <td className="p-2 text-right font-bold">${costoMateriales.toFixed(2)}</td>
-                  </tr>
-                </tfoot>
               </table>
-            </div>
-          )}
-
-          {cotizacion.piezas.some(p => p.procesos.length > 0) && (
-            <div className="mb-8">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Procesos y Operaciones
-              </h3>
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="text-left p-2">Pieza / Proceso</th>
-                    <th className="text-right p-2">Tiempo</th>
-                    <th className="text-right p-2">$/Hora Máq.</th>
-                    <th className="text-right p-2">$/Hora MO</th>
-                    <th className="text-right p-2">Costo Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cotizacion.piezas.map((pieza) => (
-                    pieza.procesos.map((p, idx) => (
-                      <tr key={`${pieza.id}-${p.id}`} className="border-b">
-                        <td className="p-2">
-                          {idx === 0 && <span className="font-medium block">{pieza.nombre}</span>}
-                          <span className={idx === 0 ? '' : 'pl-4'}>{p.nombre}</span>
-                          {p.descripcion && <p className="text-xs text-slate-500">{p.descripcion}</p>}
-                        </td>
-                        <td className="p-2 text-right">
-                          {Math.floor(p.tiempoMinutos / 60) > 0 && `${Math.floor(p.tiempoMinutos / 60)}h `}
-                          {p.tiempoMinutos % 60}m
-                        </td>
-                        <td className="p-2 text-right">${p.costoPorHora.toFixed(2)}</td>
-                        <td className="p-2 text-right">
-                          {p.costoManoObra > 0 ? (
-                            <span className="text-green-600">${p.costoManoObra.toFixed(2)}</span>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
-                        </td>
-                        <td className="p-2 text-right font-medium">${p.costoTotal.toFixed(2)}</td>
-                      </tr>
-                    ))
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-50">
-                    <td colSpan={4} className="p-2 text-right font-medium">Subtotal Procesos:</td>
-                    <td className="p-2 text-right font-bold">${costoProcesos.toFixed(2)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-
-          {(costosAdicionales > 0) && (
-            <div className="mb-8">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Costos Adicionales
-              </h3>
-              <div className="space-y-1">
-                {!cotizacion.costosAdicionales.envio.incluidoGratis && cotizacion.costosAdicionales.envio.costo > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Envío/Entrega</span>
-                    <span>${cotizacion.costosAdicionales.envio.costo.toFixed(2)}</span>
-                  </div>
-                )}
-                {cotizacion.costosAdicionales.envio.incluidoGratis && (
-                  <div className="flex justify-between text-sm">
-                    <span>Envío/Entrega</span>
-                    <span className="text-green-600">Incluido gratis</span>
-                  </div>
-                )}
-                {!cotizacion.costosAdicionales.diseno.incluidoGratis && cotizacion.costosAdicionales.diseno.costo > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Diseño CAD/CAM</span>
-                    <span>${cotizacion.costosAdicionales.diseno.costo.toFixed(2)}</span>
-                  </div>
-                )}
-                {cotizacion.costosAdicionales.diseno.incluidoGratis && (
-                  <div className="flex justify-between text-sm">
-                    <span>Diseño CAD/CAM</span>
-                    <span className="text-green-600">Incluido gratis</span>
-                  </div>
-                )}
-                {!cotizacion.costosAdicionales.estudioMaterial.incluidoGratis && cotizacion.costosAdicionales.estudioMaterial.costo > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Estudio de Material y Prueba de Dureza</span>
-                    <span>${cotizacion.costosAdicionales.estudioMaterial.costo.toFixed(2)}</span>
-                  </div>
-                )}
-                {cotizacion.costosAdicionales.estudioMaterial.incluidoGratis && (
-                  <div className="flex justify-between text-sm">
-                    <span>Estudio de Material y Prueba de Dureza</span>
-                    <span className="text-green-600">Incluido gratis</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="border-t-2 border-slate-300 pt-6 mb-8">
-            <div className="w-full md:w-1/2 ml-auto space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Costo Directo:</span>
-                <span>${costoDirecto.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Margen ({cotizacion.margenUtilidad}%):</span>
-                <span className="text-green-600">+${(cotizacion.subtotal - costoDirecto).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Subtotal:</span>
-                <span className="font-semibold">${cotizacion.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">IVA ({cotizacion.ivaPorcentaje}%):</span>
-                <span>${cotizacion.iva.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold border-t-2 border-blue-600 pt-2">
-                <span>TOTAL:</span>
-                <span className="text-blue-600">${cotizacion.total.toFixed(2)}</span>
-              </div>
             </div>
           </div>
 
-          <div className="bg-slate-50 p-6 rounded-lg">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
+          {/* ─── RESUMEN DE TOTALES ─── */}
+          <div className="border-t-2 border-slate-300 pt-6 mb-8 print:border-t print:pt-4">
+            <div className="w-full md:w-1/2 ml-auto print:w-3/5">
+              {/* Subtotal */}
+              <div className="flex justify-between items-center py-2 text-sm">
+                <span className="text-slate-600">Subtotal</span>
+                <span className="font-semibold text-slate-800">
+                  {formatearMoneda(cotizacion.subtotal)}
+                </span>
+              </div>
+
+              {/* IVA */}
+              <div className="flex justify-between items-center py-2 text-sm">
+                <span className="text-slate-600">
+                  IVA ({cotizacion.ivaPorcentaje}%)
+                </span>
+                <span className="font-medium text-slate-700">
+                  {formatearMoneda(cotizacion.iva)}
+                </span>
+              </div>
+
+              {/* Margen de utilidad (condicional) */}
+              {cotizacion.margenUtilidad > 0 && (
+                <div className="flex justify-between items-center py-2 text-sm">
+                  <span className="text-slate-600">
+                    Margen de utilidad ({cotizacion.margenUtilidad}%)
+                  </span>
+                  <span className="font-medium text-slate-700">
+                    {formatearMoneda(
+                      cotizacion.subtotal * (cotizacion.margenUtilidad / 100)
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Línea separadora antes del total */}
+              <div className="border-t-2 border-blue-600 my-3" />
+
+              {/* TOTAL destacado */}
+              <div className="flex justify-between items-center py-2">
+                <span className="text-base font-bold text-slate-900 uppercase tracking-wide">
+                  Total
+                </span>
+                <span className="text-2xl font-extrabold text-blue-600 print:text-xl">
+                  {formatearMoneda(cotizacion.total)}
+                </span>
+              </div>
+
+              {/* Monto en letras */}
+              <p className="text-xs text-slate-500 text-right mt-2 leading-relaxed">
+                {numeroALetras(cotizacion.total)} pesos{' '}
+                {((cotizacion.total % 1) * 100).toFixed(0).padStart(2, '0')}/100{' '}
+                <span className="font-medium text-slate-600">M.N.</span>
+              </p>
+
+              {/* Indicación de moneda */}
+              <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
+                Moneda: Pesos Mexicanos (MXN)
+              </p>
+            </div>
+          </div>
+
+          {/* ─── CONDICIONES COMERCIALES ─── */}
+          <div className="bg-slate-50 p-6 rounded-lg print:bg-transparent print:border print:border-slate-200 print:p-4 print:rounded-none">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4 print:mb-3">
               Condiciones Comerciales
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-slate-600">Validez de la cotización:</p>
-                <p className="font-medium">{cotizacion.condiciones.validezDias} días</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm print:gap-3">
+              {/* Validez */}
+              <div className="flex items-start gap-3">
+                <CalendarDays className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-slate-500 text-xs uppercase tracking-wide">Validez</p>
+                  <p className="font-semibold text-slate-800">
+                    {cotizacion.condiciones.validezDias} días
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-slate-600">Tiempo de entrega:</p>
-                <p className="font-medium">{cotizacion.condiciones.tiempoEntregaDias} días hábiles</p>
+
+              {/* Tiempo de entrega */}
+              <div className="flex items-start gap-3">
+                <Clock className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-slate-500 text-xs uppercase tracking-wide">Tiempo de entrega</p>
+                  <p className="font-semibold text-slate-800">
+                    {cotizacion.condiciones.tiempoEntregaDias} días hábiles
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-slate-600">Forma de pago:</p>
-                <p className="font-medium">{cotizacion.condiciones.formaPago}</p>
+
+              {/* Forma de pago */}
+              <div className="flex items-start gap-3">
+                <CreditCard className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-slate-500 text-xs uppercase tracking-wide">Forma de pago</p>
+                  <p className="font-semibold text-slate-800">
+                    {cotizacion.condiciones.formaPago}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-slate-600">Anticipo:</p>
-                <p className="font-medium">{cotizacion.condiciones.anticipoPorcentaje}%</p>
+
+              {/* Anticipo */}
+              <div className="flex items-start gap-3">
+                <Percent className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-slate-500 text-xs uppercase tracking-wide">Anticipo</p>
+                  <p className="font-semibold text-slate-800">
+                    {cotizacion.condiciones.anticipoPorcentaje}%
+                  </p>
+                </div>
               </div>
-              <div className="md:col-span-2">
-                <p className="text-slate-600">Garantía:</p>
-                <p className="font-medium">{cotizacion.condiciones.garantia}</p>
+
+              {/* Garantía */}
+              <div className="flex items-start gap-3 md:col-span-2">
+                <ShieldCheck className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-slate-500 text-xs uppercase tracking-wide">Garantía</p>
+                  <p className="font-semibold text-slate-800">
+                    {cotizacion.condiciones.garantia}
+                  </p>
+                </div>
               </div>
+
+              {/* Notas adicionales */}
               {cotizacion.condiciones.notasLegales && (
-                <div className="md:col-span-2">
-                  <p className="text-slate-600">Notas adicionales:</p>
-                  <p className="font-medium">{cotizacion.condiciones.notasLegales}</p>
+                <div className="flex items-start gap-3 md:col-span-2">
+                  <StickyNote className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-slate-500 text-xs uppercase tracking-wide">Notas adicionales</p>
+                    <p className="font-medium text-slate-700">
+                      {cotizacion.condiciones.notasLegales}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t text-center text-sm text-slate-500">
+          <div className="mt-8 pt-6 border-t text-center text-sm text-slate-500 print:mt-6 print:pt-4">
             <p>Esta cotización fue generada con Presupuesto Pro CNC</p>
             <p className="mt-1">Documento válido únicamente con firma y sello del taller</p>
           </div>
@@ -386,22 +419,115 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
   );
 }
 
-function formatearDimensiones(material: any): string {
-  const unidad = material.unidadMedida === 'mm' ? 'mm' : '"';
-  if (material.forma === 'redondo' && material.diametro) {
-    return `Ø${material.diametro}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
-  } else if (material.forma === 'cuadrado' && material.lado) {
-    return `${material.lado}${unidad} × ${material.lado}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
-  } else if (material.forma === 'barra_hueca' && material.diametro_exterior) {
-    return `Ø${material.diametro_exterior}${unidad} × Ø${material.diametro_interior || '?'}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
-  } else if (material.forma === 'barra_cromada' && material.diametro) {
-    return `Ø${material.diametro}${unidad}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
-  } else if (material.forma === 'placa' && material.largo && material.ancho) {
-    return `${material.largo}${unidad} × ${material.ancho}${unidad}${material.espesor ? ` × ${material.espesor}${unidad}` : ''}`;
-  } else if (material.forma === 'angulo' && material.lado_a) {
-    return `${material.lado_a}${unidad} × ${material.lado_b || material.lado_a}${unidad}${material.espesor ? ` × ${material.espesor}${unidad}` : ''}${material.longitud ? ` × ${material.longitud}${unidad}` : ''}`;
-  } else if (material.forma === 'otro') {
-    return material.descripcion || material.dimensiones_libre || 'Dimensiones no especificadas';
+/* ─── Helper: Formatear moneda MXN ─── */
+function formatearMoneda(valor: number): string {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(valor);
+}
+
+/* ─── Helper: Renderizar fila de costo adicional ─── */
+function renderCostoAdicionalRow(
+  num: number,
+  label: string,
+  item: { costo: number; incluidoGratis: boolean }
+): import('react').ReactNode {
+  if (!item || item.costo <= 0) return null;
+
+  if (item.incluidoGratis) {
+    return (
+      <tr className="border-b border-slate-200 hover:bg-slate-50 print:hover:bg-transparent">
+        <td className="p-2.5 text-slate-500 align-top print:p-2">{num}</td>
+        <td className="p-2.5 align-top print:p-2">
+          <div className="font-semibold text-slate-900">{label}</div>
+          <div className="text-xs text-green-600 font-medium">Incluido gratis</div>
+        </td>
+        <td className="p-2.5 align-top print:p-2">—</td>
+        <td className="p-2.5 text-right align-top print:p-2">1</td>
+        <td className="p-2.5 text-right align-top print:p-2">
+          <span className="line-through text-slate-400">${item.costo.toFixed(2)}</span>
+        </td>
+        <td className="p-2.5 text-right align-top print:p-2">
+          <span className="font-semibold text-green-600">$0.00</span>
+        </td>
+      </tr>
+    );
   }
-  return '';
+
+  return (
+    <tr className="border-b border-slate-200 hover:bg-slate-50 print:hover:bg-transparent">
+      <td className="p-2.5 text-slate-500 align-top print:p-2">{num}</td>
+      <td className="p-2.5 align-top print:p-2">
+        <div className="font-semibold text-slate-900">{label}</div>
+      </td>
+      <td className="p-2.5 align-top print:p-2">—</td>
+      <td className="p-2.5 text-right align-top print:p-2">1</td>
+      <td className="p-2.5 text-right align-top print:p-2">
+        <span className="font-medium">${item.costo.toFixed(2)}</span>
+      </td>
+      <td className="p-2.5 text-right align-top print:p-2">
+        <span className="font-semibold text-slate-900">${item.costo.toFixed(2)}</span>
+      </td>
+    </tr>
+  );
+}
+
+/* ─── Helper: Número a letras (simplificado) ─── */
+function numeroALetras(num: number): string {
+  const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+  const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
+  const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+  const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+  const n = Math.floor(num);
+  if (n === 0) return 'cero';
+  if (n === 100) return 'cien';
+  if (n === 1000) return 'mil';
+  if (n === 1000000) return 'un millón';
+
+  let result = '';
+  let resto = n;
+
+  // Millones
+  const millones = Math.floor(resto / 1000000);
+  if (millones > 0) {
+    result += millones === 1 ? 'un millón ' : `${numeroALetras(millones)} millones `;
+    resto %= 1000000;
+  }
+
+  // Miles
+  const miles = Math.floor(resto / 1000);
+  if (miles > 0) {
+    result += miles === 1 ? 'mil ' : `${numeroALetras(miles)} mil `;
+    resto %= 1000;
+  }
+
+  // Centenas
+  const c = Math.floor(resto / 100);
+  if (c > 0) {
+    result += centenas[c] + ' ';
+    resto %= 100;
+  }
+
+  // Decenas y unidades
+  if (resto >= 10 && resto < 20) {
+    result += especiales[resto - 10];
+  } else {
+    const d = Math.floor(resto / 10);
+    const u = resto % 10;
+    if (d > 0) {
+      result += decenas[d];
+      if (u > 0) {
+        result += d === 2 ? 'i' : ' y ';
+        result += unidades[u];
+      }
+    } else if (u > 0) {
+      result += unidades[u];
+    }
+  }
+
+  return result.trim();
 }
