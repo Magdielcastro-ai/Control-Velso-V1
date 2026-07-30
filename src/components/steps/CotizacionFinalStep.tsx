@@ -203,7 +203,20 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
                           )}
                           {pieza.procesos.length > 0 && (
                             <div className="text-xs text-slate-500 mt-1">
-                              Procesos: {pieza.procesos.map(p => p.nombre).join(', ')}
+                              {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 ? (
+                                <>
+                                  <span className="font-medium text-slate-600">Procesos externos:</span>{' '}
+                                  {pieza.procesos
+                                    .filter(p => p.tipo === 'otro')
+                                    .map(p => `${p.nombre} (${formatearMoneda(p.costoTotal)})`)
+                                    .join(', ')}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-medium text-slate-600">Procesos:</span>{' '}
+                                  {pieza.procesos.map(p => p.nombre).join(', ')}
+                                </>
+                              )}
                             </div>
                           )}
                         </td>
