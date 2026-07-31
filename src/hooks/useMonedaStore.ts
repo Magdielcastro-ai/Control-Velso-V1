@@ -7,7 +7,7 @@ export const useMonedaStore = () => {
   const [moneda, setMoneda] = useState<Moneda>(() => {
     try {
       const guardada = localStorage.getItem(MONEDA_STORAGE_KEY);
-      if (guardada && ['MXN', 'USD', 'EUR'].includes(guardada)) {
+      if (guardada && ['MXN', 'USD'].includes(guardada)) {
         return guardada as Moneda;
       }
     } catch {

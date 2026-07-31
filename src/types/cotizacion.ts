@@ -3,7 +3,7 @@
 export type TipoCotizacion = 'pieza_unica' | 'proyecto';
 
 // TIPOS DE MONEDA
-export type Moneda = 'MXN' | 'USD' | 'EUR';
+export type Moneda = 'MXN' | 'USD';
 
 export interface MonedaConfig {
   codigo: Moneda;
@@ -15,7 +15,6 @@ export interface MonedaConfig {
 export const MONEDAS: MonedaConfig[] = [
   { codigo: 'MXN', nombre: 'Peso Mexicano', simbolo: '$', locale: 'es-MX' },
   { codigo: 'USD', nombre: 'Dólar Estadounidense', simbolo: 'US$', locale: 'en-US' },
-  { codigo: 'EUR', nombre: 'Euro', simbolo: '€', locale: 'de-DE' },
 ];
 
 export const getMonedaConfig = (moneda: Moneda): MonedaConfig => {
