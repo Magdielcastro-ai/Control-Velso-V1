@@ -72,9 +72,6 @@ import { DashboardEjecutivo } from '@/components/DashboardEjecutivo';
 // VISTA CATÁLOGO DE PIEZAS
 import { CatalogoPiezasView } from '@/components/CatalogoPiezasView';
 
-// SELECTOR DE MONEDA
-import { MonedaSelector } from '@/components/MonedaSelector';
-
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 import type { ProyectoVenta } from '@/types/ventas';
@@ -300,8 +297,8 @@ function App() {
     recargarTalleres,
   } = useTalleresStore();
 
-  // MONEDA
-  const { moneda, cambiarMoneda } = useMonedaStore();
+  // MONEDA - Solo para referencia, el selector está en CondicionesStep
+  const { moneda } = useMonedaStore();
 
   // NUEVO: Generar pendientes y cobranzas automáticamente cuando cargan los datos
   // Usar ref para prevenir ejecuciones múltiples
@@ -1038,7 +1035,6 @@ function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <MonedaSelector moneda={moneda} onChange={cambiarMoneda} />
                     <Button variant="outline" size="sm" onClick={handleGuardar} className="border-slate-300">
                       <Save className="w-4 h-4 mr-2" />
                       Guardar
