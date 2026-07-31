@@ -636,7 +636,6 @@ export const useCotizacionStore = () => {
           tipo_cambio: safeNumber(nuevaCotizacion.tipoCambio),
           subtotal: safeNumber(nuevaCotizacion.subtotal),
           subtotal_mxn: safeNumber(nuevaCotizacion.subtotalMXN),
-          iva: safeNumber(nuevaCotizacion.iva),
           iva_mxn: safeNumber(nuevaCotizacion.ivaMXN),
           total: safeNumber(nuevaCotizacion.total),
           total_mxn: safeNumber(nuevaCotizacion.totalMXN),
