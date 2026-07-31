@@ -45,6 +45,9 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
   const ivaTotal = subtotalConUtilidad * (ivaPorcentaje / 100);
   const totalGeneral = subtotalConUtilidad + ivaTotal;
 
+  // Símbolo de moneda
+  const simbolo = cotizacion.moneda === 'USD' ? 'US$' : '$';
+
   return (
     <div className="space-y-6">
       {/* Encabezado */}
@@ -54,6 +57,16 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
         {datosCliente.nombre && (
           <p className="text-sm text-slate-500">Contacto: {datosCliente.nombre}</p>
         )}
+        <div className="flex items-center gap-2 mt-2">
+          <span className={`px-2 py-1 rounded text-xs font-bold ${cotizacion.moneda === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+            {cotizacion.moneda === 'USD' ? 'US$ USD' : '$ MXN'}
+          </span>
+          {cotizacion.moneda === 'USD' && cotizacion.tipoCambio > 1 && (
+            <span className="text-xs text-slate-500">
+              Tipo de cambio: {cotizacion.tipoCambio} MXN/USD
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Desglose por pieza */}
@@ -98,7 +111,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                       <span className="text-slate-700">
                         {pieza.material.nombre} ({formatearDimensiones(pieza)})
                       </span>
-                      <span className="font-medium">${costoMaterial.toFixed(2)}/pz</span>
+                      <span className="font-medium">{simbolo}{costoMaterial.toFixed(2)}/pz</span>
                     </div>
                   </div>
                 )}
@@ -117,14 +130,14 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                             </span>
                           </span>
                           <span className="text-slate-600">
-                            ${(proceso.costoTotal / pieza.cantidad).toFixed(2)}/pz
+                            {simbolo}{(proceso.costoTotal / pieza.cantidad).toFixed(2)}/pz
                           </span>
                         </div>
                       ))}
                     </div>
                     <div className="flex justify-between text-sm font-medium pt-1 mt-1 border-t border-slate-50">
                       <span className="text-slate-600">Total procesos</span>
-                      <span>${costoProcesos.toFixed(2)}/pz</span>
+                      <span>{simbolo}{costoProcesos.toFixed(2)}/pz</span>
                     </div>
                   </div>
                 )}
@@ -133,7 +146,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                 {costosAdicPieza > 0 && (
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-slate-600">Costos adicionales</span>
-                    <span>${costosAdicPieza.toFixed(2)}/pz</span>
+                    <span>{simbolo}{costosAdicPieza.toFixed(2)}/pz</span>
                   </div>
                 )}
 
@@ -141,20 +154,20 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                 <div className="mt-3 pt-3 border-t border-slate-200 space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Costo directo</span>
-                    <span className="font-medium">${costoDirectoPieza.toFixed(2)}</span>
+                    <span className="font-medium">{simbolo}{costoDirectoPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Utilidad ({margenUtilidad}%)</span>
-                    <span>${utilidadPieza.toFixed(2)}</span>
+                    <span>{simbolo}{utilidadPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-blue-700 pt-1 border-t border-slate-100">
                     <span>Total por pieza (con utilidad)</span>
-                    <span>${pieza.totalPieza.toFixed(2)}</span>
+                    <span>{simbolo}{pieza.totalPieza.toFixed(2)}</span>
                   </div>
                   {pieza.cantidad > 1 && (
                     <div className="flex justify-between text-sm text-slate-500">
                       <span>Total {pieza.cantidad} piezas</span>
-                      <span>${(pieza.totalPieza * pieza.cantidad).toFixed(2)}</span>
+                      <span>{simbolo}{(pieza.totalPieza * pieza.cantidad).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -179,7 +192,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
             return (
               <div key={key} className="flex justify-between text-sm">
                 <span className="text-slate-600">{labels[key] || key}</span>
-                <span>${item.costo.toFixed(2)}</span>
+                <span>{simbolo}{item.costo.toFixed(2)}</span>
               </div>
             );
           })}
@@ -193,29 +206,29 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-slate-600">
               <span>Costo directo piezas</span>
-              <span>${subtotalPiezasSinUtilidad.toFixed(2)}</span>
+              <span>{simbolo}{subtotalPiezasSinUtilidad.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm text-green-600">
               <span>Utilidad ({margenUtilidad}%)</span>
-              <span>${utilidadTotal.toFixed(2)}</span>
+              <span>{simbolo}{utilidadTotal.toFixed(2)}</span>
             </div>
             {costosGenerales > 0 && (
               <div className="flex justify-between text-sm text-slate-600">
                 <span>Costos adicionales</span>
-                <span>${costosGenerales.toFixed(2)}</span>
+                <span>{simbolo}{costosGenerales.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm font-medium text-blue-700 pt-1 border-t border-blue-200">
               <span>Subtotal (antes de IVA)</span>
-              <span>${subtotalConUtilidad.toFixed(2)}</span>
+              <span>{simbolo}{subtotalConUtilidad.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm text-slate-600">
               <span>IVA ({ivaPorcentaje}%)</span>
-              <span>${ivaTotal.toFixed(2)}</span>
+              <span>{simbolo}{ivaTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-lg font-bold border-t-2 border-blue-200 pt-2">
               <span className="text-slate-900">TOTAL</span>
-              <span className="text-blue-600">${totalGeneral.toFixed(2)}</span>
+              <span className="text-blue-600">{simbolo}{totalGeneral.toFixed(2)}</span>
             </div>
           </div>
         </CardContent>
