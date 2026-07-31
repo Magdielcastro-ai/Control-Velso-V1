@@ -581,12 +581,14 @@ function App() {
     }
   };
 
+  /*
   const handleNuevaCotizacion = () => {
     nuevaCotizacion('pieza_unica');
     setVistaActual('cotizacion');
     setPasoActual('taller');
     toast.success('Nueva cotización iniciada');
   };
+  */
 
   // Verificar si el paso actual está completo
   const pasoCompleto = () => {
@@ -1172,7 +1174,11 @@ function App() {
         return (
           <CotizacionFinalStep
             cotizacion={cotizacion}
-            onNuevaCotizacion={handleNuevaCotizacion}
+            onRegresar={() => setPasoActual('resumen')}
+            onSalir={() => {
+              setVistaActual('home');
+              setPasoActual('taller');
+            }}
           />
         );
 

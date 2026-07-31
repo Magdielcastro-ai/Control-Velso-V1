@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Printer, 
   Download, 
-  Share2, 
+  ArrowLeft,
+  Home,
   CheckCircle,
   Factory,
   Calendar,
@@ -24,10 +25,11 @@ import type { Cotizacion } from '@/types/cotizacion';
 
 interface CotizacionFinalStepProps {
   cotizacion: Cotizacion;
-  onNuevaCotizacion: () => void;
+  onRegresar?: () => void;
+  onSalir?: () => void;
 }
 
-export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: CotizacionFinalStepProps) {
+export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: CotizacionFinalStepProps) {
   const cotizacionRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
@@ -45,6 +47,12 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
       </div>
 
       <div className="flex flex-wrap justify-center gap-3 no-print">
+        {onRegresar && (
+          <Button onClick={onRegresar} variant="outline" className="border-slate-300">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Regresar
+          </Button>
+        )}
         <Button onClick={handlePrint} variant="outline" className="border-slate-300">
           <Printer className="w-4 h-4 mr-2" />
           Imprimir
@@ -53,10 +61,12 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
           <Download className="w-4 h-4 mr-2" />
           Guardar PDF
         </Button>
-        <Button onClick={onNuevaCotizacion} className="bg-blue-600 hover:bg-blue-700">
-          <Share2 className="w-4 h-4 mr-2" />
-          Nueva Cotización
-        </Button>
+        {onSalir && (
+          <Button onClick={onSalir} variant="outline" className="border-slate-300">
+            <Home className="w-4 h-4 mr-2" />
+            Salir
+          </Button>
+        )}
       </div>
 
       <Card ref={cotizacionRef} className="border-slate-300 shadow-lg print:shadow-none">
@@ -154,7 +164,7 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
           {/* ─── TABLA DE PARTIDAS ─── */}
           <div className="mb-8 print:mb-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3 print:mb-2">
-              Conceptos y Partidas
+              Items
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
@@ -164,7 +174,7 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
                       #
                     </th>
                     <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2">
-                      Código / Descripción
+                      Descripción
                     </th>
                     <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2">
                       Material
@@ -194,29 +204,20 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
                         </td>
                         <td className="p-2.5 align-top print:p-2">
                           <div className="font-semibold text-slate-900">
-                            {pieza.codigo || pieza.nombre}
+                            {pieza.nombre}
                           </div>
-                          {pieza.codigo && pieza.nombre !== pieza.codigo && (
-                            <div className="text-slate-600 text-xs mt-0.5">
-                              {pieza.nombre}
+                          {pieza.codigo && (
+                            <div className="text-slate-500 text-xs mt-0.5">
+                              Código: {pieza.codigo}
                             </div>
                           )}
-                          {pieza.procesos.length > 0 && (
+                          {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 && (
                             <div className="text-xs text-slate-500 mt-1">
-                              {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 ? (
-                                <>
-                                  <span className="font-medium text-slate-600">Procesos externos:</span>{' '}
-                                  {pieza.procesos
-                                    .filter(p => p.tipo === 'otro')
-                                    .map(p => `${p.nombre} (${formatearMoneda(p.costoTotal)})`)
-                                    .join(', ')}
-                                </>
-                              ) : (
-                                <>
-                                  <span className="font-medium text-slate-600">Procesos:</span>{' '}
-                                  {pieza.procesos.map(p => p.nombre).join(', ')}
-                                </>
-                              )}
+                              <span className="font-medium text-slate-600">Procesos externos:</span>{' '}
+                              {pieza.procesos
+                                .filter(p => p.tipo === 'otro')
+                                .map(p => p.nombre)
+                                .join(', ')}
                             </div>
                           )}
                         </td>
@@ -296,20 +297,6 @@ export function CotizacionFinalStep({ cotizacion, onNuevaCotizacion }: Cotizacio
                   {formatearMoneda(cotizacion.iva)}
                 </span>
               </div>
-
-              {/* Margen de utilidad (condicional) */}
-              {cotizacion.margenUtilidad > 0 && (
-                <div className="flex justify-between items-center py-2 text-sm">
-                  <span className="text-slate-600">
-                    Margen de utilidad ({cotizacion.margenUtilidad}%)
-                  </span>
-                  <span className="font-medium text-slate-700">
-                    {formatearMoneda(
-                      cotizacion.subtotal * (cotizacion.margenUtilidad / 100)
-                    )}
-                  </span>
-                </div>
-              )}
 
               {/* Línea separadora antes del total */}
               <div className="border-t-2 border-blue-600 my-3" />
