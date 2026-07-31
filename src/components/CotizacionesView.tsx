@@ -39,6 +39,8 @@ interface CotizacionConDetalle {
   created_at: string;
   usuario_id: string;
   datos_cliente?: any;
+  moneda?: string;
+  tipo_cambio?: number;
 }
 
 const estadosConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -111,6 +113,9 @@ export function CotizacionesView({
     return estado === 'comprada' || estado === 'convertida';
   };
 
+  // Helper para símbolo de moneda
+  const getSimboloMoneda = (moneda: string) => moneda === 'USD' ? 'US$' : '$';
+
   // Procesar cotizaciones para extraer empresa y contacto
   const cotizacionesProcesadas: CotizacionConDetalle[] = useMemo(() => {
     return cotizaciones.map(cot => {
@@ -132,6 +137,8 @@ export function CotizacionesView({
         created_at: cot.created_at,
         usuario_id: cot.usuario_id,
         datos_cliente: datosCliente,
+        moneda: cot.moneda || 'MXN',
+        tipo_cambio: cot.tipo_cambio || 1,
       };
     });
   }, [cotizaciones]);
@@ -215,7 +222,7 @@ export function CotizacionesView({
     return vendedor?.nombre || 'Desconocido';
   };
 
-  // Estadísticas
+  // Estadísticas (en MXN - globales)
   const totalCotizaciones = cotizacionesFiltradas.length;
   const totalCompradas = cotizacionesFiltradas.filter(c => esComprada(c.estado)).length;
   const totalPendientes = totalCotizaciones - totalCompradas;
@@ -258,7 +265,7 @@ export function CotizacionesView({
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Total Cotizado</p>
             <p className="text-xl font-bold text-slate-900">
-              ${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              {getSimboloMoneda('MXN')}{totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
           </CardContent>
         </Card>
@@ -266,7 +273,7 @@ export function CotizacionesView({
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Monto Comprado</p>
             <p className="text-xl font-bold text-green-600">
-              ${montoComprado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              {getSimboloMoneda('MXN')}{montoComprado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
           </CardContent>
         </Card>
@@ -274,7 +281,7 @@ export function CotizacionesView({
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Pendiente</p>
             <p className="text-xl font-bold text-amber-600">
-              ${(totalMonto - montoComprado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              {getSimboloMoneda('MXN')}{(totalMonto - montoComprado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
           </CardContent>
         </Card>
@@ -377,7 +384,7 @@ export function CotizacionesView({
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-slate-900">
-                        ${totalEmpresa.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        {getSimboloMoneda(cotizacionesEmpresa[0]?.moneda || 'MXN')}{totalEmpresa.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </p>
                       <p className="text-xs text-slate-500">Total acumulado</p>
                     </div>
@@ -420,10 +427,10 @@ export function CotizacionesView({
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-right font-medium text-slate-700">
-                                  ${totalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  {getSimboloMoneda(cot.moneda || 'MXN')}{totalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                 </td>
                                 <td className="px-4 py-3 text-right font-bold text-slate-900">
-                                  ${cot.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  {getSimboloMoneda(cot.moneda || 'MXN')}{cot.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   {comprada ? (
@@ -479,7 +486,7 @@ export function CotizacionesView({
                                               <p className="text-sm text-slate-600">Cotización:</p>
                                               <p className="font-semibold">{cot.numero}</p>
                                               <p className="text-sm">{cot.empresa} - {cot.proyecto_nombre}</p>
-                                              <p className="text-lg font-bold text-green-600">${cot.total.toFixed(2)}</p>
+                                              <p className="text-lg font-bold text-green-600">{getSimboloMoneda(cot.moneda || 'MXN')}{cot.total.toFixed(2)}</p>
                                               {isAdmin && (
                                                 <p className="text-xs text-blue-600 mt-1">
                                                   <User className="w-3 h-3 inline mr-1" />

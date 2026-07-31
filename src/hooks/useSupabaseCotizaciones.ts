@@ -20,6 +20,8 @@ export interface CotizacionDB {
   estado: string;
   created_at: string;
   updated_at: string;
+  moneda?: string;
+  tipo_cambio?: number;
 }
 
 export function useSupabaseCotizaciones() {

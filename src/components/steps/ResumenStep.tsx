@@ -57,6 +57,13 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
         {datosCliente.nombre && (
           <p className="text-sm text-slate-500">Contacto: {datosCliente.nombre}</p>
         )}
+      </div>
+      <div className="border-b border-slate-200 pb-4">
+        <h2 className="text-xl font-bold text-slate-900">{proyecto.nombre || 'Cotizaci\u00F3n'}</h2>
+        <p className="text-sm text-slate-600">Cliente: {datosCliente.empresa || 'Sin empresa'}</p>
+        {datosCliente.nombre && (
+          <p className="text-sm text-slate-500">Contacto: {datosCliente.nombre}</p>
+        )}
         <div className="flex items-center gap-2 mt-2">
           <span className={`px-2 py-1 rounded text-xs font-bold ${cotizacion.moneda === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
             {cotizacion.moneda === 'USD' ? 'US$ USD' : '$ MXN'}
@@ -235,6 +242,39 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
       </Card>
 
       {/* Condiciones comerciales */}
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+        <h4 className="text-sm font-semibold text-slate-800">Condiciones Comerciales</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-slate-700">
+          <div className="flex justify-between">
+            <span className="text-slate-500">Moneda:</span>
+            <span className={`font-bold px-2 py-0.5 rounded text-xs ${cotizacion.moneda === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+              {cotizacion.moneda === 'USD' ? 'US$ USD' : '$ MXN'}
+            </span>
+          </div>
+          {cotizacion.moneda === 'USD' && (
+            <div className="flex justify-between">
+              <span className="text-slate-500">Tipo de cambio:</span>
+              <span className="font-medium">{cotizacion.tipoCambio} MXN/USD</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-slate-500">Validez de oferta:</span>
+            <span className="font-medium">{condiciones.validezDias} días</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">Tiempo de entrega:</span>
+            <span className="font-medium">{condiciones.tiempoEntregaDias} días hábiles</span>
+          </div>
+          <div className="flex justify-between col-span-2">
+            <span className="text-slate-500">Forma de pago:</span>
+            <span className="font-medium">{condiciones.formaPago}</span>
+          </div>
+          <div className="flex justify-between col-span-2">
+            <span className="text-slate-500">Garantía:</span>
+            <span className="font-medium">{condiciones.garantia}</span>
+          </div>
+        </div>
+      </div>
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
         <h4 className="text-sm font-semibold text-slate-800">Condiciones Comerciales</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700">
