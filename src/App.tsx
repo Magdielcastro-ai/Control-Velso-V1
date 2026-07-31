@@ -1174,6 +1174,19 @@ function App() {
         return (
           <CotizacionFinalStep
             cotizacion={cotizacion}
+            onRegresar={() => {
+              setVistaActual('cotizacion');
+              setPasoActual('resumen');
+            }}
+            onSalir={() => {
+              setVistaActual('home');
+              setPasoActual('taller');
+            }}
+          />
+        );
+        return (
+          <CotizacionFinalStep
+            cotizacion={cotizacion}
             onRegresar={() => setPasoActual('resumen')}
             onSalir={() => {
               setVistaActual('home');
