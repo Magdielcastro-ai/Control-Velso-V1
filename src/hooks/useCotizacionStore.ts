@@ -527,6 +527,20 @@ export const useCotizacionStore = () => {
     setCotizacion(prev => ({ ...prev, condiciones: { ...prev.condiciones, ...datos } }));
   }, []);
 
+  const actualizarMoneda = useCallback((moneda: import('@/types/cotizacion').Moneda) => {
+    setCotizacion(prev => {
+      const nueva = { ...prev, moneda };
+      return recalcularTotales(nueva);
+    });
+  }, []);
+
+  const actualizarTipoCambio = useCallback((tipoCambio: number) => {
+    setCotizacion(prev => {
+      const nueva = { ...prev, tipoCambio };
+      return recalcularTotales(nueva);
+    });
+  }, []);
+
   const actualizarMargenUtilidad = useCallback((margen: number) => {
     setCotizacion(prev => {
       const nueva = { ...prev, margenUtilidad: margen };
@@ -888,6 +902,8 @@ export const useCotizacionStore = () => {
     actualizarProyecto,
     actualizarCostosAdicionales,
     actualizarCondiciones,
+    actualizarMoneda,
+    actualizarTipoCambio,
     actualizarMargenUtilidad,
     cambiarTipoCotizacion,
     guardarCotizacion,

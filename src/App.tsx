@@ -263,6 +263,8 @@ function App() {
     guardarCotizacion,
     cargarCotizacion,
     nuevaCotizacion,
+    actualizarMoneda,
+    actualizarTipoCambio,
     refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
 
@@ -586,6 +588,14 @@ function App() {
     } else {
       toast.error('No se pudo cargar la cotización');
     }
+  };
+
+  const handleCambiarMoneda = (moneda: 'MXN' | 'USD') => {
+    actualizarMoneda(moneda);
+  };
+
+  const handleCambiarTipoCambio = (tipoCambio: number) => {
+    actualizarTipoCambio(tipoCambio);
   };
 
   /*
@@ -1145,6 +1155,10 @@ function App() {
                   <CondicionesStep 
                     datos={cotizacion.condiciones}
                     onChange={actualizarCondiciones}
+                    moneda={cotizacion.moneda || 'MXN'}
+                    tipoCambio={cotizacion.tipoCambio || 1}
+                    onCambiarMoneda={handleCambiarMoneda}
+                    onCambiarTipoCambio={handleCambiarTipoCambio}
                   />
                 )}
                 {pasoActual === 'resumen' && (

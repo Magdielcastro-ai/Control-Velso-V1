@@ -2,15 +2,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, CreditCard, Percent, Shield, FileText } from 'lucide-react';
-import type { CondicionesComerciales } from '@/types/cotizacion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, Clock, CreditCard, Percent, Shield, FileText, Coins, DollarSign } from 'lucide-react';
+import type { CondicionesComerciales, Moneda } from '@/types/cotizacion';
 
 interface CondicionesStepProps {
   datos: CondicionesComerciales;
+  moneda: Moneda;
+  tipoCambio: number;
   onChange: (datos: Partial<CondicionesComerciales>) => void;
+  onCambiarMoneda: (moneda: Moneda) => void;
+  onCambiarTipoCambio: (tipoCambio: number) => void;
 }
 
-export function CondicionesStep({ datos, onChange }: CondicionesStepProps) {
+export function CondicionesStep({ 
+  datos, 
+  moneda, 
+  tipoCambio, 
+  onChange, 
+  onCambiarMoneda, 
+  onCambiarTipoCambio 
+}: CondicionesStepProps) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
@@ -96,6 +108,54 @@ export function CondicionesStep({ datos, onChange }: CondicionesStepProps) {
                 className="border-slate-300"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Coins className="w-5 h-5 text-blue-600" />
+              Moneda y Tipo de Cambio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-slate-500" />
+                Moneda
+              </Label>
+              <Select value={moneda} onValueChange={(val) => onCambiarMoneda(val as Moneda)}>
+                <SelectTrigger className="border-slate-300">
+                  <SelectValue placeholder="Seleccionar moneda" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MXN">MXN - Peso Mexicano ($)</SelectItem>
+                  <SelectItem value="USD">USD - Dólar Estadounidense (US$)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {moneda === 'USD' && (
+              <div className="space-y-2">
+                <Label htmlFor="tipoCambio" className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-slate-500" />
+                  Tipo de Cambio (1 USD = ? MXN)
+                </Label>
+                <Input
+                  id="tipoCambio"
+                  type="number"
+                  min={1}
+                  step={0.01}
+                  value={tipoCambio}
+                  onChange={(e) => onCambiarTipoCambio(parseFloat(e.target.value) || 1)}
+                  placeholder="Ej: 18.50"
+                  className="border-slate-300"
+                />
+                <p className="text-xs text-slate-500">
+                  El tipo de cambio se usará para convertir a MXN en reportes y dashboard
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
