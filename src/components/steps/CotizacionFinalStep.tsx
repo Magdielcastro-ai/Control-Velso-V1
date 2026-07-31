@@ -130,9 +130,11 @@ export function CotizacionFinalStep({ cotizacion, moneda = 'MXN', onRegresar, on
             </h3>
             <div className="bg-slate-50 p-4 rounded-lg">
               <p className="font-semibold text-slate-900">
-                {cotizacion.datosCliente.nombre}
-                {cotizacion.datosCliente.empresa && ` - ${cotizacion.datosCliente.empresa}`}
+                {cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre}
               </p>
+              {cotizacion.datosCliente.empresa && cotizacion.datosCliente.nombre !== cotizacion.datosCliente.empresa && (
+                <p className="text-sm text-slate-600">Contacto: {cotizacion.datosCliente.nombre}</p>
+              )}
               {cotizacion.datosCliente.direccion && (
                 <p className="text-sm text-slate-600">{cotizacion.datosCliente.direccion}</p>
               )}
