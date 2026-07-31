@@ -21,16 +21,19 @@ import {
   StickyNote,
   CalendarDays,
 } from 'lucide-react';
-import type { Cotizacion } from '@/types/cotizacion';
+import type { Cotizacion, Moneda } from '@/types/cotizacion';
+import { formatearMoneda, getMonedaConfig } from '@/types/cotizacion';
 
 interface CotizacionFinalStepProps {
   cotizacion: Cotizacion;
+  moneda?: Moneda;
   onRegresar?: () => void;
   onSalir?: () => void;
 }
 
-export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: CotizacionFinalStepProps) {
+export function CotizacionFinalStep({ cotizacion, moneda = 'MXN', onRegresar, onSalir }: CotizacionFinalStepProps) {
   const cotizacionRef = useRef<HTMLDivElement>(null);
+  const monedaConfig = getMonedaConfig(moneda);
 
   const handlePrint = () => {
     window.print();
@@ -240,11 +243,11 @@ export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: Cotizac
                           {pieza.cantidad}
                         </td>
                         <td className="p-2.5 text-right align-top print:p-2">
-                          <span className="font-medium">${unitPrice.toFixed(2)}</span>
+                          <span className="font-medium">{formatearMoneda(unitPrice, moneda)}</span>
                         </td>
                         <td className="p-2.5 text-right align-top print:p-2">
                           <span className="font-semibold text-slate-900">
-                            ${lineTotal.toFixed(2)}
+                            {formatearMoneda(lineTotal, moneda)}
                           </span>
                         </td>
                       </tr>
@@ -255,22 +258,26 @@ export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: Cotizac
                   {renderCostoAdicionalRow(
                     cotizacion.piezas.length + 1,
                     'Envío / Entrega',
-                    cotizacion.costosAdicionales.envio
+                    cotizacion.costosAdicionales.envio,
+                    moneda
                   )}
                   {renderCostoAdicionalRow(
                     cotizacion.piezas.length + 2,
                     'Diseño CAD/CAM',
-                    cotizacion.costosAdicionales.diseno
+                    cotizacion.costosAdicionales.diseno,
+                    moneda
                   )}
                   {renderCostoAdicionalRow(
                     cotizacion.piezas.length + 3,
                     'Estudio de Material',
-                    cotizacion.costosAdicionales.estudioMaterial
+                    cotizacion.costosAdicionales.estudioMaterial,
+                    moneda
                   )}
                   {renderCostoAdicionalRow(
                     cotizacion.piezas.length + 4,
                     'Prueba de Dureza',
-                    cotizacion.costosAdicionales.pruebaDureza
+                    cotizacion.costosAdicionales.pruebaDureza,
+                    moneda
                   )}
                 </tbody>
               </table>
@@ -284,7 +291,7 @@ export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: Cotizac
               <div className="flex justify-between items-center py-2 text-sm">
                 <span className="text-slate-600">Subtotal</span>
                 <span className="font-semibold text-slate-800">
-                  {formatearMoneda(cotizacion.subtotal)}
+                  {formatearMoneda(cotizacion.subtotal, moneda)}
                 </span>
               </div>
 
@@ -294,7 +301,7 @@ export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: Cotizac
                   IVA ({cotizacion.ivaPorcentaje}%)
                 </span>
                 <span className="font-medium text-slate-700">
-                  {formatearMoneda(cotizacion.iva)}
+                  {formatearMoneda(cotizacion.iva, moneda)}
                 </span>
               </div>
 
@@ -307,20 +314,20 @@ export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: Cotizac
                   Total
                 </span>
                 <span className="text-2xl font-extrabold text-blue-600 print:text-xl">
-                  {formatearMoneda(cotizacion.total)}
+                  {formatearMoneda(cotizacion.total, moneda)}
                 </span>
               </div>
 
               {/* Monto en letras */}
               <p className="text-xs text-slate-500 text-right mt-2 leading-relaxed">
-                {numeroALetras(cotizacion.total)} pesos{' '}
+                {numeroALetras(cotizacion.total)} {monedaConfig.nombre.toLowerCase()}{' '}
                 {((cotizacion.total % 1) * 100).toFixed(0).padStart(2, '0')}/100{' '}
                 <span className="font-medium text-slate-600">M.N.</span>
               </p>
 
               {/* Indicación de moneda */}
               <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
-                Moneda: Pesos Mexicanos (MXN)
+                Moneda: {monedaConfig.nombre} ({moneda})
               </p>
             </div>
           </div>
@@ -419,21 +426,12 @@ export function CotizacionFinalStep({ cotizacion, onRegresar, onSalir }: Cotizac
   );
 }
 
-/* ─── Helper: Formatear moneda MXN ─── */
-function formatearMoneda(valor: number): string {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(valor);
-}
-
 /* ─── Helper: Renderizar fila de costo adicional ─── */
 function renderCostoAdicionalRow(
   num: number,
   label: string,
-  item: { costo: number; incluidoGratis: boolean }
+  item: { costo: number; incluidoGratis: boolean },
+  moneda: Moneda = 'MXN'
 ): import('react').ReactNode {
   if (!item || item.costo <= 0) return null;
 
@@ -448,10 +446,10 @@ function renderCostoAdicionalRow(
         <td className="p-2.5 align-top print:p-2">—</td>
         <td className="p-2.5 text-right align-top print:p-2">1</td>
         <td className="p-2.5 text-right align-top print:p-2">
-          <span className="line-through text-slate-400">${item.costo.toFixed(2)}</span>
+          <span className="line-through text-slate-400">{formatearMoneda(item.costo, moneda)}</span>
         </td>
         <td className="p-2.5 text-right align-top print:p-2">
-          <span className="font-semibold text-green-600">$0.00</span>
+          <span className="font-semibold text-green-600">{formatearMoneda(0, moneda)}</span>
         </td>
       </tr>
     );
@@ -466,10 +464,10 @@ function renderCostoAdicionalRow(
       <td className="p-2.5 align-top print:p-2">—</td>
       <td className="p-2.5 text-right align-top print:p-2">1</td>
       <td className="p-2.5 text-right align-top print:p-2">
-        <span className="font-medium">${item.costo.toFixed(2)}</span>
+        <span className="font-medium">{formatearMoneda(item.costo, moneda)}</span>
       </td>
       <td className="p-2.5 text-right align-top print:p-2">
-        <span className="font-semibold text-slate-900">${item.costo.toFixed(2)}</span>
+        <span className="font-semibold text-slate-900">{formatearMoneda(item.costo, moneda)}</span>
       </td>
     </tr>
   );

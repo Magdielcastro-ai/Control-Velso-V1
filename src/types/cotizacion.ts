@@ -2,6 +2,36 @@
 
 export type TipoCotizacion = 'pieza_unica' | 'proyecto';
 
+// TIPOS DE MONEDA
+export type Moneda = 'MXN' | 'USD' | 'EUR';
+
+export interface MonedaConfig {
+  codigo: Moneda;
+  nombre: string;
+  simbolo: string;
+  locale: string;
+}
+
+export const MONEDAS: MonedaConfig[] = [
+  { codigo: 'MXN', nombre: 'Peso Mexicano', simbolo: '$', locale: 'es-MX' },
+  { codigo: 'USD', nombre: 'Dólar Estadounidense', simbolo: 'US$', locale: 'en-US' },
+  { codigo: 'EUR', nombre: 'Euro', simbolo: '€', locale: 'de-DE' },
+];
+
+export const getMonedaConfig = (moneda: Moneda): MonedaConfig => {
+  return MONEDAS.find(m => m.codigo === moneda) || MONEDAS[0];
+};
+
+export const formatearMoneda = (valor: number, moneda: Moneda = 'MXN'): string => {
+  const config = getMonedaConfig(moneda);
+  return new Intl.NumberFormat(config.locale, {
+    style: 'currency',
+    currency: moneda,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(valor);
+};
+
 export interface DatosTaller {
   nombre: string;
   direccion: string;
