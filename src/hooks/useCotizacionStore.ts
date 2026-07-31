@@ -567,6 +567,16 @@ export const useCotizacionStore = () => {
   // ========== GUARDAR / CARGAR ==========
 
   const guardarCotizacion = useCallback(async (estado: CotizacionGuardada['estado'] = 'borrador') => {
+    // Helpers para sanitizar números antes de enviar a Supabase
+    const safeNumber = (val: any): number => {
+      const num = Number(val);
+      return isNaN(num) ? 0 : num;
+    };
+    const safeInteger = (val: any): number => {
+      const num = Math.round(Number(val));
+      return isNaN(num) ? 0 : num;
+    };
+
     // Recalcular totales antes de guardar para asegurar que subtotal, iva y total sean correctos
     const cotizacionRecalculada = recalcularTotales(cotizacion);
     const id = cotizacionRecalculada.id || crypto.randomUUID();
@@ -584,9 +594,9 @@ export const useCotizacionStore = () => {
       clienteNombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
       proyectoNombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
       moneda: nuevaCotizacion.moneda,
-      tipoCambio: nuevaCotizacion.tipoCambio,
-      total: nuevaCotizacion.total,
-      totalMXN: nuevaCotizacion.totalMXN,
+      tipoCambio: safeNumber(nuevaCotizacion.tipoCambio),
+      total: safeNumber(nuevaCotizacion.total),
+      totalMXN: safeNumber(nuevaCotizacion.totalMXN),
       estado,
       usuarioId: user?.id,
       cantidadPiezas: nuevaCotizacion.piezas.length,
@@ -620,16 +630,16 @@ export const useCotizacionStore = () => {
           procesos: nuevaCotizacion.procesos,
           costos_adicionales: nuevaCotizacion.costosAdicionales,
           condiciones: nuevaCotizacion.condiciones,
-          margen_utilidad: Math.round(Number(nuevaCotizacion.margenUtilidad)) || 30,
-          iva_porcentaje: Math.round(Number(nuevaCotizacion.ivaPorcentaje)) || 16,
+          margen_utilidad: safeInteger(nuevaCotizacion.margenUtilidad),
+          iva_porcentaje: safeInteger(nuevaCotizacion.ivaPorcentaje),
           moneda: nuevaCotizacion.moneda,
-          tipo_cambio: Number(nuevaCotizacion.tipoCambio) || 1,
-          subtotal: Number(nuevaCotizacion.subtotal) || 0,
-          subtotal_mxn: Number(nuevaCotizacion.subtotalMXN) || 0,
-          iva: Number(nuevaCotizacion.iva) || 0,
-          iva_mxn: Number(nuevaCotizacion.ivaMXN) || 0,
-          total: Number(nuevaCotizacion.total) || 0,
-          total_mxn: Number(nuevaCotizacion.totalMXN) || 0,
+          tipo_cambio: safeNumber(nuevaCotizacion.tipoCambio),
+          subtotal: safeNumber(nuevaCotizacion.subtotal),
+          subtotal_mxn: safeNumber(nuevaCotizacion.subtotalMXN),
+          iva: safeNumber(nuevaCotizacion.iva),
+          iva_mxn: safeNumber(nuevaCotizacion.ivaMXN),
+          total: safeNumber(nuevaCotizacion.total),
+          total_mxn: safeNumber(nuevaCotizacion.totalMXN),
           estado,
         };
 
@@ -657,6 +667,7 @@ export const useCotizacionStore = () => {
 
     return id;
   }, [cotizacion]);
+
   const cargarCotizacion = useCallback(async (id: string): Promise<boolean> => {
     try {
       console.log('[cargarCotizacion] Intentando cargar desde Supabase:', id);
