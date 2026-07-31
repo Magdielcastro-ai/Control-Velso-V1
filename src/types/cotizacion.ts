@@ -312,7 +312,8 @@ export interface PiezaCatalogo {
   updated_at?: string;
 }
 
-export interface Cotizacion {  id: string;
+export interface Cotizacion {
+  id: string;
   numero: string;
   fecha: string;
   tipo: TipoCotizacion;
@@ -324,10 +325,16 @@ export interface Cotizacion {  id: string;
   procesos: Proceso[];     // Legacy
   costosAdicionales: CostosAdicionalesProyecto;
   condiciones: CondicionesComerciales;
+  // Moneda y tipo de cambio
+  moneda: Moneda;
+  tipoCambio: number;
   subtotal: number;
+  subtotalMXN: number;
   ivaPorcentaje: number;
   iva: number;
+  ivaMXN: number;
   total: number;
+  totalMXN: number;
   margenUtilidad: number;
 }
 
@@ -351,7 +358,10 @@ export interface CotizacionGuardada {
   tipo: TipoCotizacion;
   clienteNombre: string;
   proyectoNombre: string;
+  moneda: Moneda;
+  tipoCambio: number;
   total: number;
+  totalMXN: number;
   estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
   usuarioId?: string;
   cantidadPiezas?: number;

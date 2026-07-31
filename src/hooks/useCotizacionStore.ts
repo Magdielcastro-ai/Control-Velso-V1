@@ -140,10 +140,16 @@ const cotizacionVacia = (tipo: TipoCotizacion = 'proyecto'): Cotizacion => ({
     anticipoPorcentaje: 50,
     garantia: '30 días contra defectos de fabricación',
   },
+  // Moneda y tipo de cambio
+  moneda: 'MXN' as import('@/types/cotizacion').Moneda,
+  tipoCambio: 1,
   subtotal: 0,
+  subtotalMXN: 0,
   ivaPorcentaje: 16,
   iva: 0,
+  ivaMXN: 0,
   total: 0,
+  totalMXN: 0,
   margenUtilidad: 30,
 });
 
@@ -157,7 +163,7 @@ export const useCotizacionStore = () => {
       console.log('[useCotizacionStore] Refrescando desde Supabase...');
       const { data, error } = await supabase
         .from('cotizaciones')
-        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, total, estado, usuario_id, piezas')
+        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, moneda, tipo_cambio, total, total_mxn, estado, usuario_id, piezas')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -181,7 +187,10 @@ export const useCotizacionStore = () => {
             tipo: c.tipo || 'pieza_unica',
             clienteNombre: c.cliente_nombre || 'Sin cliente',
             proyectoNombre: c.proyecto_nombre || 'Sin nombre',
+            moneda: c.moneda || 'MXN',
+            tipoCambio: c.tipo_cambio || 1,
             total: Number(c.total) || 0,
+            totalMXN: c.total_mxn || Number(c.total) || 0,
             estado: c.estado || 'borrador',
             usuarioId: c.usuario_id,
             cantidadPiezas,
@@ -479,12 +488,21 @@ export const useCotizacionStore = () => {
       const iva = subtotal * (c.ivaPorcentaje / 100);
       const total = subtotal + iva;
 
+      // Calcular valores en MXN
+      const tipoCambio = c.tipoCambio || 1;
+      const subtotalMXN = subtotal * tipoCambio;
+      const ivaMXN = iva * tipoCambio;
+      const totalMXN = total * tipoCambio;
+
       return {
         ...c,
         piezas: piezasRecalculadas,
         subtotal,
+        subtotalMXN,
         iva,
+        ivaMXN,
         total,
+        totalMXN,
       };
     } finally {
       recalcularTotalesRef.current = false;
@@ -551,7 +569,10 @@ export const useCotizacionStore = () => {
       tipo: nuevaCotizacion.tipo,
       clienteNombre: nuevaCotizacion.datosCliente.nombre || nuevaCotizacion.datosCliente.empresa || 'Sin cliente',
       proyectoNombre: nuevaCotizacion.proyecto.nombre || 'Sin nombre',
+      moneda: nuevaCotizacion.moneda,
+      tipoCambio: nuevaCotizacion.tipoCambio,
       total: nuevaCotizacion.total,
+      totalMXN: nuevaCotizacion.totalMXN,
       estado,
       usuarioId: user?.id,
       cantidadPiezas: nuevaCotizacion.piezas.length,
@@ -587,8 +608,14 @@ export const useCotizacionStore = () => {
           condiciones: nuevaCotizacion.condiciones,
           margen_utilidad: nuevaCotizacion.margenUtilidad,
           iva_porcentaje: nuevaCotizacion.ivaPorcentaje,
+          moneda: nuevaCotizacion.moneda,
+          tipo_cambio: nuevaCotizacion.tipoCambio,
           subtotal: nuevaCotizacion.subtotal,
+          subtotal_mxn: nuevaCotizacion.subtotalMXN,
+          iva: nuevaCotizacion.iva,
+          iva_mxn: nuevaCotizacion.ivaMXN,
           total: nuevaCotizacion.total,
+          total_mxn: nuevaCotizacion.totalMXN,
           estado,
         };
 
@@ -753,10 +780,15 @@ export const useCotizacionStore = () => {
           procesos: data.procesos || [],
           costosAdicionales: migrarCostosAdicionales(data.costos_adicionales) || cotizacionVacia().costosAdicionales,
           condiciones: data.condiciones || cotizacionVacia().condiciones,
+          moneda: data.moneda || 'MXN',
+          tipoCambio: data.tipo_cambio || 1,
           subtotal: data.subtotal || 0,
+          subtotalMXN: data.subtotal_mxn || (data.subtotal || 0),
           ivaPorcentaje: data.iva_porcentaje || 16,
-          iva: (data.subtotal || 0) * (data.iva_porcentaje || 16) / 100,
+          iva: data.iva || ((data.subtotal || 0) * (data.iva_porcentaje || 16) / 100),
+          ivaMXN: data.iva_mxn || ((data.subtotal || 0) * (data.iva_porcentaje || 16) / 100),
           total: data.total || 0,
+          totalMXN: data.total_mxn || (data.total || 0),
           margenUtilidad: data.margen_utilidad || 30,
         };
 

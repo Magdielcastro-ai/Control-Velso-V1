@@ -39,6 +39,10 @@ export function CotizacionFinalStep({ cotizacion, moneda = 'MXN', onRegresar, on
     window.print();
   };
 
+  const handleGuardarPDF = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
@@ -60,7 +64,7 @@ export function CotizacionFinalStep({ cotizacion, moneda = 'MXN', onRegresar, on
           <Printer className="w-4 h-4 mr-2" />
           Imprimir
         </Button>
-        <Button onClick={handlePrint} variant="outline" className="border-slate-300">
+        <Button onClick={handleGuardarPDF} variant="outline" className="border-slate-300">
           <Download className="w-4 h-4 mr-2" />
           Guardar PDF
         </Button>
