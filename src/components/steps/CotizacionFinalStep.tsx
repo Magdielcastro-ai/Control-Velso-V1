@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Home,
   CheckCircle,
-  Factory,
   Calendar,
   FileText,
   Phone,
@@ -83,7 +82,7 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
           <div className="flex justify-between items-start mb-8 border-b pb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <Factory className="w-10 h-10 text-blue-600" />
+                <img src="/logo-velso.png" alt="Logo Velso" className="w-16 h-16 object-contain" />
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900">
                     {cotizacion.datosTaller.nombre || 'Taller CNC'}
