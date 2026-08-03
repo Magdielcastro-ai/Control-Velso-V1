@@ -356,6 +356,7 @@ export interface CotizacionGuardada {
   fecha: string;
   tipo: TipoCotizacion;
   clienteNombre: string;
+  clienteId?: string;
   proyectoNombre: string;
   moneda: Moneda;
   tipoCambio: number;
@@ -364,4 +365,11 @@ export interface CotizacionGuardada {
   estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
   usuarioId?: string;
   cantidadPiezas?: number;
+  // Campos adicionales para conversión a proyecto
+  margenUtilidad?: number;
+  ivaPorcentaje?: number;
+  piezas?: PiezaCotizacion[];
+  materiales?: Material[];
+  procesos?: Proceso[];
+  costosAdicionales?: CostosAdicionalesProyecto;
 }

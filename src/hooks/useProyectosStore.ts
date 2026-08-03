@@ -55,6 +55,8 @@ export const useProyectosStore = () => {
       if (data && data.length > 0) {
         const proyectosMapeados: ProyectoVenta[] = data.map(p => ({
           id: p.id,
+          codigoProyecto: p.codigo_proyecto || '',
+          tipoProyecto: p.tipo_proyecto || 'maquinado',
           numeroCotizacion: p.numero_cotizacion || '',
           ordenCompra: p.orden_compra || '',
           clienteId: p.cliente_id || p.clienteid || '',
@@ -71,6 +73,7 @@ export const useProyectosStore = () => {
           numeroFactura: p.numero_factura,
           totalFacturado: p.total_facturado ? Number(p.total_facturado) : undefined,
           utilidadReal: p.utilidad_real ? Number(p.utilidad_real) : undefined,
+          piezas: p.piezas || [],
           materiales: p.materiales || [],
           procesos: p.procesos || [],
           costosAdicionales: p.costos_adicionales || {
@@ -164,17 +167,20 @@ export const useProyectosStore = () => {
   const convertirAVenta = useCallback(async (datos: {
     numeroCotizacion: string;
     ordenCompra: string;
+    tipoProyecto: 'suministro' | 'maquinado';
     clienteId: string;
     clienteNombre: string;
     proyectoNombre: string;
     totalCotizado: number;
     margenUtilidad: number;
     ivaPorcentaje: number;
+    piezas: any[];
     materiales: any[];
     procesos: any[];
     costosAdicionales: any;
   }) => {
     console.log('[useProyectosStore] === CONVERTIR A VENTA ===');
+    console.log('[useProyectosStore] Datos recibidos:', datos);
 
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -183,8 +189,27 @@ export const useProyectosStore = () => {
         return false;
       }
 
+      // 1. Generar código de proyecto via RPC
+      console.log('[useProyectosStore] Generando código para tipo:', datos.tipoProyecto);
+      const { data: codigoData, error: codigoError } = await supabase
+        .rpc('generar_codigo_proyecto', {
+          tipo_proyecto: datos.tipoProyecto
+        });
+
+      if (codigoError) {
+        console.error('[useProyectosStore] ERROR generando código:', codigoError);
+        toast.error('Error generando código de proyecto: ' + codigoError.message);
+        return false;
+      }
+
+      const codigoProyecto = codigoData || '';
+      console.log('[useProyectosStore] Código generado:', codigoProyecto);
+
+      // 2. Construir datos del proyecto
       const proyectoData: any = {
         usuario_id: userData.user.id,
+        codigo_proyecto: codigoProyecto,
+        tipo_proyecto: datos.tipoProyecto,
         numero_cotizacion: datos.numeroCotizacion || '',
         orden_compra: datos.ordenCompra || '',
         cliente_nombre: datos.clienteNombre || '',
@@ -194,15 +219,20 @@ export const useProyectosStore = () => {
         iva_porcentaje: Number(datos.ivaPorcentaje) || 16,
         estado: 'en_fabricacion',
         fecha_venta: new Date().toISOString(),
+        piezas: datos.piezas || [],
         materiales: datos.materiales || [],
         procesos: datos.procesos || [],
         costos_adicionales: datos.costosAdicionales || {},
       };
 
+      // clienteId es obligatorio, no opcional
       if (datos.clienteId && datos.clienteId.trim() !== '') {
         proyectoData.cliente_id = datos.clienteId;
       }
 
+      console.log('[useProyectosStore] Insertando proyecto:', proyectoData);
+
+      // 3. Insertar en Supabase
       const { data, error } = await supabase
         .from('proyectos')
         .insert([proyectoData])
@@ -230,6 +260,8 @@ export const useProyectosStore = () => {
           if (retryData) {
             const nuevoProyecto: ProyectoVenta = {
               id: retryData.id,
+              codigoProyecto: retryData.codigo_proyecto || '',
+              tipoProyecto: retryData.tipo_proyecto || 'maquinado',
               numeroCotizacion: retryData.numero_cotizacion || '',
               ordenCompra: retryData.orden_compra || '',
               clienteId: '',
@@ -240,12 +272,14 @@ export const useProyectosStore = () => {
               ivaPorcentaje: Number(retryData.iva_porcentaje) || 16,
               estado: retryData.estado || 'en_fabricacion',
               fechaVenta: retryData.fecha_venta || new Date().toISOString(),
+              piezas: retryData.piezas || [],
               materiales: retryData.materiales || [],
               procesos: retryData.procesos || [],
               costosAdicionales: retryData.costos_adicionales || {},
               usuarioId: retryData.usuario_id,
             };
             setProyectos(prev => [nuevoProyecto, ...prev]);
+            toast.success(`Proyecto ${nuevoProyecto.codigoProyecto} creado exitosamente`);
             return true;
           }
         }
@@ -257,6 +291,8 @@ export const useProyectosStore = () => {
       if (data) {
         const nuevoProyecto: ProyectoVenta = {
           id: data.id,
+          codigoProyecto: data.codigo_proyecto || '',
+          tipoProyecto: data.tipo_proyecto || 'maquinado',
           numeroCotizacion: data.numero_cotizacion || '',
           ordenCompra: data.orden_compra || '',
           clienteId: data.cliente_id || '',
@@ -267,12 +303,14 @@ export const useProyectosStore = () => {
           ivaPorcentaje: Number(data.iva_porcentaje) || 16,
           estado: data.estado || 'en_fabricacion',
           fechaVenta: data.fecha_venta || new Date().toISOString(),
+          piezas: data.piezas || [],
           materiales: data.materiales || [],
           procesos: data.procesos || [],
           costosAdicionales: data.costos_adicionales || {},
           usuarioId: data.usuario_id,
         };
         setProyectos(prev => [nuevoProyecto, ...prev]);
+        toast.success(`Proyecto ${nuevoProyecto.codigoProyecto} creado exitosamente`);
       }
 
       return true;

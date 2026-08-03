@@ -23,29 +23,22 @@ import {
   Package,
   Clock,
   DollarSign,
-  User
+  User,
+  Hash
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import type { ProyectoVenta, EstadoProyecto, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
+import type { ProyectoVenta, EstadoProyecto } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
 interface ProyectosViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
   cotizaciones: CotizacionGuardada[];
-  onConvertirAVenta?: (datos: {
-    numeroCotizacion: string;
-    ordenCompra: string;
-    clienteId: string;
-    clienteNombre: string;
-    proyectoNombre: string;
-    totalCotizado: number;
-    margenUtilidad: number;
-    ivaPorcentaje: number;
-    materiales: MaterialProyecto[];
-    procesos: ProcesoProyecto[];
-    costosAdicionales: CostosAdicionalesProyecto;
-  }) => void;
+  onConvertirAVenta?: (
+    cotizacion: CotizacionGuardada,
+    ordenCompra: string,
+    tipoProyecto: 'suministro' | 'maquinado'
+  ) => void;
   onEliminarProyecto?: (id: string) => void;
   onMarcarFabricado?: (id: string) => void;
   onMarcarEntregado?: (id: string) => void;
@@ -110,6 +103,7 @@ export function ProyectosView({
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<CotizacionGuardada | null>(null);
   const [ordenCompra, setOrdenCompra] = useState('');
+  const [tipoProyecto, setTipoProyecto] = useState<'suministro' | 'maquinado'>('maquinado');
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
 
@@ -150,7 +144,8 @@ export function ProyectosView({
       (p.proyectoNombre?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
       (p.clienteNombre?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
       (p.ordenCompra?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
-      (p.numeroFactura?.toLowerCase() || '').includes(busqueda.toLowerCase());
+      (p.numeroFactura?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
+      (p.codigoProyecto?.toLowerCase() || '').includes(busqueda.toLowerCase());
     
     const coincideEstado = filtroEstado === 'todos' || p.estado === filtroEstado;
     const coincideVendedor = vendedorFiltro === 'todos' || p.usuarioId === vendedorFiltro;
@@ -186,27 +181,10 @@ export function ProyectosView({
   const handleConvertir = () => {
     if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
     
-    onConvertirAVenta({
-      numeroCotizacion: cotizacionSeleccionada.numero,
-      ordenCompra,
-      clienteId: '',
-      clienteNombre: cotizacionSeleccionada.clienteNombre,
-      proyectoNombre: cotizacionSeleccionada.proyectoNombre,
-      totalCotizado: cotizacionSeleccionada.total,
-      margenUtilidad: 30,
-      ivaPorcentaje: 16,
-      materiales: [],
-      procesos: [],
-      costosAdicionales: {
-        disenoCAD: 0,
-        programacionCNC: 0,
-        setup: 0,
-        transporte: 0,
-        otro: 0,
-      },
-    });
+    onConvertirAVenta(cotizacionSeleccionada, ordenCompra, tipoProyecto);
 
     setOrdenCompra('');
+    setTipoProyecto('maquinado');
     setCotizacionSeleccionada(null);
     setDialogoConvertir(false);
   };
@@ -244,6 +222,11 @@ export function ProyectosView({
   const calcularHorasTotales = (proyecto: ProyectoVenta) => {
     const minutos = proyecto.procesos.reduce((sum, p) => sum + (p.tiempoMinutosCotizado || 0), 0);
     return (minutos / 60).toFixed(1);
+  };
+
+  // Calcular piezas totales de un proyecto
+  const calcularPiezasTotales = (proyecto: ProyectoVenta) => {
+    return proyecto.piezas?.length || 0;
   };
 
   return (
@@ -310,6 +293,19 @@ export function ProyectosView({
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Tipo de Proyecto *</Label>
+                  <Select value={tipoProyecto} onValueChange={(v) => setTipoProyecto(v as 'suministro' | 'maquinado')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="suministro">Suministro (SUM)</SelectItem>
+                      <SelectItem value="maquinado">Maquinado (MAQ)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Número de Orden de Compra *</Label>
                   <Input
                     value={ordenCompra}
@@ -338,7 +334,7 @@ export function ProyectosView({
           <Input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar proyecto, cliente, OC o factura..."
+            placeholder="Buscar proyecto, cliente, OC, factura o código..."
             className="pl-10"
           />
         </div>
@@ -450,6 +446,10 @@ export function ProyectosView({
                         </div>
                         <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
                           <span className="flex items-center gap-1">
+                            <Hash className="w-3 h-3" />
+                            {proyecto.codigoProyecto || 'Sin código'}
+                          </span>
+                          <span className="flex items-center gap-1">
                             <Building2 className="w-3 h-3" />
                             {proyecto.clienteNombre}
                           </span>
@@ -469,6 +469,10 @@ export function ProyectosView({
                           )}
                         </div>
                         <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Package className="w-3 h-3" />
+                            {calcularPiezasTotales(proyecto)} piezas
+                          </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {calcularHorasTotales(proyecto)}h cotizadas

@@ -1,4 +1,4 @@
-// Tipos para Sistema de Control de Ventas Velso
+import type { PiezaCotizacion } from './cotizacion';
 
 // Estados de proyecto
 export type EstadoProyecto = 
@@ -69,6 +69,8 @@ export interface CostosAdicionalesProyecto {
 // Proyecto/Venta completo
 export interface ProyectoVenta {
   id: string;
+  codigoProyecto: string;
+  tipoProyecto: 'suministro' | 'maquinado';
   numeroCotizacion: string;
   ordenCompra: string;
   numeroFactura?: string;
@@ -86,6 +88,7 @@ export interface ProyectoVenta {
   ivaPorcentaje: number;
   usuarioId?: string;
   // Datos de cotización
+  piezas: PiezaCotizacion[];
   materiales: MaterialProyecto[];
   procesos: ProcesoProyecto[];
   costosAdicionales: CostosAdicionalesProyecto;

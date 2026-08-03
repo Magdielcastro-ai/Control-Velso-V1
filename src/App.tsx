@@ -453,28 +453,37 @@ function App() {
   };
 
   // Convertir cotización a venta desde la vista de cotizaciones
-  const handleConvertirCotizacionAVenta = async (cotizacion: CotizacionGuardada, ordenCompra: string) => {
+  const handleConvertirCotizacionAVenta = async (
+    cotizacion: CotizacionGuardada,
+    ordenCompra: string,
+    tipoProyecto: 'suministro' | 'maquinado' = 'maquinado'
+  ) => {
     if (!canConvertirAVenta()) {
       toast.error('No tienes permiso para convertir cotizaciones');
       return;
     }
 
+    // Buscar la cotización completa para obtener las piezas
+    const cotizacionCompleta = cotizacionesGuardadas.find(c => c.id === cotizacion.id);
+
     await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
       ordenCompra,
-      clienteId: '',
+      tipoProyecto,
+      clienteId: cotizacion.clienteId || '',
       clienteNombre: cotizacion.clienteNombre,
       proyectoNombre: cotizacion.proyectoNombre,
       totalCotizado: cotizacion.total,
-      margenUtilidad: 30,
-      ivaPorcentaje: 16,
-      materiales: [],
-      procesos: [],
-      costosAdicionales: {
+      margenUtilidad: cotizacion.margenUtilidad || 30,
+      ivaPorcentaje: cotizacion.ivaPorcentaje || 16,
+      piezas: cotizacionCompleta?.piezas || [],
+      materiales: cotizacionCompleta?.materiales || [],
+      procesos: cotizacionCompleta?.procesos || [],
+      costosAdicionales: cotizacionCompleta?.costosAdicionales || {
         envio: { costo: 0, incluidoGratis: false },
         diseno: { costo: 0, incluidoGratis: false },
         estudioMaterial: { costo: 0, incluidoGratis: false },
-    pruebaDureza: { costo: 0, incluidoGratis: false },
+        pruebaDureza: { costo: 0, incluidoGratis: false },
       },
     });
     toast.success('Cotización convertida a venta exitosamente');
@@ -861,7 +870,7 @@ function App() {
               onVolver={irAHome}
               proyectos={proyectos}
               cotizaciones={cotizacionesGuardadas}
-              onConvertirAVenta={canConvertirAVenta() ? convertirAVenta : undefined}
+              onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
               onEliminarProyecto={canDeleteProyectos() ? eliminarProyecto : undefined}
               onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
