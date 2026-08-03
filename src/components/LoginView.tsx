@@ -27,6 +27,15 @@ export function LoginView({ onLogin, loading = false, error = null }: LoginViewP
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo y título */}
+        <div className="text-center mb-8">
+          <img src="/logo-velso.png" alt="Logo Velso" className="w-24 h-24 object-contain mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Sistema de Control de Ventas
+          </h1>
+          <p className="text-slate-400">
+            <span className="text-blue-400 font-semibold">Velso</span> CNC
+          </p>
+        </div>
 
         {/* Formulario de login */}
         <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
