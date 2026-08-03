@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import type { Cotizacion } from '@/types/cotizacion';
 
 export interface CotizacionDB {
@@ -29,15 +30,16 @@ export function useSupabaseCotizaciones() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Obtener todas las cotizaciones (para admin/superadmin)
+  // Obtener todas las cotizaciones ACTIVAS (no eliminadas)
   const getAllCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
-    console.log('[getAllCotizaciones] Cargando todas las cotizaciones...');
+    console.log('[getAllCotizaciones] Cargando cotizaciones activas...');
     try {
       const { data, error } = await supabase
         .from('cotizaciones')
         .select('*')
+        .neq('estado', 'eliminada')  // Excluir eliminadas
         .order('created_at', { ascending: false });
 
       console.log('[getAllCotizaciones] Respuesta:', { data, error });
@@ -59,7 +61,7 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Obtener cotizaciones del usuario actual
+  // Obtener cotizaciones del usuario actual (solo activas)
   const getMisCotizaciones = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -74,6 +76,7 @@ export function useSupabaseCotizaciones() {
         .from('cotizaciones')
         .select('*')
         .eq('usuario_id', user.id)
+        .neq('estado', 'eliminada')  // Excluir eliminadas
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -167,23 +170,46 @@ export function useSupabaseCotizaciones() {
     }
   }, []);
 
-  // Eliminar cotización
+  // SOFT DELETE: Solo permite eliminar cotizaciones que NO estén vendidas
   const deleteCotizacion = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase
+      // Primero verificar el estado de la cotización
+      const { data: cotizacion, error: fetchError } = await supabase
         .from('cotizaciones')
-        .delete()
+        .select('estado')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Validar que no esté vendida
+      if (cotizacion?.estado === 'vendida') {
+        toast.error('No se puede eliminar una cotización vendida. Las cotizaciones vendidas se mantienen para historial.');
+        return false;
+      }
+
+      // Soft delete: cambiar estado a 'eliminada' en lugar de borrar
+      const { error: updateError } = await supabase
+        .from('cotizaciones')
+        .update({ 
+          estado: 'eliminada',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
       
+      // Quitar de la lista local (ya que no se muestran las eliminadas)
       setCotizaciones(prev => prev.filter(c => c.id !== id));
+      
+      toast.success('Cotización eliminada correctamente');
       return true;
     } catch (err: any) {
       console.error('Error al eliminar cotización:', err);
       setError(err.message);
+      toast.error('Error al eliminar: ' + err.message);
       return false;
     } finally {
       setLoading(false);
