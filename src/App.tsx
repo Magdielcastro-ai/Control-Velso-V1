@@ -62,6 +62,7 @@ import { DiagnosticoSupabase } from '@/components/DiagnosticoSupabase';
 import { PantallaCarga } from '@/components/PantallaCarga';
 
 // NUEVO: Vista de Hoja Viajera
+import { HojaViajeraView } from '@/components/HojaViajeraView';
 import { ProduccionView } from '@/components/ProduccionView';
 
 // NUEVOS COMPONENTES VELSO OS v2
@@ -89,7 +90,9 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' |
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion' | 'piezas-catalogo';
+                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera';
+
+// Horas disponibles por defecto
 
 // Horas disponibles por defecto
 const HORAS_DEFAULT: Record<string, number> = {
@@ -527,6 +530,18 @@ function App() {
     setVistaActual('control-codigos');
   };
 
+  // Ver hoja viajera
+  const handleVerHojaViajera = (proyecto: ProyectoVenta) => {
+    setProyectoSeleccionado(proyecto);
+    setVistaActual('hoja-viajera');
+  };
+
+  // Volver de hoja viajera
+  const handleVolverDeHojaViajera = () => {
+    setProyectoSeleccionado(null);
+    setVistaActual('proyectos');
+  };
+
   // Volver de control de códigos
   const handleVolverDeControlCodigos = () => {
     setProyectoSeleccionado(null);
@@ -876,9 +891,28 @@ function App() {
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
               onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
               onVerControlCodigos={canViewControlCodigos() ? handleVerControlCodigos : undefined}
+              onVerHojaViajera={handleVerHojaViajera}
               userRol={user.rol}
               userId={user.id}
             />
+          </>
+        );
+
+      case 'hoja-viajera':
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            {proyectoSeleccionado ? (
+              <HojaViajeraView
+                proyecto={proyectoSeleccionado}
+                onVolver={handleVolverDeHojaViajera}
+              />
+            ) : null}
           </>
         );
 
