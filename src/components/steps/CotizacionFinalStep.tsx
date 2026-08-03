@@ -326,7 +326,10 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                 </span>
               </div>
 
-              {/* Monto en letras */}
+              {/* Indicación de moneda */}
+              <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
+                Moneda: {monedaConfig.nombre} ({moneda})
+              </p>
               <p className="text-xs text-slate-500 text-right mt-2 leading-relaxed">
                 {numeroALetras(cotizacion.total)} {monedaConfig.nombre.toLowerCase()}{' '}
                 {((cotizacion.total % 1) * 100).toFixed(0).padStart(2, '0')}/100{' '}
@@ -341,6 +344,9 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
               </p>
 
               {/* Indicación de moneda */}
+              <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
+                Moneda: {monedaConfig.nombre} ({moneda})
+              </p>
               <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
                 Moneda: {monedaConfig.nombre} ({moneda})
               </p>
