@@ -326,27 +326,18 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                 </span>
               </div>
 
-              {/* Indicación de moneda */}
-              <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
-                Moneda: {monedaConfig.nombre} ({moneda})
-              </p>
+              {/* Monto en letras - solo una vez */}
               <p className="text-xs text-slate-500 text-right mt-2 leading-relaxed">
                 {numeroALetras(cotizacion.total)} {monedaConfig.nombre.toLowerCase()}{' '}
                 {((cotizacion.total % 1) * 100).toFixed(0).padStart(2, '0')}/100{' '}
-                {moneda === 'MXN' && (
+                {moneda === 'MXN' ? (
                   <span className="font-medium text-slate-600">M.N.</span>
+                ) : (
+                  <span className="font-medium text-slate-600">USD</span>
                 )}
-              </p>
-              <p className="text-xs text-slate-500 text-right mt-2 leading-relaxed">
-                {numeroALetras(cotizacion.total)} {monedaConfig.nombre.toLowerCase()}{' '}
-                {((cotizacion.total % 1) * 100).toFixed(0).padStart(2, '0')}/100{' '}
-                <span className="font-medium text-slate-600">M.N.</span>
               </p>
 
               {/* Indicación de moneda */}
-              <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
-                Moneda: {monedaConfig.nombre} ({moneda})
-              </p>
               <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
                 Moneda: {monedaConfig.nombre} ({moneda})
               </p>
