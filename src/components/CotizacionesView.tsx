@@ -113,8 +113,22 @@ export function CotizacionesView({
     return estado === 'comprada' || estado === 'convertida';
   };
 
-  // Helper para símbolo de moneda
-  const getSimboloMoneda = (moneda: string) => moneda === 'USD' ? 'US$' : '$';
+  // Helper: formatear moneda con conversión si es necesario
+  // En el listado interno: MXN primario, USD entre paréntesis
+  const formatearMonedaLista = (monto: number, monedaCot: string, tipoCambio: number) => {
+    if (monedaCot === 'USD' && tipoCambio > 1) {
+      const montoMXN = monto * tipoCambio;
+      return (
+        <span>
+          ${montoMXN.toLocaleString('es-MX', { minimumFractionDigits: 2 })}{' '}
+          <span className="text-xs text-slate-400">
+            (US${monto.toLocaleString('en-US', { minimumFractionDigits: 2 })})
+          </span>
+        </span>
+      );
+    }
+    return <span>${monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>;
+  };
 
   // Procesar cotizaciones para extraer empresa y contacto
   const cotizacionesProcesadas: CotizacionConDetalle[] = useMemo(() => {
@@ -226,10 +240,17 @@ export function CotizacionesView({
   const totalCotizaciones = cotizacionesFiltradas.length;
   const totalCompradas = cotizacionesFiltradas.filter(c => esComprada(c.estado)).length;
   const totalPendientes = totalCotizaciones - totalCompradas;
-  const totalMonto = cotizacionesFiltradas.reduce((sum, c) => sum + (c.total || 0), 0);
+  // Convertir todo a MXN para las estadísticas globales
+  const totalMonto = cotizacionesFiltradas.reduce((sum, c) => {
+    const monto = c.total || 0;
+    return sum + (c.moneda === 'USD' && c.tipo_cambio ? monto * c.tipo_cambio : monto);
+  }, 0);
   const montoComprado = cotizacionesFiltradas
     .filter(c => esComprada(c.estado))
-    .reduce((sum, c) => sum + (c.total || 0), 0);
+    .reduce((sum, c) => {
+      const monto = c.total || 0;
+      return sum + (c.moneda === 'USD' && c.tipo_cambio ? monto * c.tipo_cambio : monto);
+    }, 0);
 
   if (loading && cotizaciones.length === 0) {
     return (
@@ -265,7 +286,7 @@ export function CotizacionesView({
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Total Cotizado</p>
             <p className="text-xl font-bold text-slate-900">
-              {getSimboloMoneda('MXN')}{totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              ${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
           </CardContent>
         </Card>
@@ -273,7 +294,7 @@ export function CotizacionesView({
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Monto Comprado</p>
             <p className="text-xl font-bold text-green-600">
-              {getSimboloMoneda('MXN')}{montoComprado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              ${montoComprado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
           </CardContent>
         </Card>
@@ -281,7 +302,7 @@ export function CotizacionesView({
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Pendiente</p>
             <p className="text-xl font-bold text-amber-600">
-              {getSimboloMoneda('MXN')}{(totalMonto - montoComprado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              ${(totalMonto - montoComprado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
           </CardContent>
         </Card>
@@ -355,7 +376,11 @@ export function CotizacionesView({
           empresasOrdenadas.map((empresa) => {
             const cotizacionesEmpresa = cotizacionesPorEmpresa[empresa];
             const expandido = clientesExpandidos.has(empresa);
-            const totalEmpresa = cotizacionesEmpresa.reduce((sum, c) => sum + c.total, 0);
+            // Convertir total de empresa a MXN si es USD
+            const totalEmpresa = cotizacionesEmpresa.reduce((sum, c) => {
+              const monto = c.total || 0;
+              return sum + (c.moneda === 'USD' && c.tipo_cambio ? monto * c.tipo_cambio : monto);
+            }, 0);
             const compradasEmpresa = cotizacionesEmpresa.filter(c => esComprada(c.estado)).length;
             
             return (
@@ -384,9 +409,9 @@ export function CotizacionesView({
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-slate-900">
-                        {getSimboloMoneda(cotizacionesEmpresa[0]?.moneda || 'MXN')}{totalEmpresa.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        ${totalEmpresa.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </p>
-                      <p className="text-xs text-slate-500">Total acumulado</p>
+                      <p className="text-xs text-slate-500">Total acumulado (MXN)</p>
                     </div>
                   </div>
                 </div>
@@ -427,10 +452,10 @@ export function CotizacionesView({
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-right font-medium text-slate-700">
-                                  {getSimboloMoneda(cot.moneda || 'MXN')}{totalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  {formatearMonedaLista(totalSinIVA, cot.moneda || 'MXN', cot.tipo_cambio || 1)}
                                 </td>
                                 <td className="px-4 py-3 text-right font-bold text-slate-900">
-                                  {getSimboloMoneda(cot.moneda || 'MXN')}{cot.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  {formatearMonedaLista(cot.total, cot.moneda || 'MXN', cot.tipo_cambio || 1)}
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                   {comprada ? (
@@ -486,7 +511,9 @@ export function CotizacionesView({
                                               <p className="text-sm text-slate-600">Cotización:</p>
                                               <p className="font-semibold">{cot.numero}</p>
                                               <p className="text-sm">{cot.empresa} - {cot.proyecto_nombre}</p>
-                                              <p className="text-lg font-bold text-green-600">{getSimboloMoneda(cot.moneda || 'MXN')}{cot.total.toFixed(2)}</p>
+                                              <p className="text-lg font-bold text-green-600">
+                                                {formatearMonedaLista(cot.total, cot.moneda || 'MXN', cot.tipo_cambio || 1)}
+                                              </p>
                                               {isAdmin && (
                                                 <p className="text-xs text-blue-600 mt-1">
                                                   <User className="w-3 h-3 inline mr-1" />

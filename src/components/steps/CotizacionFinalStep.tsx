@@ -31,8 +31,10 @@ interface CotizacionFinalStepProps {
   onSalir?: () => void;
 }
 
-export function CotizacionFinalStep({ cotizacion, moneda = 'MXN', onRegresar, onSalir }: CotizacionFinalStepProps) {
+export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresar, onSalir }: CotizacionFinalStepProps) {
   const cotizacionRef = useRef<HTMLDivElement>(null);
+  // Usar la moneda de la cotización, no la prop (que siempre venía como MXN)
+  const moneda = cotizacion.moneda || 'MXN';
   const monedaConfig = getMonedaConfig(moneda);
 
   const handlePrint = () => {
