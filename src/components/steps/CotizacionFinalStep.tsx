@@ -46,7 +46,7 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
 
   return (
     <div className="space-y-6">
-      <div className="text-center mb-6">
+      <div className="text-center mb-6 no-print">
         <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
           <CheckCircle className="w-8 h-8 text-green-600" />
         </div>
@@ -81,16 +81,14 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
         <CardContent className="p-8">
           <div className="flex justify-between items-start mb-8 border-b pb-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <img src="/logo-velso.png" alt="Logo Velso" className="w-16 h-16 object-contain" />
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    {cotizacion.datosTaller.nombre || 'Taller CNC'}
-                  </h1>
-                  {cotizacion.datosTaller.rfc && (
-                    <p className="text-sm text-slate-500">RFC: {cotizacion.datosTaller.rfc}</p>
-                  )}
-                </div>
+              <div className="flex flex-col items-center mb-4">
+                <img src="/logo-velso.png" alt="Logo Velso" className="w-24 h-24 object-contain mb-3" />
+                <h1 className="text-2xl font-bold text-slate-900">
+                  {cotizacion.datosTaller.nombre || 'Taller CNC'}
+                </h1>
+                {cotizacion.datosTaller.rfc && (
+                  <p className="text-sm text-slate-500">RFC: {cotizacion.datosTaller.rfc}</p>
+                )}
               </div>
               {cotizacion.datosTaller.direccion && (
                 <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
@@ -419,7 +417,6 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
           </div>
 
           <div className="mt-8 pt-6 border-t text-center text-sm text-slate-500 print:mt-6 print:pt-4">
-            <p>Esta cotización fue generada con Presupuesto Pro CNC</p>
             <p className="mt-1">Documento válido únicamente con firma y sello del taller</p>
           </div>
         </CardContent>
