@@ -61,7 +61,7 @@ import { AdminUsuariosView } from '@/components/AdminUsuariosView';
 import { DiagnosticoSupabase } from '@/components/DiagnosticoSupabase';
 import { PantallaCarga } from '@/components/PantallaCarga';
 
-// NUEVO: Vista de Producción
+// NUEVO: Vista de Hoja Viajera
 import { ProduccionView } from '@/components/ProduccionView';
 
 // NUEVOS COMPONENTES VELSO OS v2

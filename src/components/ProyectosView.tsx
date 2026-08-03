@@ -44,6 +44,7 @@ interface ProyectosViewProps {
   onMarcarEntregado?: (id: string) => void;
   onMarcarFacturado?: (id: string, numeroFactura: string, totalFacturado: number) => void;
   onVerControlCodigos?: (proyecto: ProyectoVenta) => void;
+  onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   userRol?: string;
   userId?: string;
 }
@@ -91,6 +92,7 @@ export function ProyectosView({
   onMarcarEntregado,
   onMarcarFacturado,
   onVerControlCodigos,
+  onVerHojaViajera,
   userRol = 'vendedor',
   userId
 }: ProyectosViewProps) {
@@ -493,6 +495,19 @@ export function ProyectosView({
 
                     {/* Acciones */}
                     <div className="flex items-center gap-2 flex-wrap">
+                      {/* Botón Hoja Viajera */}
+                      {onVerHojaViajera && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onVerHojaViajera(proyecto)}
+                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                        >
+                          <FileText className="w-4 h-4 mr-1" />
+                          Hoja Viajera
+                        </Button>
+                      )}
+
                       {/* Botón Control de Códigos - solo admin, superadmin y producción */}
                       {onVerControlCodigos && (
                         <Button
