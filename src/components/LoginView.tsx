@@ -28,7 +28,7 @@ export function LoginView({ onLogin, loading = false, error = null }: LoginViewP
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <img src="/logo-velso.png" alt="Logo Velso" className="w-24 h-24 object-contain mx-auto mb-4" />
+          <img src="/logo-velso-login.png" alt="Logo Velso" className="w-full max-w-[400px] object-contain mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-white mb-2">
             Sistema de Control de Ventas
           </h1>

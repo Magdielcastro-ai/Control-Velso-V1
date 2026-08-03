@@ -82,7 +82,7 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
           <div className="flex justify-between items-start mb-8 border-b pb-6">
             <div>
               <div className="flex flex-col items-center mb-4">
-                <img src="/logo-velso.png" alt="Logo Velso" className="w-24 h-24 object-contain mb-3" />
+                <img src="/logo-velso-pdf.png" alt="Logo Velso" className="w-32 h-auto object-contain mb-3" />
                 <h1 className="text-2xl font-bold text-slate-900">
                   {cotizacion.datosTaller.nombre || 'Taller CNC'}
                 </h1>
