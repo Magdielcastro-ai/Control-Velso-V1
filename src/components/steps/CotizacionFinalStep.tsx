@@ -417,7 +417,7 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
           </div>
 
           <div className="mt-8 pt-6 border-t text-center text-sm text-slate-500 print:mt-6 print:pt-4">
-            <p className="mt-1">Documento válido únicamente con firma y sello del taller</p>
+            <p className="mt-1"></p>
           </div>
         </CardContent>
       </Card>
@@ -426,6 +426,14 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
         @media print {
           .no-print {
             display: none !important;
+          }
+          @page {
+            margin: 0;
+            padding: 0;
+          }
+          body {
+            margin: 0;
+            padding: 0;
           }
         }
       `}</style>
