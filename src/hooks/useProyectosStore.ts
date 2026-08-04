@@ -193,7 +193,7 @@ export const useProyectosStore = () => {
       console.log('[useProyectosStore] Generando código para tipo:', datos.tipoProyecto);
       const { data: codigoData, error: codigoError } = await supabase
         .rpc('generar_codigo_proyecto', {
-          tipo_proyecto: datos.tipoProyecto
+          tipo: datos.tipoProyecto
         });
 
       if (codigoError) {
