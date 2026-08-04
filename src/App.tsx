@@ -742,12 +742,10 @@ function App() {
               pendientesHoy={getPendientesHoy()}
               alertasRojas={getAlertasRojas()}
               proyectos={proyectos}
-              cotizaciones={cotizacionesGuardadas}
               totalesCobranza={getTotales()}
               onIrAPendientes={irAPendientes}
               onIrACobranza={irACobranza}
               onIrAProyectos={irAProyectos}
-              onIrACotizaciones={irACotizaciones}
               talleresCount={talleres.length}
               clientesCount={clientes.length}
               materialesCount={catalogo.length}

@@ -28,14 +28,12 @@ import {
 } from 'lucide-react';
 import type { Pendiente, Alerta } from '@/types/pendientes';
 import type { ProyectoVenta } from '@/types/ventas';
-import type { CotizacionGuardada } from '@/types/cotizacion';
 
 interface DashboardEjecutivoProps {
   onVolver: () => void;
   pendientesHoy: Pendiente[];
   alertasRojas: Alerta[];
   proyectos: ProyectoVenta[];
-  cotizaciones: CotizacionGuardada[];
   totalesCobranza: {
     totalPorCobrar: number;
     totalVencido: number;
@@ -50,7 +48,6 @@ interface DashboardEjecutivoProps {
   onIrAPendientes: () => void;
   onIrACobranza: () => void;
   onIrAProyectos: () => void;
-  onIrACotizaciones: () => void;
   // Datos adicionales de catálogos (opcionales)
   talleresCount?: number;
   materialesCount?: number;
@@ -68,12 +65,10 @@ export function DashboardEjecutivo({
   pendientesHoy,
   alertasRojas,
   proyectos,
-  cotizaciones,
   totalesCobranza,
   onIrAPendientes,
   onIrACobranza,
   onIrAProyectos,
-  onIrACotizaciones,
   talleresCount = 0,
   materialesCount = 0,
   clientesCount = 0,
@@ -89,14 +84,9 @@ export function DashboardEjecutivo({
   // CÁLCULOS HISTÓRICOS (todos los datos)
   // ============================================
   const totalesHistoricos = useMemo(() => {
-    const totalCotizado = cotizaciones.reduce((sum, c) => sum + (c.total || 0), 0);
     const totalVendido = proyectos.reduce((sum, p) => sum + (p.totalCotizado || 0), 0);
     const totalFacturado = proyectos.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
     const totalUtilidad = proyectos.reduce((sum, p) => sum + (p.utilidadReal || 0), 0);
-
-    const cotizacionesEnviadas = cotizaciones.filter(c => c.estado === 'enviada').length;
-    const cotizacionesBorrador = cotizaciones.filter(c => c.estado === 'borrador').length;
-    const cotizacionesAutorizadas = proyectos.length; // Las que se convirtieron en proyecto
 
     const proyectosFabricacion = proyectos.filter(p => p.estado === 'en_fabricacion').length;
     const proyectosFabricados = proyectos.filter(p => p.estado === 'fabricado').length;
@@ -104,20 +94,15 @@ export function DashboardEjecutivo({
     const proyectosFacturados = proyectos.filter(p => p.estado === 'facturado').length;
 
     return {
-      totalCotizado,
       totalVendido,
       totalFacturado,
       totalUtilidad,
-      cotizacionesEnviadas,
-      cotizacionesBorrador,
-      cotizacionesAutorizadas,
       proyectosFabricacion,
       proyectosFabricados,
       proyectosEntregados,
       proyectosFacturados,
-      tasaConversion: totalCotizado > 0 ? ((totalVendido / totalCotizado) * 100).toFixed(1) : '0',
     };
-  }, [cotizaciones, proyectos]);
+  }, [proyectos]);
 
   // ============================================
   // CÁLCULOS POR MES (si se selecciona un mes)
@@ -125,30 +110,21 @@ export function DashboardEjecutivo({
   const datosPorMes = useMemo(() => {
     if (mesSeleccionado === null) return null;
 
-    const cotizacionesMes = cotizaciones.filter(c => {
-      const fecha = new Date(c.fecha);
-      return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
-    });
-
     const proyectosMes = proyectos.filter(p => {
       const fecha = new Date(p.fechaVenta);
       return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
     });
 
     return {
-      cotizacionesMes,
       proyectosMes,
-      totalCotizadoMes: cotizacionesMes.reduce((sum, c) => sum + (c.total || 0), 0),
       totalVendidoMes: proyectosMes.reduce((sum, p) => sum + (p.totalCotizado || 0), 0),
     };
-  }, [cotizaciones, proyectos, mesSeleccionado, anioSeleccionado]);
+  }, [proyectos, mesSeleccionado, anioSeleccionado]);
 
   // ============================================
   // PIPELINE
   // ============================================
   const pipelineData = useMemo(() => {
-    const cotBorrador = cotizaciones.filter(c => c.estado === 'borrador');
-    const cotEnviada = cotizaciones.filter(c => c.estado === 'enviada');
     const projFabricacion = proyectos.filter(p => p.estado === 'en_fabricacion');
     const projFabricado = proyectos.filter(p => p.estado === 'fabricado');
     const projEntregado = proyectos.filter(p => p.estado === 'entregado');
@@ -156,23 +132,7 @@ export function DashboardEjecutivo({
 
     return [
       { 
-        etapa: 'Borrador', 
-        cantidad: cotBorrador.length, 
-        monto: cotBorrador.reduce((sum, c) => sum + (c.total || 0), 0),
-        color: 'bg-slate-500',
-        icon: FileText,
-        descripcion: 'Cotizaciones en borrador'
-      },
-      { 
-        etapa: 'Enviada / Esperando', 
-        cantidad: cotEnviada.length, 
-        monto: cotEnviada.reduce((sum, c) => sum + (c.total || 0), 0),
-        color: 'bg-blue-500',
-        icon: Phone,
-        descripcion: 'Cotizaciones enviadas al cliente'
-      },
-      { 
-        etapa: 'Autorizado / En Fabricación', 
+        etapa: 'En Fabricación', 
         cantidad: projFabricacion.length, 
         monto: projFabricacion.reduce((sum, p) => sum + (p.totalCotizado || 0), 0),
         color: 'bg-orange-500',
@@ -204,12 +164,12 @@ export function DashboardEjecutivo({
         descripcion: 'Facturas enviadas'
       },
     ];
-  }, [cotizaciones, proyectos]);
+  }, [proyectos]);
 
   // ============================================
   // DETECCIÓN DE ESTADO
   // ============================================
-  const hayDatos = cotizaciones.length > 0 || proyectos.length > 0;
+  const hayDatos = proyectos.length > 0;
   // ============================================
   // RENDER
   // ============================================
@@ -226,7 +186,7 @@ export function DashboardEjecutivo({
             <h1 className="text-2xl font-bold text-slate-900">Dashboard Ejecutivo</h1>
             <p className="text-sm text-slate-500">
               {hayDatos 
-                ? `${cotizaciones.length} cotizaciones · ${proyectos.length} proyectos · $${totalesHistoricos.totalCotizado.toLocaleString()} en pipeline`
+                ? `${proyectos.length} proyectos · $${totalesHistoricos.totalVendido.toLocaleString()} vendido`
                 : 'Cargando datos de Supabase...'
               }
             </p>
@@ -280,10 +240,9 @@ export function DashboardEjecutivo({
             <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-blue-600" />
             <p className="text-lg font-medium text-slate-700">Cargando datos de Supabase...</p>
             <p className="text-sm text-slate-500 mt-1">
-              Si tienes datos guardados, aparecerán en un momento.
+              Si tienes proyectos vendidos, aparecerán en un momento.
             </p>
             <div className="mt-4 text-xs text-slate-400 space-y-1">
-              <p>Cotizaciones: {cotizaciones.length}</p>
               <p>Proyectos: {proyectos.length}</p>
               <p>Pendientes: {pendientesHoy.length}</p>
             </div>
@@ -337,29 +296,13 @@ export function DashboardEjecutivo({
       {/* === VISTA RESUMEN === */}
       {vistaActiva === 'resumen' && (
         <>
-          {/* KPIs principales - HISTÓRICOS */}
+          {/* KPIs principales - SOLO PROYECTOS */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-blue-200 hover:shadow-md transition-shadow cursor-pointer" onClick={onIrACotizaciones}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <FileText className="w-8 h-8 text-blue-600" />
-                  <Badge className="bg-blue-100 text-blue-700">{cotizaciones.length} total</Badge>
-                </div>
-                <p className="text-sm text-slate-500">Total Cotizado</p>
-                <p className="text-2xl font-bold text-slate-900">${totalesHistoricos.totalCotizado.toLocaleString()}</p>
-                {datosPorMes && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    {MESES[mesSeleccionado!]}: ${datosPorMes.totalCotizadoMes.toLocaleString()}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
             <Card className="border-green-200 hover:shadow-md transition-shadow cursor-pointer" onClick={onIrAProyectos}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <Factory className="w-8 h-8 text-green-600" />
-                  <Badge className="bg-green-100 text-green-700">{proyectos.length} activos</Badge>
+                  <Badge className="bg-green-100 text-green-700">{proyectos.length} proyectos</Badge>
                 </div>
                 <p className="text-sm text-slate-500">Total Vendido</p>
                 <p className="text-2xl font-bold text-slate-900">${totalesHistoricos.totalVendido.toLocaleString()}</p>
@@ -389,11 +332,34 @@ export function DashboardEjecutivo({
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <TrendingUp className="w-8 h-8 text-amber-600" />
-                  <Badge className="bg-amber-100 text-amber-700">{totalesHistoricos.tasaConversion}%</Badge>
+                  <Badge className="bg-amber-100 text-amber-700">
+                    {totalesHistoricos.totalVendido > 0 
+                      ? ((totalesHistoricos.totalUtilidad / totalesHistoricos.totalVendido) * 100).toFixed(1) 
+                      : 0}%
+                  </Badge>
                 </div>
                 <p className="text-sm text-slate-500">Utilidad Real</p>
                 <p className="text-2xl font-bold text-amber-600">${totalesHistoricos.totalUtilidad.toLocaleString()}</p>
-                <p className="text-xs text-slate-400">Tasa conversión: {totalesHistoricos.tasaConversion}%</p>
+                <p className="text-xs text-slate-400">Margen sobre ventas</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-200 hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Package className="w-8 h-8 text-blue-600" />
+                  <Badge className="bg-blue-100 text-blue-700">
+                    {totalesHistoricos.proyectosFabricacion} activos
+                  </Badge>
+                </div>
+                <p className="text-sm text-slate-500">En Producción</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  ${proyectos
+                    .filter(p => p.estado === 'en_fabricacion')
+                    .reduce((sum, p) => sum + (p.totalCotizado || 0), 0)
+                    .toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400">Valor en fabricación</p>
               </CardContent>
             </Card>
           </div>
@@ -552,7 +518,7 @@ export function DashboardEjecutivo({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-blue-600" />
-              Pipeline de Ventas
+              Pipeline de Producción
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
