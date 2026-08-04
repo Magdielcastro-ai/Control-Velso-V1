@@ -469,7 +469,7 @@ function App() {
     // Buscar la cotización completa para obtener las piezas
     const cotizacionCompleta = cotizacionesGuardadas.find(c => c.id === cotizacion.id);
 
-    await convertirAVenta({
+    const exito = await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
       ordenCompra,
       tipoProyecto,
@@ -489,7 +489,20 @@ function App() {
         pruebaDureza: { costo: 0, incluidoGratis: false },
       },
     });
-    toast.success('Cotización convertida a venta exitosamente');
+    if (exito) {
+      // Actualizar estado de la cotización a "vendida"
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        await supabase
+          .from('cotizaciones')
+          .update({ estado: 'vendida', updated_at: new Date().toISOString() })
+          .eq('id', cotizacion.id);
+        toast.success('Cotización convertida a venta exitosamente');
+      } catch (err) {
+        console.warn('Error actualizando estado de cotización:', err);
+        toast.success('Cotización convertida a venta exitosamente');
+      }
+    }
   };
 
   // Handlers para cambio de estado de proyectos
