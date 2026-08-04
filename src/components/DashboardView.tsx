@@ -9,7 +9,6 @@ import {
   DollarSign, 
   Users, 
   Target,
-  TrendingUp,
   ShoppingCart,
   FileText
 } from 'lucide-react';
@@ -83,7 +82,6 @@ export function DashboardView({
     const totalCotizado = cotizacionesMes.reduce((sum, c) => sum + c.total, 0);
     const totalVendido = proyectosMes.reduce((sum, p) => sum + p.totalCotizado, 0);
     const totalFacturado = proyectosFacturadosMes.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
-    const totalUtilidad = proyectosFacturadosMes.reduce((sum, p) => sum + (p.utilidadReal || 0), 0);
 
     // Calcular horas
     const horasCotizadas: Record<string, number> = {};
@@ -162,7 +160,6 @@ export function DashboardView({
       totalCotizado,
       totalVendido,
       totalFacturado,
-      totalUtilidad,
       horasCotizadas,
       horasVendidas,
       horasFabricadas,
@@ -295,8 +292,8 @@ export function DashboardView({
         </Card>
       )}
 
-      {/* KPIs Principales */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* KPIs Principales - Solo 3 tarjetas, sin Utilidad */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-blue-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -334,20 +331,6 @@ export function DashboardView({
               </div>
               <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-amber-600">Utilidad Real</p>
-                <p className="text-xl font-bold text-amber-600">${datosMes.totalUtilidad.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
-              </div>
-              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-amber-600" />
               </div>
             </div>
           </CardContent>
