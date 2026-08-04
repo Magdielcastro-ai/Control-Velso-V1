@@ -81,17 +81,28 @@ export function DashboardEjecutivo({
 
 
   // ============================================
-  // CÁLCULOS HISTÓRICOS (todos los datos)
+  // PROYECTOS FILTRADOS POR MES (si aplica)
   // ============================================
-  const totalesHistoricos = useMemo(() => {
-    const totalVendido = proyectos.reduce((sum, p) => sum + (p.totalCotizado || 0), 0);
-    const totalFacturado = proyectos.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
-    const totalUtilidad = proyectos.reduce((sum, p) => sum + (p.utilidadReal || 0), 0);
+  const proyectosFiltrados = useMemo(() => {
+    if (mesSeleccionado === null) return proyectos;
+    return proyectos.filter(p => {
+      const fecha = new Date(p.fechaVenta);
+      return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
+    });
+  }, [proyectos, mesSeleccionado, anioSeleccionado]);
 
-    const proyectosFabricacion = proyectos.filter(p => p.estado === 'en_fabricacion').length;
-    const proyectosFabricados = proyectos.filter(p => p.estado === 'fabricado').length;
-    const proyectosEntregados = proyectos.filter(p => p.estado === 'entregado').length;
-    const proyectosFacturados = proyectos.filter(p => p.estado === 'facturado').length;
+  // ============================================
+  // CÁLCULOS DE MÉTRICAS (usando proyectosFiltrados)
+  // ============================================
+  const metricas = useMemo(() => {
+    const totalVendido = proyectosFiltrados.reduce((sum, p) => sum + (p.totalCotizado || 0), 0);
+    const totalFacturado = proyectosFiltrados.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+    const totalUtilidad = proyectosFiltrados.reduce((sum, p) => sum + (p.utilidadReal || 0), 0);
+
+    const proyectosFabricacion = proyectosFiltrados.filter(p => p.estado === 'en_fabricacion').length;
+    const proyectosFabricados = proyectosFiltrados.filter(p => p.estado === 'fabricado').length;
+    const proyectosEntregados = proyectosFiltrados.filter(p => p.estado === 'entregado').length;
+    const proyectosFacturados = proyectosFiltrados.filter(p => p.estado === 'facturado').length;
 
     return {
       totalVendido,
@@ -102,33 +113,16 @@ export function DashboardEjecutivo({
       proyectosEntregados,
       proyectosFacturados,
     };
-  }, [proyectos]);
+  }, [proyectosFiltrados]);
 
   // ============================================
-  // CÁLCULOS POR MES (si se selecciona un mes)
-  // ============================================
-  const datosPorMes = useMemo(() => {
-    if (mesSeleccionado === null) return null;
-
-    const proyectosMes = proyectos.filter(p => {
-      const fecha = new Date(p.fechaVenta);
-      return fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado;
-    });
-
-    return {
-      proyectosMes,
-      totalVendidoMes: proyectosMes.reduce((sum, p) => sum + (p.totalCotizado || 0), 0),
-    };
-  }, [proyectos, mesSeleccionado, anioSeleccionado]);
-
-  // ============================================
-  // PIPELINE
+  // PIPELINE (usando proyectosFiltrados)
   // ============================================
   const pipelineData = useMemo(() => {
-    const projFabricacion = proyectos.filter(p => p.estado === 'en_fabricacion');
-    const projFabricado = proyectos.filter(p => p.estado === 'fabricado');
-    const projEntregado = proyectos.filter(p => p.estado === 'entregado');
-    const projFacturado = proyectos.filter(p => p.estado === 'facturado');
+    const projFabricacion = proyectosFiltrados.filter(p => p.estado === 'en_fabricacion');
+    const projFabricado = proyectosFiltrados.filter(p => p.estado === 'fabricado');
+    const projEntregado = proyectosFiltrados.filter(p => p.estado === 'entregado');
+    const projFacturado = proyectosFiltrados.filter(p => p.estado === 'facturado');
 
     return [
       { 
@@ -164,12 +158,13 @@ export function DashboardEjecutivo({
         descripcion: 'Facturas enviadas'
       },
     ];
-  }, [proyectos]);
+  }, [proyectosFiltrados]);
 
   // ============================================
   // DETECCIÓN DE ESTADO
   // ============================================
   const hayDatos = proyectos.length > 0;
+
   // ============================================
   // RENDER
   // ============================================
@@ -186,7 +181,9 @@ export function DashboardEjecutivo({
             <h1 className="text-2xl font-bold text-slate-900">Dashboard Ejecutivo</h1>
             <p className="text-sm text-slate-500">
               {hayDatos 
-                ? `${proyectos.length} proyectos · $${totalesHistoricos.totalVendido.toLocaleString()} vendido`
+                ? mesSeleccionado !== null
+                  ? `${proyectosFiltrados.length} proyectos en ${MESES[mesSeleccionado]} ${anioSeleccionado} · $${metricas.totalVendido.toLocaleString()} vendido`
+                  : `${proyectos.length} proyectos · $${metricas.totalVendido.toLocaleString()} vendido`
                 : 'Cargando datos de Supabase...'
               }
             </p>
@@ -302,15 +299,10 @@ export function DashboardEjecutivo({
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <Factory className="w-8 h-8 text-green-600" />
-                  <Badge className="bg-green-100 text-green-700">{proyectos.length} proyectos</Badge>
+                  <Badge className="bg-green-100 text-green-700">{proyectosFiltrados.length} proyectos</Badge>
                 </div>
                 <p className="text-sm text-slate-500">Total Vendido</p>
-                <p className="text-2xl font-bold text-slate-900">${totalesHistoricos.totalVendido.toLocaleString()}</p>
-                {datosPorMes && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {MESES[mesSeleccionado!]}: ${datosPorMes.totalVendidoMes.toLocaleString()}
-                  </p>
-                )}
+                <p className="text-2xl font-bold text-slate-900">${metricas.totalVendido.toLocaleString()}</p>
               </CardContent>
             </Card>
 
@@ -323,7 +315,7 @@ export function DashboardEjecutivo({
                   </Badge>
                 </div>
                 <p className="text-sm text-slate-500">Total Facturado</p>
-                <p className="text-2xl font-bold text-slate-900">${totalesHistoricos.totalFacturado.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-slate-900">${metricas.totalFacturado.toLocaleString()}</p>
                 <p className="text-xs text-slate-400">{totalesCobranza.cantidadPorCobrar} por cobrar</p>
               </CardContent>
             </Card>
@@ -333,13 +325,13 @@ export function DashboardEjecutivo({
                 <div className="flex items-center justify-between mb-2">
                   <TrendingUp className="w-8 h-8 text-amber-600" />
                   <Badge className="bg-amber-100 text-amber-700">
-                    {totalesHistoricos.totalVendido > 0 
-                      ? ((totalesHistoricos.totalUtilidad / totalesHistoricos.totalVendido) * 100).toFixed(1) 
+                    {metricas.totalVendido > 0 
+                      ? ((metricas.totalUtilidad / metricas.totalVendido) * 100).toFixed(1) 
                       : 0}%
                   </Badge>
                 </div>
                 <p className="text-sm text-slate-500">Utilidad Real</p>
-                <p className="text-2xl font-bold text-amber-600">${totalesHistoricos.totalUtilidad.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-amber-600">${metricas.totalUtilidad.toLocaleString()}</p>
                 <p className="text-xs text-slate-400">Margen sobre ventas</p>
               </CardContent>
             </Card>
@@ -349,12 +341,12 @@ export function DashboardEjecutivo({
                 <div className="flex items-center justify-between mb-2">
                   <Package className="w-8 h-8 text-blue-600" />
                   <Badge className="bg-blue-100 text-blue-700">
-                    {totalesHistoricos.proyectosFabricacion} activos
+                    {metricas.proyectosFabricacion} activos
                   </Badge>
                 </div>
                 <p className="text-sm text-slate-500">En Producción</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  ${proyectos
+                  ${proyectosFiltrados
                     .filter(p => p.estado === 'en_fabricacion')
                     .reduce((sum, p) => sum + (p.totalCotizado || 0), 0)
                     .toLocaleString()}
@@ -490,19 +482,19 @@ export function DashboardEjecutivo({
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-orange-50 p-3 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-orange-600">{totalesHistoricos.proyectosFabricacion}</p>
+                    <p className="text-2xl font-bold text-orange-600">{metricas.proyectosFabricacion}</p>
                     <p className="text-xs text-slate-600">En Fabricación</p>
                   </div>
                   <div className="bg-yellow-50 p-3 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-yellow-600">{totalesHistoricos.proyectosFabricados}</p>
+                    <p className="text-2xl font-bold text-yellow-600">{metricas.proyectosFabricados}</p>
                     <p className="text-xs text-slate-600">Fabricados</p>
                   </div>
                   <div className="bg-purple-50 p-3 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-purple-600">{totalesHistoricos.proyectosEntregados}</p>
+                    <p className="text-2xl font-bold text-purple-600">{metricas.proyectosEntregados}</p>
                     <p className="text-xs text-slate-600">Entregados</p>
                   </div>
                   <div className="bg-green-50 p-3 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-green-600">{totalesHistoricos.proyectosFacturados}</p>
+                    <p className="text-2xl font-bold text-green-600">{metricas.proyectosFacturados}</p>
                     <p className="text-xs text-slate-600">Facturados</p>
                   </div>
                 </div>

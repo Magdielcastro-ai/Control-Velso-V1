@@ -98,11 +98,9 @@ export function DashboardView({
       horasFacturadas[p.id] = 0;
     });
 
-    // Horas cotizadas (de cotizaciones filtradas por usuario y mes)
-    cotizacionesFiltradas.forEach((cot) => {
-      const fecha = new Date(cot.fecha);
-      if (fecha.getMonth() === mesSeleccionado && fecha.getFullYear() === anioSeleccionado) {
-        // Verificar si la cotización tiene procesos (puede no tenerlos si se guardó sin completar)
+    // Horas cotizadas (de cotizaciones del mes seleccionado)
+    cotizacionesMes.forEach((cot) => {
+      // Verificar si la cotización tiene procesos (puede no tenerlos si se guardó sin completar)
         const procesosCotizacion = (cot as any).procesos;
         if (procesosCotizacion && Array.isArray(procesosCotizacion)) {
           procesosCotizacion.forEach((p: any) => {
@@ -112,7 +110,6 @@ export function DashboardView({
               horasCotizadas[tipo] += tiempoHoras;
             }
           });
-        }
       }
     });
 
@@ -286,8 +283,8 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* Mensaje si no hay datos */}
-      {cotizacionesFiltradas.length === 0 && proyectosFiltrados.length === 0 && (
+      {/* Mensaje si no hay datos del mes seleccionado */}
+      {datosMes.cotizacionesMes.length === 0 && datosMes.proyectosMes.length === 0 && (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-6 text-center">
             <p className="text-amber-700 font-medium">No hay datos disponibles para este período</p>
