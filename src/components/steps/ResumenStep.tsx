@@ -1,12 +1,37 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Cotizacion, PiezaCotizacion, Proceso } from '@/types/cotizacion';
 
 interface ResumenStepProps {
   cotizacion: Cotizacion;
+  onConvertirAVenta?: (datos: { ordenCompra: string; tipoProyecto: 'suministro' | 'maquinado' }) => void;
+  puedeConvertirAVenta?: boolean;
 }
 
-export function ResumenStep({ cotizacion }: ResumenStepProps) {
+export function ResumenStep({ cotizacion, onConvertirAVenta, puedeConvertirAVenta }: ResumenStepProps) {
   const { piezas, costosAdicionales, margenUtilidad, ivaPorcentaje, datosCliente, proyecto, condiciones } = cotizacion;
+
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [ordenCompra, setOrdenCompra] = useState('');
+  const [tipoProyecto, setTipoProyecto] = useState<'suministro' | 'maquinado'>('suministro');
 
   const costosGenerales = Object.values(costosAdicionales)
     .filter((item: any) => !item.incluidoGratis)
@@ -47,6 +72,26 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
 
   // Símbolo de moneda
   const simbolo = cotizacion.moneda === 'USD' ? 'US$' : '$';
+
+  const handleAbrirModal = () => {
+    setOrdenCompra('');
+    setTipoProyecto('suministro');
+    setModalAbierto(true);
+  };
+
+  const handleCerrarModal = () => {
+    setModalAbierto(false);
+  };
+
+  const handleConfirmarVenta = () => {
+    if (onConvertirAVenta && ordenCompra.trim()) {
+      onConvertirAVenta({
+        ordenCompra: ordenCompra.trim(),
+        tipoProyecto,
+      });
+    }
+    setModalAbierto(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -258,6 +303,64 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
           </div>
         </div>
       </div>
+
+      {/* Botón Convertir a Venta */}
+      {puedeConvertirAVenta && (
+        <div className="flex justify-end pt-4 border-t border-slate-200">
+          <Button onClick={handleAbrirModal} size="lg">
+            Convertir a Venta
+          </Button>
+        </div>
+      )}
+
+      {/* Modal de Confirmación */}
+      <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convertir a Venta</DialogTitle>
+            <DialogDescription>
+              Ingresa los datos requeridos para convertir esta cotización en una venta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="orden-compra">Orden de Compra</Label>
+              <Input
+                id="orden-compra"
+                placeholder="Ingresa el número de orden de compra"
+                value={ordenCompra}
+                onChange={(e) => setOrdenCompra(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tipo-proyecto">Tipo de Proyecto</Label>
+              <Select
+                value={tipoProyecto}
+                onValueChange={(value) => setTipoProyecto(value as 'suministro' | 'maquinado')}
+              >
+                <SelectTrigger id="tipo-proyecto" className="w-full">
+                  <SelectValue placeholder="Selecciona el tipo de proyecto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="suministro">Suministro</SelectItem>
+                  <SelectItem value="maquinado">Maquinado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCerrarModal}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarVenta}
+              disabled={!ordenCompra.trim()}
+            >
+              Confirmar Venta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
