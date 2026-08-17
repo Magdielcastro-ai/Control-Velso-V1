@@ -32,7 +32,7 @@ interface HomeVelsoProps {
   onCobranza: () => void;
   onDashboardEjecutivo: () => void;
   onProduccion: () => void;
-  onPiezasCatalogo: () => void;
+  onPiezasCatalogo: () => void;    onOrdenesCompra: () => void;
   alertasCount: number;
   pendientesCount: number;
   cobranzaVencidaCount: number;
@@ -52,7 +52,7 @@ export function HomeVelso({
   onCobranza,
   onDashboardEjecutivo,
   onProduccion,
-  onPiezasCatalogo,
+  onPiezasCatalogo,    onOrdenesCompra,
   alertasCount,
   pendientesCount,
   cobranzaVencidaCount,
@@ -277,6 +277,19 @@ export function HomeVelso({
         </Card>
 
         <Card 
+          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+          onClick={onOrdenesCompra}
+        >
+          <CardContent className="p-4">
+            <div className="flex flex-col items-center text-center gap-2">
+              <Package className="w-8 h-8 text-slate-600" />
+              <h3 className="font-medium text-slate-900 text-sm">Órdenes de Compra</h3>
+              <p className="text-xs text-slate-500">Gastos e insumos</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
           className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
           onClick={onDiagnostico}
         >
