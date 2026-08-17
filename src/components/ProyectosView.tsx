@@ -24,11 +24,18 @@ import {
   Clock,
   DollarSign,
   User,
-  Hash
+  Hash,
+  Plus,
+  ShoppingCart,
+  ChevronDown,
+  ChevronUp,
+  Save
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
+
+import type { OrdenCompra, OrdenCompraItem } from '@/types/ordenesCompra';
 
 interface ProyectosViewProps {
   onVolver: () => void;
@@ -44,9 +51,24 @@ interface ProyectosViewProps {
   onMarcarEntregado?: (id: string) => void;
   onMarcarFacturado?: (id: string, numeroFactura: string, totalFacturado: number) => void;
   onVerControlCodigos?: (proyecto: ProyectoVenta) => void;
-  onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   userRol?: string;
   userId?: string;
+  // Órdenes de Compra
+  ordenesCompra?: OrdenCompra[];
+  onCrearOrdenCompra?: (datos: {
+    proyectoId?: string;
+    proveedor?: string;
+    concepto?: string;
+    items: OrdenCompraItem[];
+    subtotal: number;
+    ivaPorcentaje: number;
+    iva: number;
+    total: number;
+    fechaEntrega?: string;
+    notas?: string;
+  }) => Promise<boolean> | void;
+  onCambiarEstadoOC?: (id: string, estado: OrdenCompra['estado']) => Promise<boolean> | void;
+  onEliminarOC?: (id: string) => void;
 }
 
 interface Vendedor {
@@ -82,6 +104,15 @@ const estadoConfig: Record<EstadoProyecto, { label: string; color: string; bgCol
   },
 };
 
+// Configuración de estados de OC
+const estadoOCConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  pendiente: { label: 'Pendiente', color: 'text-amber-600', bgColor: 'bg-amber-100' },
+  autorizada: { label: 'Autorizada', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  pagada: { label: 'Pagada', color: 'text-indigo-600', bgColor: 'bg-indigo-100' },
+  recibida: { label: 'Recibida', color: 'text-green-600', bgColor: 'bg-green-100' },
+  cancelada: { label: 'Cancelada', color: 'text-red-600', bgColor: 'bg-red-100' },
+};
+
 export function ProyectosView({ 
   onVolver, 
   proyectos, 
@@ -92,9 +123,12 @@ export function ProyectosView({
   onMarcarEntregado,
   onMarcarFacturado,
   onVerControlCodigos,
-  onVerHojaViajera,
   userRol = 'vendedor',
-  userId
+  userId,
+  ordenesCompra = [],
+  onCrearOrdenCompra,
+  onCambiarEstadoOC,
+  onEliminarOC
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
@@ -108,6 +142,14 @@ export function ProyectosView({
   const [tipoProyecto, setTipoProyecto] = useState<'suministro' | 'maquinado'>('maquinado');
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
+  
+  // Estados para Órdenes de Compra
+  const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
+  const [dialogoOC, setDialogoOC] = useState(false);
+  const [ocProveedor, setOcProveedor] = useState('');
+  const [ocConcepto, setOcConcepto] = useState('');
+  const [ocItems, setOcItems] = useState<OrdenCompraItem[]>([]);
+  const [proyectoOCSeleccionado, setProyectoOCSeleccionado] = useState<ProyectoVenta | null>(null);
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
   const isVendedor = userRol === 'vendedor';
@@ -229,6 +271,89 @@ export function ProyectosView({
   // Calcular piezas totales de un proyecto
   const calcularPiezasTotales = (proyecto: ProyectoVenta) => {
     return proyecto.piezas?.length || 0;
+  };
+
+  // Funciones para Órdenes de Compra
+  const toggleExpandirProyecto = (proyectoId: string) => {
+    setProyectoExpandido(prev => prev === proyectoId ? null : proyectoId);
+  };
+
+  const getOCsByProyecto = (proyectoId: string) => {
+    return ordenesCompra.filter(oc => oc.proyectoId === proyectoId);
+  };
+
+  const handleAbrirOC = (proyecto: ProyectoVenta) => {
+    setProyectoOCSeleccionado(proyecto);
+    setOcProveedor('');
+    setOcConcepto('');
+    setOcItems([]);
+    setDialogoOC(true);
+  };
+
+  const handleAgregarItemOC = () => {
+    const newItem: OrdenCompraItem = {
+      id: crypto.randomUUID(),
+      nombre: '',
+      cantidad: 1,
+      unidad: 'pza',
+      precioUnitario: 0,
+      total: 0,
+    };
+    setOcItems(prev => [...prev, newItem]);
+  };
+
+  const handleActualizarItemOC = (id: string, campo: keyof OrdenCompraItem, valor: string | number) => {
+    setOcItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, [campo]: valor };
+      if (campo === 'cantidad' || campo === 'precioUnitario') {
+        updated.total = updated.cantidad * updated.precioUnitario;
+      }
+      return updated;
+    }));
+  };
+
+  const handleEliminarItemOC = (id: string) => {
+    setOcItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const calcularTotalesOC = () => {
+    const subtotal = ocItems.reduce((sum, item) => sum + item.total, 0);
+    const iva = subtotal * 0.16;
+    const total = subtotal + iva;
+    return { subtotal, iva, total };
+  };
+
+  const handleGuardarOC = () => {
+    if (!proyectoOCSeleccionado || !ocProveedor.trim() || ocItems.length === 0 || !onCrearOrdenCompra) return;
+    
+    const { subtotal, iva, total } = calcularTotalesOC();
+    
+    onCrearOrdenCompra({
+      proyectoId: proyectoOCSeleccionado.id,
+      proveedor: ocProveedor.trim(),
+      concepto: ocConcepto.trim() || undefined,
+      items: ocItems,
+      subtotal,
+      ivaPorcentaje: 16,
+      iva,
+      total,
+    });
+
+    setDialogoOC(false);
+    setProyectoOCSeleccionado(null);
+    setOcProveedor('');
+    setOcConcepto('');
+    setOcItems([]);
+  };
+
+  const siguienteEstadoOC = (estadoActual: OrdenCompra['estado']): OrdenCompra['estado'] => {
+    const estados: OrdenCompra['estado'][] = ['pendiente', 'autorizada', 'pagada', 'recibida'];
+    const idx = estados.indexOf(estadoActual);
+    if (idx >= 0 && idx < estados.length - 1) {
+      return estados[idx + 1];
+    }
+    return estados[0];
   };
 
   return (
@@ -430,6 +555,8 @@ export function ProyectosView({
         ) : (
           proyectosFiltrados.map((proyecto) => {
             const EstadoIcon = estadoConfig[proyecto.estado].icon;
+            const expandido = proyectoExpandido === proyecto.id;
+            const ocs = getOCsByProyecto(proyecto.id);
             return (
               <Card key={proyecto.id} className="border-slate-200">
                 <CardContent className="p-4">
@@ -495,18 +622,26 @@ export function ProyectosView({
 
                     {/* Acciones */}
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Botón Hoja Viajera */}
-                      {onVerHojaViajera && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onVerHojaViajera(proyecto)}
-                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                        >
-                          <FileText className="w-4 h-4 mr-1" />
-                          Hoja Viajera
-                        </Button>
-                      )}
+                      {/* Botón expandir/colapsar OC */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleExpandirProyecto(proyecto.id)}
+                        className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-1" />
+                        Órdenes de Compra
+                        {ocs.length > 0 && (
+                          <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
+                            {ocs.length}
+                          </Badge>
+                        )}
+                        {expandido ? (
+                          <ChevronUp className="w-3 h-3 ml-1" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3 ml-1" />
+                        )}
+                      </Button>
 
                       {/* Botón Control de Códigos - solo admin, superadmin y producción */}
                       {onVerControlCodigos && (
@@ -568,6 +703,84 @@ export function ProyectosView({
                       )}
                     </div>
                   </div>
+
+                  {/* Sección Órdenes de Compra (expandible) */}
+                  {expandido && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                          <ShoppingCart className="w-4 h-4" />
+                          Órdenes de Compra
+                        </h4>
+                        {onCrearOrdenCompra && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleAbrirOC(proyecto)}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Nueva OC
+                          </Button>
+                        )}
+                      </div>
+
+                      {ocs.length === 0 ? (
+                        <p className="text-sm text-slate-500 py-2">No hay órdenes de compra para este proyecto</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {ocs.map((oc) => {
+                            const ocEstado = estadoOCConfig[oc.estado] || estadoOCConfig.pendiente;
+                            return (
+                              <div
+                                key={oc.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200"
+                              >
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="font-medium text-sm">{oc.numeroOc}</span>
+                                  <Badge variant="outline" className={`${ocEstado.color} border-current text-xs`}>
+                                    {ocEstado.label}
+                                  </Badge>
+                                  <span className="text-sm text-slate-600">
+                                    {oc.proveedor || 'Sin proveedor'}
+                                  </span>
+                                  {oc.concepto && (
+                                    <span className="text-xs text-slate-400">
+                                      {oc.concepto}
+                                    </span>
+                                  )}
+                                  <span className="text-sm font-medium text-slate-700">
+                                    ${oc.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {onCambiarEstadoOC && oc.estado !== 'cancelada' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onCambiarEstadoOC(oc.id, siguienteEstadoOC(oc.estado))}
+                                      className="text-xs h-7"
+                                    >
+                                      Cambiar Estado
+                                    </Button>
+                                  )}
+                                  {onEliminarOC && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => onEliminarOC(oc.id)}
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -622,6 +835,154 @@ export function ProyectosView({
             >
               <Receipt className="w-4 h-4 mr-2" />
               Facturar Proyecto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de Nueva Orden de Compra */}
+      <Dialog open={dialogoOC} onOpenChange={setDialogoOC}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nueva Orden de Compra</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Proyecto</Label>
+              <p className="text-sm text-slate-600">{proyectoOCSeleccionado?.proyectoNombre}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Proveedor *</Label>
+              <Input
+                value={ocProveedor}
+                onChange={(e) => setOcProveedor(e.target.value)}
+                placeholder="Nombre del proveedor"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Concepto</Label>
+              <Input
+                value={ocConcepto}
+                onChange={(e) => setOcConcepto(e.target.value)}
+                placeholder="Concepto general de la orden"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Items</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAgregarItemOC}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Agregar Item
+                </Button>
+              </div>
+
+              {ocItems.length === 0 ? (
+                <p className="text-sm text-slate-500 py-2">No hay items agregados</p>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-slate-600">Nombre</th>
+                        <th className="px-3 py-2 text-center font-medium text-slate-600 w-24">Cantidad</th>
+                        <th className="px-3 py-2 text-center font-medium text-slate-600 w-24">Unidad</th>
+                        <th className="px-3 py-2 text-right font-medium text-slate-600 w-28">P. Unitario</th>
+                        <th className="px-3 py-2 text-right font-medium text-slate-600 w-28">Total</th>
+                        <th className="px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {ocItems.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={item.nombre}
+                              onChange={(e) => handleActualizarItemOC(item.id, 'nombre', e.target.value)}
+                              placeholder="Descripción"
+                              className="h-8 text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min={0.01}
+                              step={0.01}
+                              value={item.cantidad}
+                              onChange={(e) => handleActualizarItemOC(item.id, 'cantidad', parseFloat(e.target.value) || 0)}
+                              className="h-8 text-sm text-center"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={item.unidad}
+                              onChange={(e) => handleActualizarItemOC(item.id, 'unidad', e.target.value)}
+                              placeholder="pza"
+                              className="h-8 text-sm text-center"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={item.precioUnitario}
+                              onChange={(e) => handleActualizarItemOC(item.id, 'precioUnitario', parseFloat(e.target.value) || 0)}
+                              className="h-8 text-sm text-right"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-slate-700">
+                            ${item.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEliminarItemOC(item.id)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Totales */}
+            {ocItems.length > 0 && (
+              <div className="flex justify-end">
+                <div className="space-y-1 text-right">
+                  <div className="text-sm text-slate-600">
+                    Subtotal: ${calcularTotalesOC().subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm text-slate-600">
+                    IVA (16%): ${calcularTotalesOC().iva.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-lg font-bold text-slate-900">
+                    Total: ${calcularTotalesOC().total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Button 
+              onClick={handleGuardarOC}
+              disabled={!ocProveedor.trim() || ocItems.length === 0 || ocItems.some(i => !i.nombre.trim())}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Guardar Orden de Compra
             </Button>
           </div>
         </DialogContent>

@@ -35,6 +35,7 @@ import { usePendientesStore } from '@/hooks/usePendientesStore';
 import { useCobranzaStore } from '@/hooks/useCobranzaStore';
 import { usePiezasCatalogoStore } from '@/hooks/usePiezasCatalogoStore';
 import { useMonedaStore } from '@/hooks/useMonedaStore';
+import { useOrdenesCompraStore } from '@/hooks/useOrdenesCompraStore';
 
 // Componentes de pasos
 import { TallerStep } from '@/components/steps/TallerStep';
@@ -72,6 +73,7 @@ import { DashboardEjecutivo } from '@/components/DashboardEjecutivo';
 
 // VISTA CATÁLOGO DE PIEZAS
 import { CatalogoPiezasView } from '@/components/CatalogoPiezasView';
+import { OrdenesCompraView } from '@/components/OrdenesCompraView';
 
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
@@ -90,11 +92,8 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' |
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera';
+                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra';
 
-// Horas disponibles por defecto
-
-// Horas disponibles por defecto
 const HORAS_DEFAULT: Record<string, number> = {
   codigo_07: 742.69,
   mo_s: 268.88,
@@ -229,6 +228,15 @@ function App() {
     getTotales,
   } = useCobranzaStore();
 
+  // Órdenes de Compra
+  const {
+    ordenes: ordenesCompra,
+    crearOrdenCompra,
+    actualizarEstado: actualizarEstadoOC,
+    eliminarOrdenCompra,
+    refrescarDesdeSupabase: refrescarOrdenes,
+  } = useOrdenesCompraStore();
+
   // Verificar sesión periódicamente para evitar cierres inesperados
   useEffect(() => {
     if (!initialized || authLoading) return;
@@ -342,6 +350,7 @@ function App() {
       refrescarCotizaciones(),
       refrescarProyectos(),
       recargarTalleres(),
+      refrescarOrdenes(),
     ]);
     setDatosCargados(true);
     toast.success('Datos sincronizados correctamente');
@@ -352,6 +361,7 @@ function App() {
     setDatosCargados(true);
     toast.info('Usando datos del dispositivo (modo offline)');
   };
+
 
   // Logout handler
   const handleLogout = async () => {
@@ -438,6 +448,7 @@ function App() {
   const irACobranza = () => setVistaActual('cobranza');
   const irADashboardEjecutivo = () => setVistaActual('dashboard-ejecutivo');
   const irAProduccion = () => setVistaActual('produccion');
+  const irAOrdenesCompra = () => setVistaActual('ordenes-compra');
 
   const irANuevaCotizacion = () => {
     if (!canCreateCotizacion()) {
@@ -588,12 +599,6 @@ function App() {
     }
     setProyectoSeleccionado(proyecto);
     setVistaActual('control-codigos');
-  };
-
-  // Ver hoja viajera
-  const handleVerHojaViajera = (proyecto: ProyectoVenta) => {
-    setProyectoSeleccionado(proyecto);
-    setVistaActual('hoja-viajera');
   };
 
   // Volver de hoja viajera
@@ -770,6 +775,7 @@ function App() {
               onDashboardEjecutivo={irADashboardEjecutivo}
               onProduccion={irAProduccion}
               onPiezasCatalogo={irAPiezasCatalogo}
+              onOrdenesCompra={irAOrdenesCompra}
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
               cobranzaVencidaCount={getVencidos().length}
@@ -949,9 +955,12 @@ function App() {
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
               onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
               onVerControlCodigos={canViewControlCodigos() ? handleVerControlCodigos : undefined}
-              onVerHojaViajera={handleVerHojaViajera}
               userRol={user.rol}
               userId={user.id}
+              ordenesCompra={ordenesCompra}
+              onCrearOrdenCompra={crearOrdenCompra}
+              onCambiarEstadoOC={actualizarEstadoOC}
+              onEliminarOC={eliminarOrdenCompra}
             />
           </>
         );
@@ -1068,6 +1077,25 @@ function App() {
               userRol={user.rol}
               onCargarCotizacion={handleCargarCotizacion}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
+            />
+          </>
+        );
+
+      case 'ordenes-compra':
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <OrdenesCompraView
+              onVolver={irAHome}
+              ordenes={ordenesCompra}
+              proyectos={proyectos}
+              onCambiarEstado={actualizarEstadoOC}
+              onEliminar={eliminarOrdenCompra}
             />
           </>
         );
