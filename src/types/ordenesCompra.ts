@@ -5,6 +5,7 @@ export interface OrdenCompra {
   cotizacionId?: string;
   usuarioId?: string;
   proveedor?: string;
+  proveedorId?: string;
   concepto?: string;
   items: OrdenCompraItem[];
   subtotal: number;
@@ -14,6 +15,11 @@ export interface OrdenCompra {
   estado: 'pendiente' | 'autorizada' | 'pagada' | 'recibida' | 'cancelada';
   fechaOc: string;
   fechaEntrega?: string;
+  terminosPago?: 'contado' | 'credito';
+  moneda?: 'MXN' | 'USD';
+  certificadoCalidad?: boolean;
+  solicitanteNombre?: string;
+  solicitanteCodigo?: string;
   notas?: string;
   createdAt?: string;
 }
@@ -25,4 +31,16 @@ export interface OrdenCompraItem {
   unidad: string;
   precioUnitario: number;
   total: number;
+}
+
+export interface Proveedor {
+  id: string;
+  numero: string;
+  nombre: string;
+  tipo?: string;
+  domicilio?: string;
+  telefono?: string;
+  email?: string;
+  contacto?: string;
+  createdAt?: string;
 }

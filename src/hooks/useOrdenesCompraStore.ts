@@ -18,6 +18,7 @@ export const useOrdenesCompraStore = () => {
     cotizacionId: row.cotizacion_id || undefined,
     usuarioId: row.usuario_id || undefined,
     proveedor: row.proveedor || undefined,
+    proveedorId: row.proveedor_id || undefined,
     concepto: row.concepto || undefined,
     items: (row.items || []).map((it: any): OrdenCompraItem => ({
       id: it.id,
@@ -34,6 +35,11 @@ export const useOrdenesCompraStore = () => {
     estado: row.estado || 'pendiente',
     fechaOc: row.fecha_oc || new Date().toISOString(),
     fechaEntrega: row.fecha_entrega || undefined,
+    terminosPago: row.terminos_pago || 'contado',
+    moneda: row.moneda || 'MXN',
+    certificadoCalidad: row.certificado_calidad ?? false,
+    solicitanteNombre: row.solicitante_nombre || undefined,
+    solicitanteCodigo: row.solicitante_codigo || undefined,
     notas: row.notas || undefined,
     createdAt: row.created_at || undefined,
   });
@@ -119,6 +125,7 @@ export const useOrdenesCompraStore = () => {
     proyectoId?: string;
     cotizacionId?: string;
     proveedor?: string;
+    proveedorId?: string;
     concepto?: string;
     items: OrdenCompraItem[];
     subtotal: number;
@@ -126,6 +133,11 @@ export const useOrdenesCompraStore = () => {
     iva: number;
     total: number;
     fechaEntrega?: string;
+    terminosPago?: 'contado' | 'credito';
+    moneda?: 'MXN' | 'USD';
+    certificadoCalidad?: boolean;
+    solicitanteNombre?: string;
+    solicitanteCodigo?: string;
     notas?: string;
   }) => {
     console.log('[useOrdenesCompraStore] === CREAR ORDEN DE COMPRA ===');
@@ -180,8 +192,20 @@ export const useOrdenesCompraStore = () => {
       if (datos.cotizacionId && datos.cotizacionId.trim() !== '') {
         insertData.cotizacion_id = datos.cotizacionId;
       }
+      if (datos.proveedorId && datos.proveedorId.trim() !== '') {
+        insertData.proveedor_id = datos.proveedorId;
+      }
       if (datos.fechaEntrega && datos.fechaEntrega.trim() !== '') {
         insertData.fecha_entrega = datos.fechaEntrega;
+      }
+      insertData.terminos_pago = datos.terminosPago || 'contado';
+      insertData.moneda = datos.moneda || 'MXN';
+      insertData.certificado_calidad = datos.certificadoCalidad ?? false;
+      if (datos.solicitanteNombre && datos.solicitanteNombre.trim() !== '') {
+        insertData.solicitante_nombre = datos.solicitanteNombre;
+      }
+      if (datos.solicitanteCodigo && datos.solicitanteCodigo.trim() !== '') {
+        insertData.solicitante_codigo = datos.solicitanteCodigo;
       }
       if (datos.notas && datos.notas.trim() !== '') {
         insertData.notas = datos.notas;

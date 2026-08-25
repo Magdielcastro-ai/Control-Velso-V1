@@ -33,16 +33,25 @@ import {
   CreditCard,
   Boxes,
   FileText,
+  Plus,
+  Printer,
 } from 'lucide-react';
-import type { OrdenCompra } from '@/types/ordenesCompra';
+import type { OrdenCompra, Proveedor } from '@/types/ordenesCompra';
 import type { ProyectoVenta } from '@/types/ventas';
+import { NuevaOrdenCompraDialog } from '@/components/NuevaOrdenCompraDialog';
+import { OrdenCompraDocumento, type DatosTallerOC } from '@/components/OrdenCompraDocumento';
 
 export interface OrdenesCompraViewProps {
   onVolver: () => void;
   ordenes: OrdenCompra[];
   proyectos: ProyectoVenta[];
+  proveedores?: Proveedor[];
+  datosTaller?: DatosTallerOC;
+  solicitanteDefault?: string;
   onCambiarEstado?: (id: string, estado: OrdenCompra['estado']) => void;
   onEliminar?: (id: string) => void;
+  onCrearOrden?: (datos: any) => Promise<boolean>;
+  onCrearProveedor?: (datos: any) => Promise<Proveedor | null>;
 }
 
 const estadoConfig: Record<
@@ -96,13 +105,28 @@ export function OrdenesCompraView({
   onVolver,
   ordenes,
   proyectos,
+  proveedores = [],
+  datosTaller,
+  solicitanteDefault,
   onCambiarEstado,
   onEliminar,
+  onCrearOrden,
+  onCrearProveedor,
 }: OrdenesCompraViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
   const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCompra | null>(null);
   const [dialogoDetalle, setDialogoDetalle] = useState(false);
+  const [dialogoNueva, setDialogoNueva] = useState(false);
+  const [ordenDocumento, setOrdenDocumento] = useState<OrdenCompra | null>(null);
+
+  const proveedorMap = useMemo(() => {
+    const map: Record<string, Proveedor> = {};
+    proveedores.forEach((p) => {
+      map[p.id] = p;
+    });
+    return map;
+  }, [proveedores]);
 
   // Mapeo rápido de proyectoId -> nombre
   const proyectoNombreMap = useMemo(() => {
@@ -187,6 +211,12 @@ export function OrdenesCompraView({
             {stats.total} órdenes · {stats.pendientes} pendientes · {stats.recibidas} recibidas
           </p>
         </div>
+        {onCrearOrden && (
+          <Button onClick={() => setDialogoNueva(true)} className="bg-blue-600 hover:bg-blue-700 w-fit">
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva OC
+          </Button>
+        )}
       </div>
 
       {/* Tarjetas de resumen */}
@@ -313,6 +343,15 @@ export function OrdenesCompraView({
                         className="h-8 w-8 p-0"
                       >
                         <Eye className="w-4 h-4 text-blue-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setOrdenDocumento(oc)}
+                        className="h-8 w-8 p-0"
+                        title="Ver documento imprimible"
+                      >
+                        <Printer className="w-4 h-4 text-slate-600" />
                       </Button>
                       {onCambiarEstado && (
                         <Select
@@ -486,6 +525,28 @@ export function OrdenesCompraView({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo: Nueva OC */}
+      {onCrearOrden && onCrearProveedor && (
+        <NuevaOrdenCompraDialog
+          open={dialogoNueva}
+          onOpenChange={setDialogoNueva}
+          proveedores={proveedores}
+          proyectos={proyectos}
+          solicitanteDefault={solicitanteDefault}
+          onCrearProveedor={onCrearProveedor}
+          onCrearOrden={onCrearOrden}
+        />
+      )}
+
+      {/* Documento imprimible */}
+      <OrdenCompraDocumento
+        open={ordenDocumento !== null}
+        onOpenChange={(open) => { if (!open) setOrdenDocumento(null); }}
+        orden={ordenDocumento}
+        proveedor={ordenDocumento?.proveedorId ? proveedorMap[ordenDocumento.proveedorId] : undefined}
+        datosTaller={datosTaller || { nombre: 'Soluciones Integrales Velso' }}
+      />
     </div>
   );
 }

@@ -362,7 +362,7 @@ export interface CotizacionGuardada {
   tipoCambio: number;
   total: number;
   totalMXN: number;
-  estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
+  estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada' | 'comprada' | 'vendida';
   usuarioId?: string;
   cantidadPiezas?: number;
   // Campos adicionales para conversión a proyecto

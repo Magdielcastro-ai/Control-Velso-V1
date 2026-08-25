@@ -30,6 +30,8 @@ const estadosConfig = {
   enviada: { label: 'Enviada', color: 'bg-blue-500', icon: Send },
   aceptada: { label: 'Aceptada', color: 'bg-green-500', icon: CheckCircle },
   rechazada: { label: 'Rechazada', color: 'bg-red-500', icon: XCircle },
+  comprada: { label: 'Comprada', color: 'bg-purple-500', icon: CheckCircle },
+  vendida: { label: 'Vendida', color: 'bg-indigo-500', icon: CheckCircle },
 };
 
 export function CotizacionesGuardadas({ 

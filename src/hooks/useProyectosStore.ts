@@ -178,6 +178,7 @@ export const useProyectosStore = () => {
     materiales: any[];
     procesos: any[];
     costosAdicionales: any;
+    cotizacionId?: string;
   }) => {
     console.log('[useProyectosStore] === CONVERTIR A VENTA ===');
     console.log('[useProyectosStore] Datos recibidos:', datos);
@@ -230,6 +231,11 @@ export const useProyectosStore = () => {
         proyectoData.cliente_id = datos.clienteId;
       }
 
+      // Vincular con la cotización de origen para trazabilidad
+      if (datos.cotizacionId && datos.cotizacionId.trim() !== '') {
+        proyectoData.cotizacion_id = datos.cotizacionId;
+      }
+
       console.log('[useProyectosStore] Insertando proyecto:', proyectoData);
 
       // 3. Insertar en Supabase
@@ -279,6 +285,12 @@ export const useProyectosStore = () => {
               usuarioId: retryData.usuario_id,
             };
             setProyectos(prev => [nuevoProyecto, ...prev]);
+
+            // Actualizar estado de cotización a comprada
+            if (datos.cotizacionId) {
+              await supabase.from('cotizaciones').update({ estado: 'comprada', updated_at: new Date().toISOString() }).eq('id', datos.cotizacionId);
+            }
+
             toast.success(`Proyecto ${nuevoProyecto.codigoProyecto} creado exitosamente`);
             return true;
           }
@@ -310,6 +322,21 @@ export const useProyectosStore = () => {
           usuarioId: data.usuario_id,
         };
         setProyectos(prev => [nuevoProyecto, ...prev]);
+
+        // Actualizar estado de cotización a comprada SIEMPRE que se cree el proyecto
+        if (datos.cotizacionId) {
+          const { error: updateError } = await supabase
+            .from('cotizaciones')
+            .update({ estado: 'comprada', updated_at: new Date().toISOString() })
+            .eq('id', datos.cotizacionId);
+
+          if (updateError) {
+            console.warn('[useProyectosStore] Error actualizando estado cotización:', updateError.message);
+          } else {
+            console.log('[useProyectosStore] Cotización marcada como comprada');
+          }
+        }
+
         toast.success(`Proyecto ${nuevoProyecto.codigoProyecto} creado exitosamente`);
       }
 

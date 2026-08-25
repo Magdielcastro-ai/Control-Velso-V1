@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { Cotizacion, Moneda } from '@/types/cotizacion';
 import { formatearMoneda, getMonedaConfig } from '@/types/cotizacion';
+import { numeroALetras } from '@/utils/numeroALetras';
 
 interface CotizacionFinalStepProps {
   cotizacion: Cotizacion;
@@ -486,61 +487,4 @@ function renderCostoAdicionalRow(
       </td>
     </tr>
   );
-}
-
-/* ─── Helper: Número a letras (simplificado) ─── */
-function numeroALetras(num: number): string {
-  const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
-  const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
-  const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
-  const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
-
-  const n = Math.floor(num);
-  if (n === 0) return 'cero';
-  if (n === 100) return 'cien';
-  if (n === 1000) return 'mil';
-  if (n === 1000000) return 'un millón';
-
-  let result = '';
-  let resto = n;
-
-  // Millones
-  const millones = Math.floor(resto / 1000000);
-  if (millones > 0) {
-    result += millones === 1 ? 'un millón ' : `${numeroALetras(millones)} millones `;
-    resto %= 1000000;
-  }
-
-  // Miles
-  const miles = Math.floor(resto / 1000);
-  if (miles > 0) {
-    result += miles === 1 ? 'mil ' : `${numeroALetras(miles)} mil `;
-    resto %= 1000;
-  }
-
-  // Centenas
-  const c = Math.floor(resto / 100);
-  if (c > 0) {
-    result += centenas[c] + ' ';
-    resto %= 100;
-  }
-
-  // Decenas y unidades
-  if (resto >= 10 && resto < 20) {
-    result += especiales[resto - 10];
-  } else {
-    const d = Math.floor(resto / 10);
-    const u = resto % 10;
-    if (d > 0) {
-      result += decenas[d];
-      if (u > 0) {
-        result += d === 2 ? 'i' : ' y ';
-        result += unidades[u];
-      }
-    } else if (u > 0) {
-      result += unidades[u];
-    }
-  }
-
-  return result.trim();
 }

@@ -36,6 +36,7 @@ import { useCobranzaStore } from '@/hooks/useCobranzaStore';
 import { usePiezasCatalogoStore } from '@/hooks/usePiezasCatalogoStore';
 import { useMonedaStore } from '@/hooks/useMonedaStore';
 import { useOrdenesCompraStore } from '@/hooks/useOrdenesCompraStore';
+import { useProveedoresStore } from '@/hooks/useProveedoresStore';
 
 // Componentes de pasos
 import { TallerStep } from '@/components/steps/TallerStep';
@@ -236,6 +237,12 @@ function App() {
     eliminarOrdenCompra,
     refrescarDesdeSupabase: refrescarOrdenes,
   } = useOrdenesCompraStore();
+
+  // Proveedores (para órdenes de compra)
+  const {
+    proveedores,
+    crearProveedor,
+  } = useProveedoresStore();
 
   // Verificar sesión periódicamente para evitar cierres inesperados
   useEffect(() => {
@@ -495,21 +502,11 @@ function App() {
         estudioMaterial: { costo: 0, incluidoGratis: false },
         pruebaDureza: { costo: 0, incluidoGratis: false },
       },
+      cotizacionId: cotizacion.id,
     });
 
     if (exito) {
-      // Actualizar estado de la cotización a "vendida"
-      try {
-        const { supabase } = await import('@/lib/supabase');
-        await supabase
-          .from('cotizaciones')
-          .update({ estado: 'vendida', updated_at: new Date().toISOString() })
-          .eq('id', cotizacion.id);
-        toast.success('Cotización convertida a venta exitosamente');
-      } catch (err) {
-        console.warn('Error actualizando estado de cotización:', err);
-        toast.success('Cotización convertida a venta exitosamente');
-      }
+      toast.success('Cotización convertida a venta exitosamente');
     }
   };
 
@@ -546,20 +543,10 @@ function App() {
         estudioMaterial: { costo: 0, incluidoGratis: false },
         pruebaDureza: { costo: 0, incluidoGratis: false },
       },
+      cotizacionId: cotizacion.id,
     });
     if (exito) {
-      // Actualizar estado de la cotización a "vendida"
-      try {
-        const { supabase } = await import('@/lib/supabase');
-        await supabase
-          .from('cotizaciones')
-          .update({ estado: 'vendida', updated_at: new Date().toISOString() })
-          .eq('id', cotizacion.id);
-        toast.success('Cotización convertida a venta exitosamente');
-      } catch (err) {
-        console.warn('Error actualizando estado de cotización:', err);
-        toast.success('Cotización convertida a venta exitosamente');
-      }
+      toast.success('Cotización convertida a venta exitosamente');
     }
   };
 
@@ -1094,8 +1081,31 @@ function App() {
               onVolver={irAHome}
               ordenes={ordenesCompra}
               proyectos={proyectos}
+              proveedores={proveedores}
+              datosTaller={
+                talleres[0]
+                  ? {
+                      nombre: talleres[0].nombre,
+                      direccion: talleres[0].direccion,
+                      telefono: talleres[0].telefono,
+                      email: talleres[0].email,
+                      rfc: talleres[0].rfc,
+                    }
+                  : cotizacion.datosTaller?.nombre
+                    ? {
+                        nombre: cotizacion.datosTaller.nombre,
+                        direccion: cotizacion.datosTaller.direccion,
+                        telefono: cotizacion.datosTaller.telefono,
+                        email: cotizacion.datosTaller.email,
+                        rfc: cotizacion.datosTaller.rfc,
+                      }
+                    : { nombre: 'Soluciones Integrales Velso' }
+              }
+              solicitanteDefault={user?.nombre || user?.email || ''}
               onCambiarEstado={actualizarEstadoOC}
               onEliminar={eliminarOrdenCompra}
+              onCrearOrden={crearOrdenCompra}
+              onCrearProveedor={crearProveedor}
             />
           </>
         );
