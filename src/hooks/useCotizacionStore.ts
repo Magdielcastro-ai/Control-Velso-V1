@@ -582,6 +582,15 @@ export const useCotizacionStore = () => {
     const id = cotizacionRecalculada.id || crypto.randomUUID();
     const nuevaCotizacion = { ...cotizacionRecalculada, id };
 
+    // No degradar el estado: navegar entre pasos guarda como 'borrador',
+    // pero eso no debe regresar una cotización ya enviada/comprada/vendida
+    const estadoExistente = cotizacionesGuardadas.find(c => c.id === id)?.estado;
+    const esNueva = !cotizacionRecalculada.id;
+    const esAutoguardado = estado === 'borrador';
+    const estadoFinal = esAutoguardado && estadoExistente && estadoExistente !== 'borrador'
+      ? estadoExistente
+      : estado;
+
     setCotizacion(nuevaCotizacion);
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -597,7 +606,7 @@ export const useCotizacionStore = () => {
       tipoCambio: safeNumber(nuevaCotizacion.tipoCambio),
       total: safeNumber(nuevaCotizacion.total),
       totalMXN: safeNumber(nuevaCotizacion.totalMXN),
-      estado,
+      estado: estadoFinal,
       usuarioId: user?.id,
       cantidadPiezas: nuevaCotizacion.piezas.length,
     };
@@ -639,7 +648,9 @@ export const useCotizacionStore = () => {
           iva_mxn: safeNumber(nuevaCotizacion.ivaMXN),
           total: safeNumber(nuevaCotizacion.total),
           total_mxn: safeNumber(nuevaCotizacion.totalMXN),
-          estado,
+          // En autoguardado de una cotización existente no tocamos el estado
+          // en la nube (por si la lista local está desactualizada)
+          ...(esAutoguardado && !esNueva ? {} : { estado: estadoFinal }),
         };
 
         console.log('[guardarCotizacion] Guardando en Supabase:', cotizacionDB);
@@ -665,7 +676,7 @@ export const useCotizacionStore = () => {
     }
 
     return id;
-  }, [cotizacion]);
+  }, [cotizacion, cotizacionesGuardadas]);
 
   const cargarCotizacion = useCallback(async (id: string): Promise<boolean> => {
     try {
