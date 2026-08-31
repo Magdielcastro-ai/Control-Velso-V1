@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Pendiente, Alerta } from '@/types/pendientes';
-import type { ProyectoVenta } from '@/types/ventas';
-import type { CotizacionGuardada } from '@/types/cotizacion';
 
 export const usePendientesStore = () => {
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
@@ -130,137 +128,6 @@ export const usePendientesStore = () => {
     }
   }, []);
 
-  // Verificar si existe pendiente en Supabase (incluso si está completado)
-  const existePendienteEnDB = useCallback(async (tipo: string, proyectoId?: string, cotizacionId?: string) => {
-    try {
-      let query = supabase
-        .from('pendientes')
-        .select('id')
-        .eq('tipo', tipo);
-
-      if (proyectoId) query = query.eq('proyecto_id', proyectoId);
-      if (cotizacionId) query = query.eq('cotizacion_id', cotizacionId);
-
-      const { data, error } = await query.limit(1);
-
-      if (error) {
-        console.error('Error verificando pendiente:', error);
-        return false;
-      }
-
-      return data && data.length > 0;
-    } catch (e) {
-      console.error('Error verificando pendiente:', e);
-      return false;
-    }
-  }, []);
-
-  // Generar pendientes y alertas automáticos desde proyectos y cotizaciones
-  const generarPendientesDesdeProyectos = useCallback(async (
-    proyectos: ProyectoVenta[],
-    cotizaciones: CotizacionGuardada[]
-  ) => {
-    const hoy = new Date().toISOString().split('T')[0];
-    let hayNuevos = false;
-
-    // 1. Cotizaciones en estado "enviada" → seguimiento
-    for (const c of cotizaciones.filter(c => c.estado === 'enviada')) {
-      const diasEspera = Math.floor(
-        (Date.now() - new Date(c.fecha).getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      const existe = await existePendienteEnDB('seguimiento_cotizacion', undefined, c.id);
-      if (!existe) {
-        await guardarPendienteDB({
-          tipo: 'seguimiento_cotizacion',
-          titulo: `Seguimiento cotización ${c.numero}`,
-          descripcion: `Cotización enviada hace ${diasEspera} días. Llamar al cliente para seguimiento.`,
-          cotizacionId: c.id,
-          clienteNombre: c.clienteNombre,
-          proyectoNombre: c.proyectoNombre,
-          fechaVencimiento: hoy,
-          prioridad: diasEspera > 5 ? 'urgente' : diasEspera > 3 ? 'alta' : 'media',
-          completado: false,
-          responsable: 'yo',
-          notas: '',
-        });
-        hayNuevos = true;
-      }
-    }
-
-    // 2. Proyectos en fabricación → seguimiento producción
-    for (const p of proyectos.filter(p => p.estado === 'en_fabricacion')) {
-      const diasFabricacion = Math.floor(
-        (Date.now() - new Date(p.fechaVenta).getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      const existe = await existePendienteEnDB('produccion', p.id);
-      if (!existe) {
-        await guardarPendienteDB({
-          tipo: 'produccion',
-          titulo: `Seguimiento producción: ${p.proyectoNombre}`,
-          descripcion: `Proyecto en fabricación desde hace ${diasFabricacion} días. Verificar avance.`,
-          proyectoId: p.id,
-          clienteNombre: p.clienteNombre,
-          proyectoNombre: p.proyectoNombre,
-          fechaVencimiento: hoy,
-          prioridad: diasFabricacion > 7 ? 'urgente' : diasFabricacion > 3 ? 'alta' : 'media',
-          completado: false,
-          responsable: 'pm',
-          notas: '',
-        });
-        hayNuevos = true;
-      }
-    }
-
-    // 3. Proyectos fabricados → cotejar utilidad
-    for (const p of proyectos.filter(p => p.estado === 'fabricado')) {
-      const existe = await existePendienteEnDB('cotejar_utilidad', p.id);
-      if (!existe) {
-        await guardarPendienteDB({
-          tipo: 'cotejar_utilidad',
-          titulo: `Cotejar utilidad: ${p.proyectoNombre}`,
-          descripcion: `Verificar si se cobró bien y si se alcanzó el 30% de utilidad esperada.`,
-          proyectoId: p.id,
-          clienteNombre: p.clienteNombre,
-          proyectoNombre: p.proyectoNombre,
-          fechaVencimiento: hoy,
-          prioridad: 'alta',
-          completado: false,
-          responsable: 'yo',
-          notas: '',
-        });
-        hayNuevos = true;
-      }
-    }
-
-    // 4. Proyectos entregados → facturar
-    for (const p of proyectos.filter(p => p.estado === 'entregado')) {
-      const existe = await existePendienteEnDB('facturar', p.id);
-      if (!existe) {
-        await guardarPendienteDB({
-          tipo: 'facturar',
-          titulo: `Facturar: ${p.proyectoNombre}`,
-          descripcion: `Proyecto entregado. Emitir y enviar factura al cliente.`,
-          proyectoId: p.id,
-          clienteNombre: p.clienteNombre,
-          proyectoNombre: p.proyectoNombre,
-          fechaVencimiento: hoy,
-          prioridad: 'alta',
-          completado: false,
-          responsable: 'yo',
-          notas: '',
-        });
-        hayNuevos = true;
-      }
-    }
-
-    // Solo recargar si se crearon nuevos pendientes
-    if (hayNuevos) {
-      await cargarPendientes();
-    }
-  }, [existePendienteEnDB, guardarPendienteDB, cargarPendientes]);
-
   // Completar pendiente
   const completarPendiente = useCallback(async (id: string) => {
     try {
@@ -385,7 +252,6 @@ export const usePendientesStore = () => {
     cargado,
     cargarPendientes,
     cargarAlertas,
-    generarPendientesDesdeProyectos,
     completarPendiente,
     agregarPendiente,
     eliminarPendiente,
