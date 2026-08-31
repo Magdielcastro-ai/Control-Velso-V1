@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
@@ -18,6 +17,7 @@ interface CotizacionesViewProps {
   userRol?: string;
   onCargarCotizacion: (id: string) => void;
   onConvertirAVenta?: (cotizacion: any, ordenCompra: string) => void;
+  onCambiarEstado?: (cotizacion: any, nuevoEstado: string) => Promise<void> | void;
 }
 
 interface Vendedor {
@@ -48,13 +48,19 @@ const estadosConfig: Record<string, { label: string; color: string; icon: any }>
   enviada: { label: 'Enviada', color: 'bg-blue-500', icon: FileText },
   aceptada: { label: 'Aceptada', color: 'bg-green-500', icon: CheckCircle },
   rechazada: { label: 'Rechazada', color: 'bg-red-500', icon: Trash2 },
+  comprada: { label: 'Comprada', color: 'bg-purple-500', icon: CheckCircle },
+  vendida: { label: 'Vendida', color: 'bg-indigo-500', icon: CheckCircle },
 };
+
+// Estados que implican que la cotización ya tiene proyecto en fabricación
+const ESTADOS_CONVERTIDA = ['comprada', 'convertida', 'vendida'];
 
 export function CotizacionesView({
   onVolver,
   userRol = 'vendedor',
   onCargarCotizacion,
-  onConvertirAVenta
+  onConvertirAVenta,
+  onCambiarEstado
 }: CotizacionesViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
@@ -220,12 +226,39 @@ export function CotizacionesView({
 
   const handleEliminar = async (id: string) => {
     if (!confirm('¿Estás seguro de eliminar esta cotización?')) return;
-    
+
     try {
       await deleteCotizacion(id);
       toast.success('Cotización eliminada');
     } catch (err) {
       toast.error('Error al eliminar cotización');
+    }
+  };
+
+  // Cambio de estado manual (útil para debug y pruebas)
+  const handleCambiarEstado = async (cot: CotizacionConDetalle, nuevoEstado: string) => {
+    if (nuevoEstado === cot.estado) return;
+
+    const saleDeConvertida =
+      ESTADOS_CONVERTIDA.includes(cot.estado) && !ESTADOS_CONVERTIDA.includes(nuevoEstado);
+
+    if (saleDeConvertida) {
+      const ok = confirm(
+        `Al cambiar "${cot.numero}" de "${cot.estado}" a "${nuevoEstado}" también se eliminará:\n\n` +
+        `• El proyecto vinculado (desaparece de Proyectos y Producción)\n` +
+        `• Las órdenes de compra relacionadas\n\n¿Continuar?`
+      );
+      if (!ok) return;
+    }
+
+    try {
+      await updateEstado(cot.id, nuevoEstado);
+      if (saleDeConvertida && onCambiarEstado) {
+        await onCambiarEstado(cot, nuevoEstado);
+      }
+      toast.success(`Estado actualizado a "${estadosConfig[nuevoEstado]?.label || nuevoEstado}"`);
+    } catch (err) {
+      toast.error('Error al actualizar estado');
     }
   };
 
@@ -437,7 +470,6 @@ export function CotizacionesView({
                           {cotizacionesEmpresa.map((cot) => {
                             const comprada = esComprada(cot.estado);
                             const estadoConfig = estadosConfig[cot.estado] || estadosConfig.borrador;
-                            const EstadoIcon = estadoConfig.icon;
                             const totalSinIVA = cot.subtotal || (cot.total / (1 + cot.iva_porcentaje / 100));
                             
                             return (
@@ -458,17 +490,24 @@ export function CotizacionesView({
                                   {formatearMonedaLista(cot.total, cot.moneda || 'MXN', cot.tipo_cambio || 1)}
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  {comprada ? (
-                                    <Badge className="bg-green-600 text-white text-xs">
-                                      <CheckCircle className="w-3 h-3 mr-1" />
-                                      COMPRADA
-                                    </Badge>
-                                  ) : (
-                                    <Badge className={`${estadoConfig.color} text-white text-xs`}>
-                                      <EstadoIcon className="w-3 h-3 mr-1" />
-                                      {estadoConfig.label}
-                                    </Badge>
-                                  )}
+                                  <Select
+                                    value={cot.estado}
+                                    onValueChange={(v) => handleCambiarEstado(cot, v)}
+                                  >
+                                    <SelectTrigger
+                                      className={`h-7 w-[125px] mx-auto text-xs text-white border-0 ${estadoConfig.color}`}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="borrador">Borrador</SelectItem>
+                                      <SelectItem value="enviada">Enviada</SelectItem>
+                                      <SelectItem value="aceptada">Aceptada</SelectItem>
+                                      <SelectItem value="rechazada">Rechazada</SelectItem>
+                                      <SelectItem value="comprada">Comprada</SelectItem>
+                                      <SelectItem value="vendida">Vendida</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center justify-center gap-1">

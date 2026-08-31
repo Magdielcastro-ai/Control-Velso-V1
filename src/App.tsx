@@ -663,6 +663,38 @@ function App() {
     }
   };
 
+  // Cambio manual de estado de cotización (debug/pruebas):
+  // si sale de comprada/vendida, eliminar proyecto vinculado
+  // (desaparece de Proyectos y Producción) y sus órdenes de compra
+  const handleCambiarEstadoCotizacion = async (cot: any, nuevoEstado: string) => {
+    const ESTADOS_CONVERTIDA = ['comprada', 'convertida', 'vendida'];
+    const saleDeConvertida =
+      ESTADOS_CONVERTIDA.includes(cot.estado) && !ESTADOS_CONVERTIDA.includes(nuevoEstado);
+    if (!saleDeConvertida) return;
+
+    const proyectosVinculados = proyectos.filter(
+      (p) => (p.cotizacionId && p.cotizacionId === cot.id) || p.numeroCotizacion === cot.numero
+    );
+    const idsProyectos = new Set(proyectosVinculados.map((p) => p.id));
+
+    const ocsVinculadas = ordenesCompra.filter(
+      (o) => (o.proyectoId && idsProyectos.has(o.proyectoId)) || o.cotizacionId === cot.id
+    );
+
+    for (const oc of ocsVinculadas) {
+      await eliminarOrdenCompra(oc.id);
+    }
+    for (const proy of proyectosVinculados) {
+      await eliminarProyecto(proy.id);
+    }
+
+    if (proyectosVinculados.length > 0 || ocsVinculadas.length > 0) {
+      toast.info(
+        `Limpieza: ${proyectosVinculados.length} proyecto(s) y ${ocsVinculadas.length} orden(es) de compra eliminadas`
+      );
+    }
+  };
+
   const handleCambiarMoneda = (moneda: 'MXN' | 'USD') => {
     actualizarMoneda(moneda);
   };
@@ -1064,6 +1096,7 @@ function App() {
               userRol={user.rol}
               onCargarCotizacion={handleCargarCotizacion}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
+              onCambiarEstado={handleCambiarEstadoCotizacion}
             />
           </>
         );

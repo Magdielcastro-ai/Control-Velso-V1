@@ -58,6 +58,7 @@ export const useProyectosStore = () => {
           codigoProyecto: p.codigo_proyecto || '',
           tipoProyecto: p.tipo_proyecto || 'maquinado',
           numeroCotizacion: p.numero_cotizacion || '',
+          cotizacionId: p.cotizacion_id || '',
           ordenCompra: p.orden_compra || '',
           clienteId: p.cliente_id || p.clienteid || '',
           clienteNombre: p.cliente_nombre || '',

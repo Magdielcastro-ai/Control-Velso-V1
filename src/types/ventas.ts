@@ -72,6 +72,7 @@ export interface ProyectoVenta {
   codigoProyecto: string;
   tipoProyecto: 'suministro' | 'maquinado';
   numeroCotizacion: string;
+  cotizacionId?: string;
   ordenCompra: string;
   numeroFactura?: string;
   fechaVenta: string;
