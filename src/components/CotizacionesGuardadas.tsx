@@ -13,7 +13,6 @@ import {
   FolderOpen,
   CheckCircle,
   Clock,
-  XCircle,
   Send
 } from 'lucide-react';
 import type { CotizacionGuardada } from '@/types/cotizacion';
@@ -27,11 +26,8 @@ interface CotizacionesGuardadasProps {
 
 const estadosConfig = {
   borrador: { label: 'Borrador', color: 'bg-slate-500', icon: Clock },
-  enviada: { label: 'Enviada', color: 'bg-blue-500', icon: Send },
-  aceptada: { label: 'Aceptada', color: 'bg-green-500', icon: CheckCircle },
-  rechazada: { label: 'Rechazada', color: 'bg-red-500', icon: XCircle },
-  comprada: { label: 'Comprada', color: 'bg-purple-500', icon: CheckCircle },
-  vendida: { label: 'Vendida', color: 'bg-indigo-500', icon: CheckCircle },
+  cotizacion: { label: 'Cotización', color: 'bg-blue-500', icon: Send },
+  orden: { label: 'Orden', color: 'bg-green-600', icon: CheckCircle },
 };
 
 export function CotizacionesGuardadas({ 
@@ -92,7 +88,7 @@ export function CotizacionesGuardadas({
                 </TableHeader>
                 <TableBody>
                   {cotizaciones.map((cot) => {
-                    const estadoConfig = estadosConfig[cot.estado];
+                    const estadoConfig = estadosConfig[cot.estado as keyof typeof estadosConfig] || estadosConfig.borrador;
                     return (
                       <TableRow key={cot.id}>
                         <TableCell className="font-medium">{cot.numero}</TableCell>

@@ -639,7 +639,7 @@ function App() {
       }
     }
 
-    await guardarCotizacion('enviada');
+    await guardarCotizacion('cotizacion');
     setVistaActual('cotizacion-final');
     toast.success('¡Cotización generada exitosamente!');
   };
@@ -659,7 +659,7 @@ function App() {
   // si sale de comprada/vendida, eliminar proyecto vinculado
   // (desaparece de Proyectos y Producción) y sus órdenes de compra
   const handleCambiarEstadoCotizacion = async (cot: any, nuevoEstado: string) => {
-    const ESTADOS_CONVERTIDA = ['comprada', 'convertida', 'vendida'];
+    const ESTADOS_CONVERTIDA = ['orden'];
     const saleDeConvertida =
       ESTADOS_CONVERTIDA.includes(cot.estado) && !ESTADOS_CONVERTIDA.includes(nuevoEstado);
     if (!saleDeConvertida) return;

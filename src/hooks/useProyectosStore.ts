@@ -287,9 +287,9 @@ export const useProyectosStore = () => {
             };
             setProyectos(prev => [nuevoProyecto, ...prev]);
 
-            // Actualizar estado de cotización a comprada
+            // Actualizar estado de cotización a orden
             if (datos.cotizacionId) {
-              await supabase.from('cotizaciones').update({ estado: 'comprada', updated_at: new Date().toISOString() }).eq('id', datos.cotizacionId);
+              await supabase.from('cotizaciones').update({ estado: 'orden', updated_at: new Date().toISOString() }).eq('id', datos.cotizacionId);
             }
 
             toast.success(`Proyecto ${nuevoProyecto.codigoProyecto} creado exitosamente`);
@@ -324,11 +324,11 @@ export const useProyectosStore = () => {
         };
         setProyectos(prev => [nuevoProyecto, ...prev]);
 
-        // Actualizar estado de cotización a comprada SIEMPRE que se cree el proyecto
+        // Actualizar estado de cotización a orden SIEMPRE que se cree el proyecto
         if (datos.cotizacionId) {
           const { error: updateError } = await supabase
             .from('cotizaciones')
-            .update({ estado: 'comprada', updated_at: new Date().toISOString() })
+            .update({ estado: 'orden', updated_at: new Date().toISOString() })
             .eq('id', datos.cotizacionId);
 
           if (updateError) {

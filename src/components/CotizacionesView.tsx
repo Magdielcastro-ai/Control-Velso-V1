@@ -45,15 +45,12 @@ interface CotizacionConDetalle {
 
 const estadosConfig: Record<string, { label: string; color: string; icon: any }> = {
   borrador: { label: 'Borrador', color: 'bg-slate-500', icon: Clock },
-  enviada: { label: 'Enviada', color: 'bg-blue-500', icon: FileText },
-  aceptada: { label: 'Aceptada', color: 'bg-green-500', icon: CheckCircle },
-  rechazada: { label: 'Rechazada', color: 'bg-red-500', icon: Trash2 },
-  comprada: { label: 'Comprada', color: 'bg-purple-500', icon: CheckCircle },
-  vendida: { label: 'Vendida', color: 'bg-indigo-500', icon: CheckCircle },
+  cotizacion: { label: 'Cotización', color: 'bg-blue-500', icon: FileText },
+  orden: { label: 'Orden', color: 'bg-green-600', icon: CheckCircle },
 };
 
-// Estados que implican que la cotización ya tiene proyecto en fabricación
-const ESTADOS_CONVERTIDA = ['comprada', 'convertida', 'vendida'];
+// Estado que implica que la cotización ya tiene proyecto en fabricación
+const ESTADOS_CONVERTIDA = ['orden'];
 
 export function CotizacionesView({
   onVolver,
@@ -114,9 +111,9 @@ export function CotizacionesView({
     }
   };
 
-  // Verificar si una cotización ya fue convertida en proyecto
+  // Verificar si una cotización ya tiene orden (y proyecto)
   const esComprada = (estado: string) => {
-    return estado === 'comprada' || estado === 'convertida';
+    return estado === 'orden';
   };
 
   // Helper: formatear moneda con conversión si es necesario
@@ -170,8 +167,8 @@ export function CotizacionesView({
       c.empresa.toLowerCase().includes(busqueda.toLowerCase()) ||
       c.contacto.toLowerCase().includes(busqueda.toLowerCase()) ||
       c.proyecto_nombre.toLowerCase().includes(busqueda.toLowerCase());
-    const matchEstado = estadoFiltro === 'todos' ? true : 
-                        estadoFiltro === 'comprada' ? esComprada(c.estado) :
+    const matchEstado = estadoFiltro === 'todos' ? true :
+                        estadoFiltro === 'orden' ? esComprada(c.estado) :
                         estadoFiltro === 'pendiente' ? !esComprada(c.estado) :
                         c.estado === estadoFiltro;
     const matchVendedor = vendedorFiltro === 'todos' ? true :
@@ -213,7 +210,7 @@ export function CotizacionesView({
     if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
     
     try {
-      await updateEstado(cotizacionSeleccionada.id, 'comprada');
+      await updateEstado(cotizacionSeleccionada.id, 'orden');
       onConvertirAVenta(cotizacionSeleccionada, ordenCompra);
       setOrdenCompra('');
       setCotizacionSeleccionada(null);
@@ -307,7 +304,7 @@ export function CotizacionesView({
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-slate-900">Cotizaciones</h2>
           <p className="text-slate-500">
-            {totalCotizaciones} cotizaciones · {totalCompradas} compradas · {totalPendientes} pendientes
+            {totalCotizaciones} cotizaciones · {totalCompradas} con orden · {totalPendientes} sin orden
             {isAdmin ? <span className="text-blue-600 ml-2">(Vista de Admin)</span> : <span className="text-blue-600 ml-2">(Vista Personal)</span>}
           </p>
         </div>
@@ -325,7 +322,7 @@ export function CotizacionesView({
         </Card>
         <Card className="border-slate-200">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Monto Comprado</p>
+            <p className="text-sm text-slate-500">Monto en Órdenes</p>
             <p className="text-xl font-bold text-green-600">
               ${montoComprado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
@@ -368,12 +365,10 @@ export function CotizacionesView({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos los estados</SelectItem>
-            <SelectItem value="comprada">Compradas</SelectItem>
-            <SelectItem value="pendiente">Pendientes</SelectItem>
             <SelectItem value="borrador">Borrador</SelectItem>
-            <SelectItem value="enviada">Enviadas</SelectItem>
-            <SelectItem value="aceptada">Aceptadas</SelectItem>
-            <SelectItem value="rechazada">Rechazadas</SelectItem>
+            <SelectItem value="cotizacion">Cotización</SelectItem>
+            <SelectItem value="orden">Con Orden</SelectItem>
+            <SelectItem value="pendiente">Sin Orden</SelectItem>
           </SelectContent>
         </Select>
         {isAdmin && (
@@ -436,7 +431,7 @@ export function CotizacionesView({
                       <div>
                         <h3 className="font-semibold text-slate-900">{empresa}</h3>
                         <p className="text-sm text-slate-500">
-                          {cotizacionesEmpresa.length} cotizaciones · {compradasEmpresa} compradas
+                          {cotizacionesEmpresa.length} cotizaciones · {compradasEmpresa} con orden
                         </p>
                       </div>
                     </div>
@@ -501,11 +496,8 @@ export function CotizacionesView({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="borrador">Borrador</SelectItem>
-                                      <SelectItem value="enviada">Enviada</SelectItem>
-                                      <SelectItem value="aceptada">Aceptada</SelectItem>
-                                      <SelectItem value="rechazada">Rechazada</SelectItem>
-                                      <SelectItem value="comprada">Comprada</SelectItem>
-                                      <SelectItem value="vendida">Vendida</SelectItem>
+                                      <SelectItem value="cotizacion">Cotización</SelectItem>
+                                      <SelectItem value="orden">Orden</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </td>
@@ -520,7 +512,7 @@ export function CotizacionesView({
                                       <Eye className="w-4 h-4 text-blue-600" />
                                     </Button>
 
-                                    {!comprada && cot.estado !== 'rechazada' && onConvertirAVenta && (
+                                    {!comprada && onConvertirAVenta && (
                                       <Dialog open={dialogoConvertir && cotizacionSeleccionada?.id === cot.id} 
                                              onOpenChange={(open) => {
                                                if (!open) {

@@ -184,9 +184,9 @@ export function useSupabaseCotizaciones() {
 
       if (fetchError) throw fetchError;
 
-      // Validar que no esté vendida
-      if (cotizacion?.estado === 'vendida') {
-        toast.error('No se puede eliminar una cotización vendida. Las cotizaciones vendidas se mantienen para historial.');
+      // Validar que no tenga orden de compra ingresada
+      if (cotizacion?.estado === 'orden') {
+        toast.error('No se puede eliminar una cotización con orden. Las cotizaciones con orden se mantienen para historial.');
         return false;
       }
 

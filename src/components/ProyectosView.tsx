@@ -197,20 +197,11 @@ export function ProyectosView({
     return coincideBusqueda && coincideEstado && coincideVendedor;
   });
 
-  // Cotizaciones que aún no son ventas (solo admin y vendedor pueden ver)
-  // Incluye: enviada, aceptada, y comprada SIN proyecto asociado
+  // Cotizaciones que aún no tienen proyecto asociado (solo admin y vendedor pueden ver)
   const cotizacionesPendientes = isAdmin
-    ? cotizaciones.filter(c =>
-        c.estado !== 'comprada' && c.estado !== 'vendida'
-          ? !proyectos.some(p => p.numeroCotizacion === c.numero)
-          : c.estado === 'comprada' && !proyectos.some(p => p.numeroCotizacion === c.numero)
-      )
+    ? cotizaciones.filter(c => !proyectos.some(p => p.numeroCotizacion === c.numero))
     : cotizaciones.filter(c =>
-        c.usuarioId === userId && (
-          c.estado !== 'comprada' && c.estado !== 'vendida'
-            ? !proyectos.some(p => p.numeroCotizacion === c.numero)
-            : c.estado === 'comprada' && !proyectos.some(p => p.numeroCotizacion === c.numero)
-        )
+        c.usuarioId === userId && !proyectos.some(p => p.numeroCotizacion === c.numero)
       );
 
   // Totales por estado (solo de proyectos visibles para el usuario)
