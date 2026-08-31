@@ -288,6 +288,27 @@ export const usePendientesStore = () => {
     }
   }, [guardarPendienteDB, cargarPendientes]);
 
+  // Eliminar pendiente definitivamente
+  const eliminarPendiente = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('pendientes')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error eliminando pendiente:', error);
+        return false;
+      }
+
+      setPendientes(prev => prev.filter(p => p.id !== id));
+      return true;
+    } catch (e) {
+      console.error('Error eliminando pendiente:', e);
+      return false;
+    }
+  }, []);
+
   // Actualizar notas
   const actualizarNotas = useCallback(async (id: string, notas: string) => {
     try {
@@ -367,6 +388,7 @@ export const usePendientesStore = () => {
     generarPendientesDesdeProyectos,
     completarPendiente,
     agregarPendiente,
+    eliminarPendiente,
     actualizarNotas,
     marcarAlertaLeida,
     eliminarAlerta,

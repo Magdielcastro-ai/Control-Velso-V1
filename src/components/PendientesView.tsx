@@ -1,445 +1,233 @@
 // src/components/PendientesView.tsx
+// Bullet journal manual de pendientes — sin automatización.
+// El usuario anota cliente + pendiente, los tacha al completarlos
+// y puede imprimir o exportar a PDF su lista.
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  CheckCircle, 
-  AlertTriangle, 
-  Clock, 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   Plus,
-  MessageSquare,
-  User,
-  Briefcase,
-  Phone,
-  Truck,
-  FileText,
-  DollarSign,
-  AlertOctagon,
-  Send,
-  Factory,
-  Search,
-  X
+  Printer,
+  Trash2,
+  CheckCircle,
+  Circle,
 } from 'lucide-react';
-import type { Pendiente, TipoPendiente, PrioridadPendiente } from '@/types/pendientes';
-
-const iconosPorTipo: Record<TipoPendiente, React.ElementType> = {
-  levantamiento: Briefcase,
-  pasar_a_diseño: FileText,
-  cotizar: FileText,
-  enviar_cotizacion: Send,
-  seguimiento_cotizacion: Phone,
-  autorizar_oc: FileText,
-  seguimiento_oc: Truck,
-  produccion: Factory,
-  cotejar_utilidad: DollarSign,
-  entrega: Truck,
-  facturar: FileText,
-  cobranza: DollarSign,
-  cobranza_urgente: AlertOctagon,
-};
-
-const coloresPrioridad = {
-  baja: 'bg-slate-100 text-slate-700 border-slate-200',
-  media: 'bg-blue-100 text-blue-700 border-blue-200',
-  alta: 'bg-orange-100 text-orange-700 border-orange-200',
-  urgente: 'bg-red-100 text-red-700 border-red-300 animate-pulse',
-};
-
-const labelsTipo: Record<TipoPendiente, string> = {
-  levantamiento: 'Levantamiento',
-  pasar_a_diseño: 'Pasar a Diseño',
-  cotizar: 'Cotizar',
-  enviar_cotizacion: 'Enviar Cotización',
-  seguimiento_cotizacion: 'Seguimiento Cotización',
-  autorizar_oc: 'Autorizar OC',
-  seguimiento_oc: 'Seguimiento OC',
-  produccion: 'Producción',
-  cotejar_utilidad: 'Cotejar Utilidad',
-  entrega: 'Entrega',
-  facturar: 'Facturar',
-  cobranza: 'Cobranza',
-  cobranza_urgente: 'Cobranza URGENTE',
-};
-
-const labelsResponsable: Record<string, string> = {
-  yo: 'Yo (Dueño)',
-  diseno: 'Diseño',
-  pm: 'Project Manager',
-  produccion: 'Producción',
-};
+import type { Pendiente } from '@/types/pendientes';
 
 interface PendientesViewProps {
   onVolver: () => void;
   pendientes: Pendiente[];
   onCompletar: (id: string) => void;
   onAgregar: (pendiente: Omit<Pendiente, 'id' | 'fechaCreacion' | 'diasEstancado'>) => void;
-  onActualizarNotas: (id: string, notas: string) => void;
+  onEliminar?: (id: string) => void;
 }
 
-export function PendientesView({ 
-  onVolver, 
-  pendientes, 
-  onCompletar, 
+export function PendientesView({
+  onVolver,
+  pendientes,
+  onCompletar,
   onAgregar,
-  onActualizarNotas 
+  onEliminar,
 }: PendientesViewProps) {
-  const [filtroResponsable, setFiltroResponsable] = useState<string>('todos');
-  const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos');
-  const [filtroBusqueda, setFiltroBusqueda] = useState('');
-  const [mostrarCompletados, setMostrarCompletados] = useState(false);
-  const [notasEditando, setNotasEditando] = useState<string | null>(null);
-  const [notasTemp, setNotasTemp] = useState('');
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-
-  // Formulario nuevo pendiente
-  const [nuevoTitulo, setNuevoTitulo] = useState('');
-  const [nuevoDescripcion, setNuevoDescripcion] = useState('');
   const [nuevoCliente, setNuevoCliente] = useState('');
-  const [nuevoProyecto, setNuevoProyecto] = useState('');
-  const [nuevoTipo, setNuevoTipo] = useState<TipoPendiente>('levantamiento');
-  const [nuevoPrioridad, setNuevoPrioridad] = useState<PrioridadPendiente>('media');
-  const [nuevoResponsable, setNuevoResponsable] = useState('yo');
+  const [nuevoTitulo, setNuevoTitulo] = useState('');
+  const [mostrarCompletados, setMostrarCompletados] = useState(false);
 
-  const pendientesFiltrados = pendientes.filter(p => {
-    const matchResponsable = filtroResponsable === 'todos' || p.responsable === filtroResponsable;
-    const matchPrioridad = filtroPrioridad === 'todos' || p.prioridad === filtroPrioridad;
-    const matchBusqueda = !filtroBusqueda || 
-      p.titulo.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
-      p.clienteNombre.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
-      p.proyectoNombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
-    const matchCompletado = mostrarCompletados ? true : !p.completado;
-    return matchResponsable && matchPrioridad && matchBusqueda && matchCompletado;
-  });
+  const activos = useMemo(
+    () => pendientes.filter((p) => !p.completado),
+    [pendientes]
+  );
+  const completados = useMemo(
+    () => pendientes.filter((p) => p.completado),
+    [pendientes]
+  );
 
-  const pendientesHoy = pendientes.filter(p => !p.completado && p.fechaVencimiento <= new Date().toISOString().split('T')[0]);
-  const alertasRojas = pendientes.filter(p => !p.completado && (p.prioridad === 'urgente' || p.diasEstancado > 7));
-  const misPendientes = pendientes.filter(p => p.responsable === 'yo' && !p.completado);
-  const equipoPendientes = pendientes.filter(p => p.responsable !== 'yo' && !p.completado);
-
-  const handleGuardarNotas = (id: string) => {
-    onActualizarNotas(id, notasTemp);
-    setNotasEditando(null);
-    setNotasTemp('');
-  };
-
-  const handleAgregarPendiente = () => {
-    if (!nuevoTitulo || !nuevoCliente) return;
+  const handleAgregar = () => {
+    if (!nuevoTitulo.trim()) return;
 
     onAgregar({
-      tipo: nuevoTipo,
-      titulo: nuevoTitulo,
-      descripcion: nuevoDescripcion,
-      clienteNombre: nuevoCliente,
-      proyectoNombre: nuevoProyecto,
+      tipo: 'manual',
+      titulo: nuevoTitulo.trim(),
+      descripcion: '',
+      clienteNombre: nuevoCliente.trim() || 'General',
+      proyectoNombre: '',
       fechaVencimiento: new Date().toISOString().split('T')[0],
-      prioridad: nuevoPrioridad,
+      prioridad: 'media',
       completado: false,
-      responsable: nuevoResponsable,
+      responsable: 'yo',
       notas: '',
     });
 
     setNuevoTitulo('');
-    setNuevoDescripcion('');
-    setNuevoCliente('');
-    setNuevoProyecto('');
-    setMostrarFormulario(false);
+    // Se conserva el cliente para anotar varios pendientes seguidos del mismo
   };
+
+  const handleEliminar = (id: string) => {
+    if (!onEliminar) return;
+    if (!confirm('¿Eliminar este pendiente definitivamente?')) return;
+    onEliminar(id);
+  };
+
+  const handleImprimir = () => {
+    document.body.classList.add('imprimiendo-pendientes');
+    window.print();
+    // Limpieza por si el diálogo de impresión se cancela
+    setTimeout(() => document.body.classList.remove('imprimiendo-pendientes'), 500);
+  };
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 no-print">
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={onVolver} className="border-slate-300">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Mis Pendientes</h1>
-            <p className="text-sm text-slate-500">Control diario de tareas y seguimientos</p>
+            <h1 className="text-2xl font-bold text-slate-900">Pendientes</h1>
+            <p className="text-sm text-slate-500">
+              Bullet journal manual — anota, tacha e imprime
+            </p>
           </div>
         </div>
-        <Button onClick={() => setMostrarFormulario(!mostrarFormulario)} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Pendiente
+        <Button onClick={handleImprimir} variant="outline" className="border-slate-300">
+          <Printer className="w-4 h-4 mr-2" />
+          Imprimir / PDF
         </Button>
       </div>
 
-      {/* Formulario nuevo pendiente */}
-      {mostrarFormulario && (
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Agregar Pendiente Manual</h3>
-              <Button variant="ghost" size="sm" onClick={() => setMostrarFormulario(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input 
-                placeholder="Título del pendiente" 
-                value={nuevoTitulo}
-                onChange={(e) => setNuevoTitulo(e.target.value)}
-              />
-              <Input 
-                placeholder="Cliente" 
-                value={nuevoCliente}
-                onChange={(e) => setNuevoCliente(e.target.value)}
-              />
-              <Input 
-                placeholder="Proyecto (opcional)" 
-                value={nuevoProyecto}
-                onChange={(e) => setNuevoProyecto(e.target.value)}
-              />
-              <Input 
-                placeholder="Descripción" 
-                value={nuevoDescripcion}
-                onChange={(e) => setNuevoDescripcion(e.target.value)}
-              />
-              <select 
-                value={nuevoTipo}
-                onChange={(e) => setNuevoTipo(e.target.value as TipoPendiente)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
-              >
-                {Object.entries(labelsTipo).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-              <select 
-                value={nuevoPrioridad}
-                onChange={(e) => setNuevoPrioridad(e.target.value as PrioridadPendiente)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
-              >
-                <option value="baja">Baja</option>
-                <option value="media">Media</option>
-                <option value="alta">Alta</option>
-                <option value="urgente">Urgente</option>
-              </select>
-              <select 
-                value={nuevoResponsable}
-                onChange={(e) => setNuevoResponsable(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
-              >
-                {Object.entries(labelsResponsable).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-            <Button onClick={handleAgregarPendiente} className="w-full bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar Pendiente
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-slate-500">Para Hoy</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{pendientesHoy.length}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-              <span className="text-sm text-slate-500">Alertas Rojas</span>
-            </div>
-            <p className="text-2xl font-bold text-red-600">{alertasRojas.length}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <User className="w-5 h-5 text-purple-600" />
-              <span className="text-sm text-slate-500">Míos</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{misPendientes.length}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Briefcase className="w-5 h-5 text-green-600" />
-              <span className="text-sm text-slate-500">Del Equipo</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-900">{equipoPendientes.length}</p>
-          </CardContent>
-        </Card>
+      {/* Captura rápida */}
+      <div className="flex flex-col sm:flex-row gap-2 no-print">
+        <Input
+          placeholder="Cliente"
+          value={nuevoCliente}
+          onChange={(e) => setNuevoCliente(e.target.value)}
+          className="sm:w-48"
+        />
+        <Input
+          placeholder="Pendiente (ej. llamar para seguimiento de cotización)"
+          value={nuevoTitulo}
+          onChange={(e) => setNuevoTitulo(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAgregar()}
+          className="flex-1"
+        />
+        <Button
+          onClick={handleAgregar}
+          disabled={!nuevoTitulo.trim()}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Anotar
+        </Button>
       </div>
 
-      {/* Filtros */}
-      <Card className="border-slate-200">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input 
-                placeholder="Buscar pendiente..."
-                value={filtroBusqueda}
-                onChange={(e) => setFiltroBusqueda(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <select 
-              value={filtroResponsable}
-              onChange={(e) => setFiltroResponsable(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
-            >
-              <option value="todos">Todos los responsables</option>
-              <option value="yo">Yo (Dueño/Vendedor)</option>
-              <option value="diseño">Diseño</option>
-              <option value="pm">Project Manager</option>
-              <option value="produccion">Producción</option>
-            </select>
-
-            <select 
-              value={filtroPrioridad}
-              onChange={(e) => setFiltroPrioridad(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
-            >
-              <option value="todos">Todas las prioridades</option>
-              <option value="urgente">🔴 Urgente</option>
-              <option value="alta">🟠 Alta</option>
-              <option value="media">🔵 Media</option>
-              <option value="baja">⚪ Baja</option>
-            </select>
-
-            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={mostrarCompletados}
-                onChange={(e) => setMostrarCompletados(e.target.checked)}
-                className="rounded border-slate-300"
-              />
-              Completados
-            </label>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lista de Pendientes */}
-      <div className="space-y-3">
-        {pendientesFiltrados.length === 0 ? (
-          <Card className="border-slate-200">
-            <CardContent className="p-8 text-center">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-              <p className="text-lg font-medium text-slate-700">¡Todo al día!</p>
-              <p className="text-sm text-slate-500">No hay pendientes que coincidan con los filtros</p>
-            </CardContent>
-          </Card>
+      {/* Lista interactiva (pantalla) */}
+      <div className="space-y-1.5 no-print">
+        {activos.length === 0 && completados.length === 0 ? (
+          <p className="text-center text-slate-400 py-10">
+            No hay pendientes anotados. Escribe el primero arriba ✏️
+          </p>
         ) : (
-          pendientesFiltrados.map(pendiente => {
-            const Icono = iconosPorTipo[pendiente.tipo];
-            return (
-              <Card 
-                key={pendiente.id} 
-                className={`border-slate-200 transition-all hover:shadow-md ${pendiente.completado ? 'opacity-50' : ''} ${
-                  pendiente.prioridad === 'urgente' ? 'border-red-300 shadow-red-100' : ''
-                }`}
+          <>
+            {activos.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-slate-50 group"
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Checkbox */}
-                    <button
-                      onClick={() => onCompletar(pendiente.id)}
-                      className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        pendiente.completado 
-                          ? 'bg-green-500 border-green-500' 
-                          : 'border-slate-300 hover:border-blue-500 hover:bg-blue-50'
-                      }`}
+                <button
+                  onClick={() => onCompletar(p.id)}
+                  className="text-slate-300 hover:text-green-500 transition-colors shrink-0"
+                  title="Marcar como hecho"
+                >
+                  <Circle className="w-5 h-5" />
+                </button>
+                <span className="font-semibold text-slate-800 shrink-0">{p.clienteNombre}</span>
+                <span className="text-slate-400 shrink-0">—</span>
+                <span className="text-slate-700 flex-1 min-w-0">{p.titulo}</span>
+                {onEliminar && (
+                  <button
+                    onClick={() => handleEliminar(p.id)}
+                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {completados.length > 0 && (
+              <div className="pt-4">
+                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer px-3 pb-2">
+                  <input
+                    type="checkbox"
+                    checked={mostrarCompletados}
+                    onChange={(e) => setMostrarCompletados(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  Mostrar completados ({completados.length})
+                </label>
+                {mostrarCompletados &&
+                  completados.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 py-2 px-3 opacity-50"
                     >
-                      {pendiente.completado && <CheckCircle className="w-4 h-4 text-white" />}
-                    </button>
-
-                    {/* Contenido */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <Icono className="w-4 h-4 text-slate-500" />
-                        <span className="font-medium text-slate-900">{pendiente.titulo}</span>
-                        <Badge className={coloresPrioridad[pendiente.prioridad]}>
-                          {pendiente.prioridad.toUpperCase()}
-                        </Badge>
-                        {pendiente.diasEstancado > 0 && (
-                          <Badge variant="outline" className="text-red-600 border-red-200">
-                            {pendiente.diasEstancado} días
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-slate-500">
-                          {labelsResponsable[pendiente.responsable] || pendiente.responsable}
-                        </Badge>
-                      </div>
-
-                      <p className="text-sm text-slate-600 mb-2">{pendiente.descripcion}</p>
-
-                      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          {pendiente.clienteNombre}
-                        </span>
-                        {pendiente.proyectoNombre && (
-                          <>
-                            <span>•</span>
-                            <span>{pendiente.proyectoNombre}</span>
-                          </>
-                        )}
-                        <span>•</span>
-                        <span>Vence: {pendiente.fechaVencimiento}</span>
-                      </div>
-
-                      {/* Notas */}
-                      {notasEditando === pendiente.id ? (
-                        <div className="mt-3 flex gap-2">
-                          <Input
-                            value={notasTemp}
-                            onChange={(e) => setNotasTemp(e.target.value)}
-                            placeholder="Agregar nota..."
-                            className="flex-1 text-sm"
-                            autoFocus
-                          />
-                          <Button size="sm" onClick={() => handleGuardarNotas(pendiente.id)}>
-                            Guardar
-                          </Button>
-                        </div>
-                      ) : pendiente.notas ? (
-                        <div className="mt-2 flex items-center gap-2 text-sm text-slate-600 bg-slate-50 p-2 rounded">
-                          <MessageSquare className="w-3 h-3 text-slate-400" />
-                          {pendiente.notas}
-                        </div>
-                      ) : null}
-
-                      {!pendiente.completado && notasEditando !== pendiente.id && (
+                      <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                      <span className="font-semibold text-slate-600 shrink-0">{p.clienteNombre}</span>
+                      <span className="text-slate-300 shrink-0">—</span>
+                      <span className="text-slate-500 line-through flex-1 min-w-0">{p.titulo}</span>
+                      {onEliminar && (
                         <button
-                          onClick={() => {
-                            setNotasEditando(pendiente.id);
-                            setNotasTemp(pendiente.notas);
-                          }}
-                          className="mt-2 text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          onClick={() => handleEliminar(p.id)}
+                          className="text-slate-300 hover:text-red-500 shrink-0"
+                          title="Eliminar"
                         >
-                          <MessageSquare className="w-3 h-3" />
-                          Agregar nota
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
+                  ))}
+              </div>
+            )}
+          </>
         )}
+      </div>
+
+      {/* ─── ÁREA DE IMPRESIÓN: bullet journal limpio ─── */}
+      <div className="area-impresion hidden print:block">
+        <h1 className="text-xl font-bold text-slate-900 mb-1">Pendientes</h1>
+        <p className="text-sm text-slate-500 mb-4 capitalize">{fechaHoy}</p>
+        <div className="border-t-2 border-slate-800 mb-3" />
+        {activos.length === 0 ? (
+          <p className="text-slate-400 text-sm">Sin pendientes activos 🎉</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {activos.map((p) => (
+              <li key={p.id} className="flex items-start gap-3 text-sm">
+                <span className="inline-block w-4 h-4 border-2 border-slate-700 rounded-sm mt-0.5 shrink-0" />
+                <span>
+                  <strong>{p.clienteNombre}</strong>
+                  {' — '}
+                  {p.titulo}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-xs text-slate-300 mt-8">
+          {activos.length} pendiente{activos.length !== 1 ? 's' : ''} · Soluciones Integrales Velso
+        </p>
       </div>
     </div>
   );

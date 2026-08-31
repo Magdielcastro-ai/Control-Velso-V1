@@ -13,7 +13,8 @@ export type TipoPendiente =
   | 'entrega'
   | 'facturar'
   | 'cobranza'
-  | 'cobranza_urgente';
+  | 'cobranza_urgente'
+  | 'manual';
 
 export type PrioridadPendiente = 'baja' | 'media' | 'alta' | 'urgente';
 

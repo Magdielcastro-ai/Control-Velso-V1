@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Toaster, toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -210,10 +211,9 @@ function App() {
   // NUEVOS STORES VELSO OS v2
   const {
     pendientes,
-    generarPendientesDesdeProyectos,
     completarPendiente,
     agregarPendiente,
-    actualizarNotas: actualizarNotasPendiente,
+    eliminarPendiente,
     getPendientesHoy,
     getAlertasRojas,
   } = usePendientesStore();
@@ -318,22 +318,14 @@ function App() {
   // MONEDA - Solo para referencia, el selector está en CondicionesStep
   const { moneda } = useMonedaStore();
 
-  // NUEVO: Generar pendientes y cobranzas automáticamente cuando cargan los datos
-  // Usar ref para prevenir ejecuciones múltiples
-  const pendientesGeneradosRef = useRef(false);
-  useEffect(() => {
-    if (datosCargados && proyectos.length > 0 && !pendientesGeneradosRef.current) {
-      pendientesGeneradosRef.current = true;
-      generarPendientesDesdeProyectos(proyectos, cotizacionesGuardadas);
-      generarCobranzas(proyectos);
-    }
-  }, [datosCargados, proyectos.length, cotizacionesGuardadas.length, generarPendientesDesdeProyectos, generarCobranzas]);
+  // Generar cobranzas automáticamente cuando cargan los datos.
+  // NOTA: los pendientes ya NO se autogeneran — la sección es un
+  // bullet journal 100% manual a petición del usuario.
   useEffect(() => {
     if (datosCargados && proyectos.length > 0) {
-      generarPendientesDesdeProyectos(proyectos, cotizacionesGuardadas);
       generarCobranzas(proyectos);
     }
-  }, [datosCargados, proyectos, cotizacionesGuardadas, generarPendientesDesdeProyectos, generarCobranzas]);
+  }, [datosCargados, proyectos, generarCobranzas]);
 
   // Login handler
   const handleLogin = async (email: string, password: string) => {
@@ -681,16 +673,31 @@ function App() {
       (o) => (o.proyectoId && idsProyectos.has(o.proyectoId)) || o.cotizacionId === cot.id
     );
 
+    // Pendientes vinculados al proyecto o a la cotización
+    const pendientesVinculados = pendientes.filter(
+      (p) => (p.proyectoId && idsProyectos.has(p.proyectoId)) || p.cotizacionId === cot.id
+    );
+
     for (const oc of ocsVinculadas) {
       await eliminarOrdenCompra(oc.id);
+    }
+    for (const pend of pendientesVinculados) {
+      await eliminarPendiente(pend.id);
+    }
+    // Alertas vinculadas (se limpian directo en Supabase)
+    await supabase.from('alertas').delete().eq('cotizacion_id', cot.id);
+    if (idsProyectos.size > 0) {
+      await supabase.from('alertas').delete().in('proyecto_id', [...idsProyectos]);
     }
     for (const proy of proyectosVinculados) {
       await eliminarProyecto(proy.id);
     }
 
-    if (proyectosVinculados.length > 0 || ocsVinculadas.length > 0) {
+    const totalLimpieza =
+      proyectosVinculados.length + ocsVinculadas.length + pendientesVinculados.length;
+    if (totalLimpieza > 0) {
       toast.info(
-        `Limpieza: ${proyectosVinculados.length} proyecto(s) y ${ocsVinculadas.length} orden(es) de compra eliminadas`
+        `Limpieza: ${proyectosVinculados.length} proyecto(s), ${ocsVinculadas.length} orden(es) de compra y ${pendientesVinculados.length} pendiente(s) eliminados`
       );
     }
   };
@@ -853,7 +860,7 @@ function App() {
               pendientes={pendientes}
               onCompletar={completarPendiente}
               onAgregar={agregarPendiente}
-              onActualizarNotas={actualizarNotasPendiente}
+              onEliminar={eliminarPendiente}
             />
           </>
         );
