@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-import { 
-  ArrowLeft, 
-  FolderKanban, 
-  FileText, 
+import {
+  ArrowLeft,
+  FolderKanban,
+  FileText,
   Calendar,
   Building2,
   Trash2,
@@ -25,17 +25,16 @@ import {
   DollarSign,
   User,
   Hash,
-  Plus,
   ShoppingCart,
   ChevronDown,
   ChevronUp,
-  Save
+  ClipboardList
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto } from '@/types/ventas';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
-import type { OrdenCompra, OrdenCompraItem } from '@/types/ordenesCompra';
+import type { OrdenCompra } from '@/types/ordenesCompra';
 
 interface ProyectosViewProps {
   onVolver: () => void;
@@ -51,22 +50,11 @@ interface ProyectosViewProps {
   onMarcarEntregado?: (id: string) => void;
   onMarcarFacturado?: (id: string, numeroFactura: string, totalFacturado: number) => void;
   onVerControlCodigos?: (proyecto: ProyectoVenta) => void;
+  onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   userRol?: string;
   userId?: string;
-  // Órdenes de Compra
+  // Órdenes de Compra (solo lectura: la creación se hace desde la sección Órdenes de Compra)
   ordenesCompra?: OrdenCompra[];
-  onCrearOrdenCompra?: (datos: {
-    proyectoId?: string;
-    proveedor?: string;
-    concepto?: string;
-    items: OrdenCompraItem[];
-    subtotal: number;
-    ivaPorcentaje: number;
-    iva: number;
-    total: number;
-    fechaEntrega?: string;
-    notas?: string;
-  }) => Promise<boolean> | void;
   onCambiarEstadoOC?: (id: string, estado: OrdenCompra['estado']) => Promise<boolean> | void;
   onEliminarOC?: (id: string) => void;
 }
@@ -123,10 +111,10 @@ export function ProyectosView({
   onMarcarEntregado,
   onMarcarFacturado,
   onVerControlCodigos,
+  onVerHojaViajera,
   userRol = 'vendedor',
   userId,
   ordenesCompra = [],
-  onCrearOrdenCompra,
   onCambiarEstadoOC,
   onEliminarOC
 }: ProyectosViewProps) {
@@ -143,13 +131,8 @@ export function ProyectosView({
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
   
-  // Estados para Órdenes de Compra
+  // Estado para la sección expandible de Órdenes de Compra (solo lectura)
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
-  const [dialogoOC, setDialogoOC] = useState(false);
-  const [ocProveedor, setOcProveedor] = useState('');
-  const [ocConcepto, setOcConcepto] = useState('');
-  const [ocItems, setOcItems] = useState<OrdenCompraItem[]>([]);
-  const [proyectoOCSeleccionado, setProyectoOCSeleccionado] = useState<ProyectoVenta | null>(null);
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
   const isVendedor = userRol === 'vendedor';
@@ -280,71 +263,6 @@ export function ProyectosView({
 
   const getOCsByProyecto = (proyectoId: string) => {
     return ordenesCompra.filter(oc => oc.proyectoId === proyectoId);
-  };
-
-  const handleAbrirOC = (proyecto: ProyectoVenta) => {
-    setProyectoOCSeleccionado(proyecto);
-    setOcProveedor('');
-    setOcConcepto('');
-    setOcItems([]);
-    setDialogoOC(true);
-  };
-
-  const handleAgregarItemOC = () => {
-    const newItem: OrdenCompraItem = {
-      id: crypto.randomUUID(),
-      nombre: '',
-      cantidad: 1,
-      unidad: 'pza',
-      precioUnitario: 0,
-      total: 0,
-    };
-    setOcItems(prev => [...prev, newItem]);
-  };
-
-  const handleActualizarItemOC = (id: string, campo: keyof OrdenCompraItem, valor: string | number) => {
-    setOcItems(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const updated = { ...item, [campo]: valor };
-      if (campo === 'cantidad' || campo === 'precioUnitario') {
-        updated.total = updated.cantidad * updated.precioUnitario;
-      }
-      return updated;
-    }));
-  };
-
-  const handleEliminarItemOC = (id: string) => {
-    setOcItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const calcularTotalesOC = () => {
-    const subtotal = ocItems.reduce((sum, item) => sum + item.total, 0);
-    const iva = subtotal * 0.16;
-    const total = subtotal + iva;
-    return { subtotal, iva, total };
-  };
-
-  const handleGuardarOC = () => {
-    if (!proyectoOCSeleccionado || !ocProveedor.trim() || ocItems.length === 0 || !onCrearOrdenCompra) return;
-    
-    const { subtotal, iva, total } = calcularTotalesOC();
-    
-    onCrearOrdenCompra({
-      proyectoId: proyectoOCSeleccionado.id,
-      proveedor: ocProveedor.trim(),
-      concepto: ocConcepto.trim() || undefined,
-      items: ocItems,
-      subtotal,
-      ivaPorcentaje: 16,
-      iva,
-      total,
-    });
-
-    setDialogoOC(false);
-    setProyectoOCSeleccionado(null);
-    setOcProveedor('');
-    setOcConcepto('');
-    setOcItems([]);
   };
 
   const siguienteEstadoOC = (estadoActual: OrdenCompra['estado']): OrdenCompra['estado'] => {
@@ -643,6 +561,20 @@ export function ProyectosView({
                         )}
                       </Button>
 
+                      {/* Botón Hoja Viajera */}
+                      {onVerHojaViajera && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onVerHojaViajera(proyecto)}
+                          title="Hoja viajera"
+                          className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                        >
+                          <ClipboardList className="w-4 h-4 mr-1" />
+                          Hoja Viajera
+                        </Button>
+                      )}
+
                       {/* Botón Control de Códigos - solo admin, superadmin y producción */}
                       {onVerControlCodigos && (
                         <Button
@@ -712,16 +644,6 @@ export function ProyectosView({
                           <ShoppingCart className="w-4 h-4" />
                           Órdenes de Compra
                         </h4>
-                        {onCrearOrdenCompra && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleAbrirOC(proyecto)}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Nueva OC
-                          </Button>
-                        )}
                       </div>
 
                       {ocs.length === 0 ? (
@@ -835,154 +757,6 @@ export function ProyectosView({
             >
               <Receipt className="w-4 h-4 mr-2" />
               Facturar Proyecto
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de Nueva Orden de Compra */}
-      <Dialog open={dialogoOC} onOpenChange={setDialogoOC}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nueva Orden de Compra</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label>Proyecto</Label>
-              <p className="text-sm text-slate-600">{proyectoOCSeleccionado?.proyectoNombre}</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Proveedor *</Label>
-              <Input
-                value={ocProveedor}
-                onChange={(e) => setOcProveedor(e.target.value)}
-                placeholder="Nombre del proveedor"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Concepto</Label>
-              <Input
-                value={ocConcepto}
-                onChange={(e) => setOcConcepto(e.target.value)}
-                placeholder="Concepto general de la orden"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Items</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAgregarItemOC}
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Agregar Item
-                </Button>
-              </div>
-
-              {ocItems.length === 0 ? (
-                <p className="text-sm text-slate-500 py-2">No hay items agregados</p>
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50 border-b">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Nombre</th>
-                        <th className="px-3 py-2 text-center font-medium text-slate-600 w-24">Cantidad</th>
-                        <th className="px-3 py-2 text-center font-medium text-slate-600 w-24">Unidad</th>
-                        <th className="px-3 py-2 text-right font-medium text-slate-600 w-28">P. Unitario</th>
-                        <th className="px-3 py-2 text-right font-medium text-slate-600 w-28">Total</th>
-                        <th className="px-3 py-2 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {ocItems.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-3 py-2">
-                            <Input
-                              value={item.nombre}
-                              onChange={(e) => handleActualizarItemOC(item.id, 'nombre', e.target.value)}
-                              placeholder="Descripción"
-                              className="h-8 text-sm"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min={0.01}
-                              step={0.01}
-                              value={item.cantidad}
-                              onChange={(e) => handleActualizarItemOC(item.id, 'cantidad', parseFloat(e.target.value) || 0)}
-                              className="h-8 text-sm text-center"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              value={item.unidad}
-                              onChange={(e) => handleActualizarItemOC(item.id, 'unidad', e.target.value)}
-                              placeholder="pza"
-                              className="h-8 text-sm text-center"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              step={0.01}
-                              value={item.precioUnitario}
-                              onChange={(e) => handleActualizarItemOC(item.id, 'precioUnitario', parseFloat(e.target.value) || 0)}
-                              className="h-8 text-sm text-right"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right font-medium text-slate-700">
-                            ${item.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEliminarItemOC(item.id)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Totales */}
-            {ocItems.length > 0 && (
-              <div className="flex justify-end">
-                <div className="space-y-1 text-right">
-                  <div className="text-sm text-slate-600">
-                    Subtotal: ${calcularTotalesOC().subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm text-slate-600">
-                    IVA (16%): ${calcularTotalesOC().iva.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-lg font-bold text-slate-900">
-                    Total: ${calcularTotalesOC().total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <Button 
-              onClick={handleGuardarOC}
-              disabled={!ocProveedor.trim() || ocItems.length === 0 || ocItems.some(i => !i.nombre.trim())}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Guardar Orden de Compra
             </Button>
           </div>
         </DialogContent>

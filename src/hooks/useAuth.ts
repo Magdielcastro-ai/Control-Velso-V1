@@ -269,13 +269,15 @@ export function useAuth() {
     return false;
   }, [user]);
 
+  // Dashboard consolidado: SOLO admin y superadmin
   const canViewDashboard = useCallback(() => {
-    if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
   }, [user]);
 
+  // Mantenido por compatibilidad: el dashboard de producción se fusionó
+  // en el dashboard consolidado (solo admin)
   const canViewProduccionDashboard = useCallback(() => {
-    return user?.rol === 'produccion';
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
   }, [user]);
 
   const canViewControlCodigos = useCallback(() => {

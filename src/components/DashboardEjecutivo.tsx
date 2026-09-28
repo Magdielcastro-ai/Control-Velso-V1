@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   ArrowLeft, 
   TrendingUp, 
@@ -24,16 +25,24 @@ import {
   Settings,
   Loader2,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  Target,
+  ShoppingCart,
+  Wrench
 } from 'lucide-react';
 import type { Pendiente, Alerta } from '@/types/pendientes';
 import type { ProyectoVenta } from '@/types/ventas';
+import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
+import type { CotizacionGuardada } from '@/types/cotizacion';
+import { GraficaCircular, GraficaComparacion, GraficaBarrasComparacion } from '@/components/GraficasCirculares';
 
 interface DashboardEjecutivoProps {
   onVolver: () => void;
   pendientesHoy: Pendiente[];
   alertasRojas: Alerta[];
   proyectos: ProyectoVenta[];
+  cotizaciones: CotizacionGuardada[];
+  horasDisponibles: Record<string, number>;
   totalesCobranza: {
     totalPorCobrar: number;
     totalVencido: number;
@@ -65,6 +74,8 @@ export function DashboardEjecutivo({
   pendientesHoy,
   alertasRojas,
   proyectos,
+  cotizaciones,
+  horasDisponibles,
   totalesCobranza,
   onIrAPendientes,
   onIrACobranza,
@@ -74,10 +85,15 @@ export function DashboardEjecutivo({
   clientesCount = 0,
   procesosCount = 0,
 }: DashboardEjecutivoProps) {
-  const [vistaActiva, setVistaActiva] = useState<'resumen' | 'pipeline' | 'alertas' | 'catalogos'>('resumen');
+  const [vistaActiva, setVistaActiva] = useState<'resumen' | 'pipeline' | 'ventas' | 'produccion' | 'alertas' | 'catalogos'>('resumen');
   const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null); // null = todos los meses
   const [anioSeleccionado] = useState(2026);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+
+  // Período independiente para la pestaña de Ventas (meta mensual)
+  const hoy = new Date();
+  const [mesVentas, setMesVentas] = useState(hoy.getMonth());
+  const [anioVentas, setAnioVentas] = useState(hoy.getFullYear());
 
 
   // ============================================
@@ -161,6 +177,151 @@ export function DashboardEjecutivo({
   }, [proyectosFiltrados]);
 
   // ============================================
+  // VENTAS: HORAS COTIZADAS VS META MENSUAL
+  // (integrado desde DashboardView)
+  // ============================================
+  const datosVentasMes = useMemo(() => {
+    const cotizacionesMes = cotizaciones.filter(c => {
+      const fecha = new Date(c.fecha);
+      return fecha.getMonth() === mesVentas && fecha.getFullYear() === anioVentas;
+    });
+
+    const proyectosMes = proyectos.filter(p => {
+      const fecha = new Date(p.fechaVenta);
+      return fecha.getMonth() === mesVentas && fecha.getFullYear() === anioVentas;
+    });
+
+    const proyectosFacturadosMes = proyectos.filter(p => {
+      if (!p.fechaFacturado) return false;
+      const fecha = new Date(p.fechaFacturado);
+      return fecha.getMonth() === mesVentas && fecha.getFullYear() === anioVentas;
+    });
+
+    const totalCotizado = cotizacionesMes.reduce((sum, c) => sum + c.total, 0);
+    const totalVendido = proyectosMes.reduce((sum, p) => sum + p.totalCotizado, 0);
+    const totalFacturado = proyectosFacturadosMes.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+
+    const horasCotizadas: Record<string, number> = {};
+    const horasVendidas: Record<string, number> = {};
+    const horasFabricadas: Record<string, number> = {};
+    const horasFacturadas: Record<string, number> = {};
+
+    CATALOGO_PROCESOS_VELSO.forEach(p => {
+      horasCotizadas[p.id] = 0;
+      horasVendidas[p.id] = 0;
+      horasFabricadas[p.id] = 0;
+      horasFacturadas[p.id] = 0;
+    });
+
+    cotizacionesMes.forEach((cot) => {
+      const procesosCotizacion = (cot as any).procesos;
+      if (procesosCotizacion && Array.isArray(procesosCotizacion)) {
+        procesosCotizacion.forEach((p: any) => {
+          const tiempoHoras = (p?.tiempoMinutos || 0) / 60;
+          const tipo = p?.tipo;
+          if (tipo && horasCotizadas[tipo] !== undefined) {
+            horasCotizadas[tipo] += tiempoHoras;
+          }
+        });
+      }
+    });
+
+    proyectosMes.forEach(p => {
+      p.procesos.forEach(proc => {
+        const tiempoHoras = (proc.tiempoMinutosCotizado || 0) / 60;
+        const tiempoRealHoras = (proc.tiempoMinutosReal || proc.tiempoMinutosCotizado || 0) / 60;
+
+        if (horasVendidas[proc.tipo] !== undefined) {
+          horasVendidas[proc.tipo] += tiempoHoras;
+
+          if (p.estado === 'fabricado' || p.estado === 'entregado' || p.estado === 'facturado') {
+            horasFabricadas[proc.tipo] += tiempoRealHoras;
+          }
+
+          if (p.estado === 'facturado') {
+            horasFacturadas[proc.tipo] += tiempoRealHoras;
+          }
+        }
+      });
+    });
+
+    return {
+      cotizacionesMes,
+      proyectosMes,
+      proyectosFacturadosMes,
+      totalCotizado,
+      totalVendido,
+      totalFacturado,
+      horasCotizadas,
+      horasVendidas,
+      horasFabricadas,
+      horasFacturadas,
+    };
+  }, [cotizaciones, proyectos, mesVentas, anioVentas]);
+
+  // ============================================
+  // PRODUCCIÓN: MÉTRICAS PRINCIPALES
+  // (integrado desde ProduccionDashboardView;
+  //  usa proyectosFiltrados, responde al filtro de período)
+  // ============================================
+  const datosProduccion = useMemo(() => {
+    const proyectosFabricadosMes = proyectosFiltrados.filter(p =>
+      p.estado === 'fabricado' || p.estado === 'entregado' || p.estado === 'facturado'
+    );
+    const proyectosPendientes = proyectosFiltrados.filter(p => p.estado === 'en_fabricacion');
+
+    const totalVendido = proyectosFiltrados.reduce((sum, p) => sum + p.totalCotizado, 0);
+    const totalFabricado = proyectosFabricadosMes.reduce((sum, p) => sum + p.totalCotizado, 0);
+    const totalPendiente = proyectosPendientes.reduce((sum, p) => sum + p.totalCotizado, 0);
+
+    const horasVendidas = proyectosFiltrados.reduce((sum, p) =>
+      sum + p.procesos.reduce((h, proc) => h + (proc.tiempoMinutosCotizado || 0), 0) / 60, 0
+    );
+    const horasFabricadas = proyectosFabricadosMes.reduce((sum, p) =>
+      sum + p.procesos.reduce((h, proc) => h + (proc.tiempoMinutosCotizado || 0), 0) / 60, 0
+    );
+
+    return {
+      proyectosFabricadosMes,
+      proyectosPendientes,
+      totalVendido,
+      totalFabricado,
+      totalPendiente,
+      horasVendidas,
+      horasFabricadas,
+    };
+  }, [proyectosFiltrados]);
+
+  // Datos derivados para las gráficas de Ventas
+  const datosGraficaMontos = [
+    { nombre: 'Cotizado', valor: datosVentasMes.totalCotizado, color: '#3b82f6' },
+    { nombre: 'Vendido', valor: datosVentasMes.totalVendido, color: '#22c55e' },
+    { nombre: 'Facturado', valor: datosVentasMes.totalFacturado, color: '#8b5cf6' },
+  ];
+
+  const datosGraficaHorasTotales = [
+    { nombre: 'Cotizadas', valor: Object.values(datosVentasMes.horasCotizadas).reduce((a, b) => a + b, 0), color: '#3b82f6' },
+    { nombre: 'Vendidas', valor: Object.values(datosVentasMes.horasVendidas).reduce((a, b) => a + b, 0), color: '#22c55e' },
+    { nombre: 'Fabricadas', valor: Object.values(datosVentasMes.horasFabricadas).reduce((a, b) => a + b, 0), color: '#f59e0b' },
+    { nombre: 'Facturadas', valor: Object.values(datosVentasMes.horasFacturadas).reduce((a, b) => a + b, 0), color: '#8b5cf6' },
+  ];
+
+  const datosPorProceso = CATALOGO_PROCESOS_VELSO
+    .filter(p => p.id !== 'otro')
+    .map(p => ({
+      categoria: p.nombre,
+      cotizadas: datosVentasMes.horasCotizadas[p.id] || 0,
+      vendidas: datosVentasMes.horasVendidas[p.id] || 0,
+      fabricadas: datosVentasMes.horasFabricadas[p.id] || 0,
+      facturadas: datosVentasMes.horasFacturadas[p.id] || 0,
+    }));
+
+  const datosCotizadas = datosPorProceso.map(p => ({ nombre: p.categoria, valor: p.cotizadas }));
+  const datosVendidas = datosPorProceso.map(p => ({ nombre: p.categoria, valor: p.vendidas }));
+  const datosFabricadas = datosPorProceso.map(p => ({ nombre: p.categoria, valor: p.fabricadas }));
+  const datosFacturadas = datosPorProceso.map(p => ({ nombre: p.categoria, valor: p.facturadas }));
+
+  // ============================================
   // DETECCIÓN DE ESTADO
   // ============================================
   const hayDatos = proyectos.length > 0;
@@ -178,7 +339,7 @@ export function DashboardEjecutivo({
             Volver
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard Ejecutivo</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
             <p className="text-sm text-slate-500">
               {hayDatos 
                 ? mesSeleccionado !== null
@@ -208,6 +369,24 @@ export function DashboardEjecutivo({
           >
             <TrendingUp className="w-4 h-4 mr-1" />
             Pipeline
+          </Button>
+          <Button 
+            size="sm" 
+            variant={vistaActiva === 'ventas' ? 'default' : 'outline'}
+            onClick={() => setVistaActiva('ventas')}
+            className={vistaActiva === 'ventas' ? 'bg-green-600' : ''}
+          >
+            <ShoppingCart className="w-4 h-4 mr-1" />
+            Ventas
+          </Button>
+          <Button 
+            size="sm" 
+            variant={vistaActiva === 'produccion' ? 'default' : 'outline'}
+            onClick={() => setVistaActiva('produccion')}
+            className={vistaActiva === 'produccion' ? 'bg-amber-600' : ''}
+          >
+            <Wrench className="w-4 h-4 mr-1" />
+            Producción
           </Button>
           <Button 
             size="sm" 
@@ -563,6 +742,330 @@ export function DashboardEjecutivo({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* === VISTA VENTAS (horas cotizadas vs meta mensual) === */}
+      {vistaActiva === 'ventas' && (
+        <div className="space-y-6">
+          {/* Selector de período */}
+          <Card className="border-slate-200">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="flex-1 w-full">
+                  <label className="text-sm font-medium text-slate-700 mb-2 block">Mes</label>
+                  <Select value={mesVentas.toString()} onValueChange={(v) => setMesVentas(parseInt(v))}>
+                    <SelectTrigger className="border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MESES.map((mes, index) => (
+                        <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 w-full">
+                  <label className="text-sm font-medium text-slate-700 mb-2 block">Año</label>
+                  <Select value={anioVentas.toString()} onValueChange={(v) => setAnioVentas(parseInt(v))}>
+                    <SelectTrigger className="border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[2024, 2025, 2026].map((anio) => (
+                        <SelectItem key={anio} value={anio.toString()}>{anio}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {datosVentasMes.cotizacionesMes.length === 0 && datosVentasMes.proyectosMes.length === 0 && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="p-6 text-center">
+                <p className="text-amber-700 font-medium">No hay datos disponibles para este período</p>
+                <p className="text-amber-600 text-sm mt-1">
+                  Crea cotizaciones o conviértelas en ventas para ver métricas aquí
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* KPIs del mes */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-600">Total Cotizado</p>
+                    <p className="text-xl font-bold text-slate-900">${datosVentasMes.totalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
+                    <p className="text-xs text-slate-400">{datosVentasMes.cotizacionesMes.length} cotizaciones</p>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-600">Total Vendido</p>
+                    <p className="text-xl font-bold text-green-600">${datosVentasMes.totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
+                    <p className="text-xs text-slate-400">{datosVentasMes.proyectosMes.length} proyectos</p>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <ShoppingCart className="w-5 h-5 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-purple-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600">Total Facturado</p>
+                    <p className="text-xl font-bold text-purple-600">${datosVentasMes.totalFacturado.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
+                    <p className="text-xs text-slate-400">{datosVentasMes.proyectosFacturadosMes.length} facturas</p>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gráficas circulares */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <GraficaCircular titulo="Distribución de Montos" datos={datosGraficaMontos} />
+            <GraficaCircular titulo="Distribución de Horas" datos={datosGraficaHorasTotales} />
+          </div>
+
+          {/* Código 07 - Meta mensual */}
+          <Card className="border-2 border-blue-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Target className="w-5 h-5 text-blue-600" />
+                Código 07 - Objetivo Principal
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg text-center">
+                  <p className="text-xs text-slate-500">Horas Cotizadas</p>
+                  <p className="text-2xl font-bold text-blue-600">{(datosVentasMes.horasCotizadas['codigo_07'] || 0).toFixed(1)}h</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <p className="text-xs text-green-600">Horas Vendidas</p>
+                  <p className="text-2xl font-bold text-green-600">{(datosVentasMes.horasVendidas['codigo_07'] || 0).toFixed(1)}h</p>
+                </div>
+                <div className="bg-amber-50 p-4 rounded-lg text-center">
+                  <p className="text-xs text-amber-600">Horas Fabricadas</p>
+                  <p className="text-2xl font-bold text-amber-600">{(datosVentasMes.horasFabricadas['codigo_07'] || 0).toFixed(1)}h</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg text-center">
+                  <p className="text-xs text-purple-600">Horas Facturadas</p>
+                  <p className="text-2xl font-bold text-purple-600">{(datosVentasMes.horasFacturadas['codigo_07'] || 0).toFixed(1)}h</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progreso: Facturadas vs Meta</span>
+                  <span className="font-semibold">
+                    {Math.min(((datosVentasMes.horasFacturadas['codigo_07'] || 0) / (horasDisponibles['codigo_07'] || 1)) * 100, 100).toFixed(1)}%
+                  </span>
+                </div>
+                <Progress
+                  value={Math.min(((datosVentasMes.horasFacturadas['codigo_07'] || 0) / (horasDisponibles['codigo_07'] || 1)) * 100, 100)}
+                  className="h-3"
+                />
+                <p className="text-xs text-slate-500 text-right">
+                  Meta: {horasDisponibles['codigo_07']?.toFixed(2) || '0.00'}h
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Comparaciones de horas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <GraficaComparacion
+              titulo="Cotizadas vs Vendidas"
+              datos1={datosCotizadas}
+              datos2={datosVendidas}
+              color1="#3b82f6"
+              color2="#22c55e"
+              label1="Cotizadas"
+              label2="Vendidas"
+            />
+            <GraficaComparacion
+              titulo="Vendidas vs Fabricadas"
+              datos1={datosVendidas}
+              datos2={datosFabricadas}
+              color1="#22c55e"
+              color2="#f59e0b"
+              label1="Vendidas"
+              label2="Fabricadas"
+            />
+            <GraficaComparacion
+              titulo="Fabricadas vs Facturadas"
+              datos1={datosFabricadas}
+              datos2={datosFacturadas}
+              color1="#f59e0b"
+              color2="#8b5cf6"
+              label1="Fabricadas"
+              label2="Facturadas"
+            />
+          </div>
+
+          {/* Horas por proceso */}
+          <GraficaBarrasComparacion
+            titulo="Comparación de Horas por Proceso"
+            datos={datosPorProceso}
+          />
+        </div>
+      )}
+
+      {/* === VISTA PRODUCCIÓN (métricas de fabricación) === */}
+      {vistaActiva === 'produccion' && (
+        <div className="space-y-6">
+          {/* KPIs principales */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Total Vendido</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      ${datosProduccion.totalVendido.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-xs text-slate-400">{proyectosFiltrados.length} proyectos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Package className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Total Fabricado</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      ${datosProduccion.totalFabricado.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-xs text-slate-400">{datosProduccion.proyectosFabricadosMes.length} proyectos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                    <Factory className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Pendiente de Fabricar</p>
+                    <p className="text-2xl font-bold text-amber-600">
+                      ${datosProduccion.totalPendiente.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-xs text-slate-400">{datosProduccion.proyectosPendientes.length} proyectos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Horas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  Horas Cotizadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-blue-600">
+                  {datosProduccion.horasVendidas.toFixed(1)}h
+                </p>
+                <p className="text-sm text-slate-500">
+                  Total de horas en proyectos del período
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                  Horas Fabricadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-green-600">
+                  {datosProduccion.horasFabricadas.toFixed(1)}h
+                </p>
+                <p className="text-sm text-slate-500">
+                  {datosProduccion.horasVendidas > 0
+                    ? `${((datosProduccion.horasFabricadas / datosProduccion.horasVendidas) * 100).toFixed(1)}% completado`
+                    : 'Sin horas pendientes'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Proyectos pendientes de fabricar */}
+          <Card className="border-slate-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Factory className="w-5 h-5 text-amber-600" />
+                Proyectos Pendientes de Fabricar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {datosProduccion.proyectosPendientes.length === 0 ? (
+                <p className="text-center text-slate-500 py-4">
+                  No hay proyectos pendientes de fabricar en este período
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {datosProduccion.proyectosPendientes.map((proyecto) => (
+                    <div
+                      key={proyecto.id}
+                      className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200"
+                    >
+                      <div>
+                        <p className="font-medium">{proyecto.proyectoNombre}</p>
+                        <p className="text-sm text-slate-500">{proyecto.clienteNombre}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-amber-600">
+                          ${proyecto.totalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                        </p>
+                        <Badge variant="outline" className="text-amber-600 border-amber-600">
+                          En Fabricación
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* === VISTA ALERTAS === */}

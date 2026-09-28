@@ -75,24 +75,3 @@ export interface PagoRecibido {
   formaPago: 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'deposito';
   referencia: string;
 }
-
-export interface OrdenCompra {
-  id: string;
-  proyectoId: string;
-  numeroOC: string;
-  clienteNombre: string;
-  proyectoNombre: string;
-  proveedor: string;
-  materiales: Array<{
-    material: string;
-    cantidad: number;
-    precioUnitario: number;
-    total: number;
-  }>;
-  totalOC: number;
-  fechaEmision: string;
-  fechaEntregaEsperada: string;
-  fechaEntregaReal?: string;
-  estado: 'pendiente' | 'enviada' | 'parcial' | 'recibida' | 'cancelada';
-  notas: string;
-}

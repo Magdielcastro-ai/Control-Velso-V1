@@ -10,7 +10,6 @@ import {
   Package, 
   Settings, 
   DollarSign, 
-  BarChart3,
   Plus,
   Activity,
   CheckSquare,
@@ -30,7 +29,6 @@ interface HomeVelsoProps {
   // NUEVOS PROPS VELSO OS v2
   onPendientes: () => void;
   onCobranza: () => void;
-  onDashboardEjecutivo: () => void;
   onProduccion: () => void;
   onPiezasCatalogo: () => void;    onOrdenesCompra: () => void;
   alertasCount: number;
@@ -50,7 +48,6 @@ export function HomeVelso({
   // NUEVOS
   onPendientes,
   onCobranza,
-  onDashboardEjecutivo,
   onProduccion,
   onPiezasCatalogo,    onOrdenesCompra,
   alertasCount,
@@ -88,11 +85,11 @@ export function HomeVelso({
         </div>
       </button>
 
-      {/* NUEVO: Dashboard Ejecutivo - Principal */}
+      {/* NUEVO: Dashboard consolidado (solo admins) - Principal */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card 
           className="border-blue-200 hover:shadow-lg transition-all cursor-pointer bg-blue-50/50"
-          onClick={onDashboardEjecutivo}
+          onClick={onDashboard}
         >
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
@@ -101,8 +98,8 @@ export function HomeVelso({
                   <LayoutDashboard className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">Dashboard Ejecutivo</h3>
-                  <p className="text-sm text-slate-500">Pipeline, alertas, utilidades, cobranza</p>
+                  <h3 className="font-semibold text-slate-900">Dashboard</h3>
+                  <p className="text-sm text-slate-500">Pipeline, ventas, producción y cobranza</p>
                 </div>
               </div>
               {alertasCount > 0 && (
@@ -160,24 +157,6 @@ export function HomeVelso({
                   {cobranzaVencidaCount} vencidas
                 </Badge>
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Dashboard Ventas */}
-        <Card 
-          className="border-slate-200 hover:shadow-lg transition-all cursor-pointer"
-          onClick={onDashboard}
-        >
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-slate-900">Dashboard Ventas</h3>
-                <p className="text-sm text-slate-500">Horas cotizadas vs meta mensual</p>
-              </div>
             </div>
           </CardContent>
         </Card>

@@ -284,13 +284,14 @@ export function NuevaOrdenCompraDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_ninguno">Sin proyecto</SelectItem>
-                  {proyectos.map(p => (
+                  {proyectos.filter(p => p.estado !== 'facturado').map(p => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigoProyecto} · {p.proyectoNombre || p.clienteNombre}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-slate-500">Solo proyectos activos sin facturar</p>
             </div>
             <div className="space-y-1.5">
               <Label>Concepto</Label>

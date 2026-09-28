@@ -51,8 +51,6 @@ import { PiezasStep } from '@/components/steps/PiezasStep';
 
 // Vistas principales
 import { HomeVelso } from '@/components/HomeVelso';
-import { DashboardView } from '@/components/DashboardView';
-import { ProduccionDashboardView } from '@/components/ProduccionDashboardView';
 import { ClientesView } from '@/components/ClientesView';
 import { ProyectosView } from '@/components/ProyectosView';
 import { MaterialesCatalogoView } from '@/components/MaterialesCatalogoView';
@@ -91,10 +89,10 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
   { id: 'resumen', label: 'Resumen', icon: CheckCircle },
 ];
 
-type VistaPrincipal = 'home' | 'dashboard' | 'produccion-dashboard' | 'clientes' | 'proyectos' | 'materiales' |
+type VistaPrincipal = 'home' | 'dashboard' | 'clientes' | 'proyectos' | 'materiales' |
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'dashboard-ejecutivo' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra';
+                      'pendientes' | 'cobranza' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra';
 
 const HORAS_DEFAULT: Record<string, number> = {
   codigo_07: 742.69,
@@ -193,7 +191,6 @@ function App() {
     canCreateCotizacion,
     canConvertirAVenta,
     canViewDashboard,
-    canViewProduccionDashboard,
     canViewControlCodigos,
     canUpdateProyectoEstado,
     canManageClientes,
@@ -318,15 +315,6 @@ function App() {
   // MONEDA - Solo para referencia, el selector está en CondicionesStep
   const { moneda } = useMonedaStore();
 
-  // Generar cobranzas automáticamente cuando cargan los datos.
-  // NOTA: los pendientes ya NO se autogeneran — la sección es un
-  // bullet journal 100% manual a petición del usuario.
-  useEffect(() => {
-    if (datosCargados && proyectos.length > 0) {
-      generarCobranzas(proyectos);
-    }
-  }, [datosCargados, proyectos, generarCobranzas]);
-
   // Login handler
   const handleLogin = async (email: string, password: string) => {
     setLoginError(null);
@@ -372,13 +360,12 @@ function App() {
   // Navegación con permisos
   const irAHome = () => setVistaActual('home');
 
+  // Dashboard consolidado: SOLO admin/superadmin
   const irADashboard = () => {
-    if (canViewProduccionDashboard()) {
-      setVistaActual('produccion-dashboard');
-    } else if (canViewDashboard()) {
+    if (canViewDashboard()) {
       setVistaActual('dashboard');
     } else {
-      toast.error('No tienes permiso para ver el dashboard');
+      toast.error('Solo los administradores pueden ver el dashboard');
     }
   };
 
@@ -445,7 +432,6 @@ function App() {
   // NUEVAS NAVEGACIONES VELSO OS v2
   const irAPendientes = () => setVistaActual('pendientes');
   const irACobranza = () => setVistaActual('cobranza');
-  const irADashboardEjecutivo = () => setVistaActual('dashboard-ejecutivo');
   const irAProduccion = () => setVistaActual('produccion');
   const irAOrdenesCompra = () => setVistaActual('ordenes-compra');
 
@@ -578,6 +564,12 @@ function App() {
     }
     setProyectoSeleccionado(proyecto);
     setVistaActual('control-codigos');
+  };
+
+  // Ver hoja viajera
+  const handleVerHojaViajera = (proyecto: ProyectoVenta) => {
+    setProyectoSeleccionado(proyecto);
+    setVistaActual('hoja-viajera');
   };
 
   // Volver de hoja viajera
@@ -798,7 +790,6 @@ function App() {
               onDiagnostico={irADiagnostico}
               onPendientes={irAPendientes}
               onCobranza={irACobranza}
-              onDashboardEjecutivo={irADashboardEjecutivo}
               onProduccion={irAProduccion}
               onPiezasCatalogo={irAPiezasCatalogo}
               onOrdenesCompra={irAOrdenesCompra}
@@ -820,7 +811,7 @@ function App() {
           </>
         );
 
-      case 'dashboard-ejecutivo':
+      case 'dashboard':
         return (
           <>
             <UserHeader 
@@ -834,6 +825,8 @@ function App() {
               pendientesHoy={getPendientesHoy()}
               alertasRojas={getAlertasRojas()}
               proyectos={proyectos}
+              cotizaciones={cotizacionesGuardadas}
+              horasDisponibles={horasDisponibles}
               totalesCobranza={getTotales()}
               onIrAPendientes={irAPendientes}
               onIrACobranza={irACobranza}
@@ -881,42 +874,10 @@ function App() {
               onActualizarNotas={actualizarNotasCobranza}
               onActualizarContacto={actualizarContacto}
               onMarcarIncobrable={marcarIncobrable}
-            />
-          </>
-        );
-
-      case 'dashboard':
-        return (
-          <>
-            <UserHeader 
-              user={user} 
-              onLogout={handleLogout}
-              alertasCount={alertasCount}
-              pendientesCount={pendientesCount}
-            />
-            <DashboardView
-              onVolver={irAHome}
-              cotizaciones={cotizacionesGuardadas}
-              horasDisponibles={horasDisponibles}
-              proyectos={proyectos}
-              userRol={user.rol}
-              userId={user.id}
-            />
-          </>
-        );
-
-      case 'produccion-dashboard':
-        return (
-          <>
-            <UserHeader 
-              user={user} 
-              onLogout={handleLogout}
-              alertasCount={alertasCount}
-              pendientesCount={pendientesCount}
-            />
-            <ProduccionDashboardView
-              onVolver={irAHome}
-              proyectos={proyectos}
+              onGenerarDesdeProyectos={async () => {
+                await generarCobranzas(proyectos);
+                toast.success('Cobranzas generadas desde proyectos facturados');
+              }}
             />
           </>
         );
@@ -981,10 +942,10 @@ function App() {
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
               onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
               onVerControlCodigos={canViewControlCodigos() ? handleVerControlCodigos : undefined}
+              onVerHojaViajera={handleVerHojaViajera}
               userRol={user.rol}
               userId={user.id}
               ordenesCompra={ordenesCompra}
-              onCrearOrdenCompra={crearOrdenCompra}
               onCambiarEstadoOC={actualizarEstadoOC}
               onEliminarOC={eliminarOrdenCompra}
             />

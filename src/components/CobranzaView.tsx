@@ -26,6 +26,7 @@ interface CobranzaViewProps {
   onActualizarNotas: (proyectoId: string, notas: string) => void;
   onActualizarContacto: (proyectoId: string, fecha: string) => void;
   onMarcarIncobrable: (proyectoId: string) => void;
+  onGenerarDesdeProyectos?: () => void;
 }
 
 const coloresEstado = {
@@ -51,6 +52,7 @@ export function CobranzaView({
   onActualizarNotas,
   onActualizarContacto,
   onMarcarIncobrable,
+  onGenerarDesdeProyectos,
 }: CobranzaViewProps) {
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [busqueda, setBusqueda] = useState('');
@@ -131,6 +133,16 @@ export function CobranzaView({
             <p className="text-sm text-slate-500">Seguimiento de facturas y pagos</p>
           </div>
         </div>
+
+        {onGenerarDesdeProyectos && (
+          <Button 
+            onClick={onGenerarDesdeProyectos}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Generar desde proyectos
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
