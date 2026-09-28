@@ -2,46 +2,40 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft,
   Factory,
   Clock,
-  Play,
-  CheckCircle,
-  AlertTriangle,
   Package,
   TrendingUp,
   Search,
   ChevronRight,
   ChevronDown,
   User,
+  ClipboardList,
+  Wrench,
 } from 'lucide-react';
 import type { ProyectoVenta } from '@/types/ventas';
-import type { RegistroProduccion } from '@/types/produccion';
+import { procesosAplanados, materialesAplanados, minutosCotizados } from '@/utils/proyectoDatos';
 
 interface ProduccionViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
-  registros: RegistroProduccion[];
-  onIniciarProceso?: (registroId: string) => void;
-  onCompletarProceso?: (registroId: string, tiempoRealMinutos: number) => void;
   onVerDetalle?: (proyecto: ProyectoVenta) => void;
+  onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
 }
 
 export function ProduccionView({
   onVolver,
   proyectos,
-  registros,
-  onIniciarProceso,
-  onCompletarProceso,
   onVerDetalle,
+  onVerHojaViajera,
 }: ProduccionViewProps) {
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
 
-  // Filtrar proyectos en fabricación
+  // Proyectos activos en piso: en fabricación o fabricados pendientes de entrega
   const proyectosEnFabricacion = proyectos.filter(p =>
     p.estado === 'en_fabricacion' || p.estado === 'fabricado'
   );
@@ -52,59 +46,12 @@ export function ProduccionView({
     return matchBusqueda;
   });
 
-  // Calcular progreso de un proyecto
-  const calcularProgreso = (proyectoId: string) => {
-    const regs = registros.filter(r => r.proyectoId === proyectoId);
-    if (regs.length === 0) return 0;
-    const completados = regs.filter(r => r.estado === 'completado').length;
-    return Math.round((completados / regs.length) * 100);
-  };
+  // Horas estimadas de un proyecto (desde las piezas de la cotización)
+  const horasEstimadas = (proyecto: ProyectoVenta) =>
+    procesosAplanados(proyecto).reduce((sum, proc) => sum + minutosCotizados(proc), 0) / 60;
 
-  // Obtener registros de un proyecto
-  const getRegistrosProyecto = (proyectoId: string) => {
-    return registros.filter(r => r.proyectoId === proyectoId);
-  };
-
-  // Agrupar registros por pieza
-  const getPiezasDeProyecto = (proyectoId: string) => {
-    const regs = getRegistrosProyecto(proyectoId);
-    const piezasMap = new Map<string, { nombre: string; registros: RegistroProduccion[] }>();
-
-    for (const r of regs) {
-      if (!piezasMap.has(r.piezaId)) {
-        piezasMap.set(r.piezaId, { nombre: r.piezaNombre, registros: [] });
-      }
-      piezasMap.get(r.piezaId)!.registros.push(r);
-    }
-
-    return Array.from(piezasMap.entries()).map(([id, data]) => ({
-      id,
-      nombre: data.nombre,
-      registros: data.registros,
-    }));
-  };
-
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'pendiente': return 'bg-slate-100 text-slate-600';
-      case 'en_proceso': return 'bg-blue-100 text-blue-600';
-      case 'pausado': return 'bg-amber-100 text-amber-600';
-      case 'completado': return 'bg-green-100 text-green-600';
-      case 'retrasado': return 'bg-red-100 text-red-600';
-      default: return 'bg-slate-100 text-slate-600';
-    }
-  };
-
-  const getEstadoLabel = (estado: string) => {
-    switch (estado) {
-      case 'pendiente': return 'Pendiente';
-      case 'en_proceso': return 'En proceso';
-      case 'pausado': return 'Pausado';
-      case 'completado': return 'Completado';
-      case 'retrasado': return 'Retrasado';
-      default: return estado;
-    }
-  };
+  const totalHorasPiso = proyectosEnFabricacion.reduce((sum, p) => sum + horasEstimadas(p), 0);
+  const totalPiezas = proyectosEnFabricacion.reduce((sum, p) => sum + (p.piezas?.length || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -122,7 +69,7 @@ export function ProduccionView({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Card className="border-slate-200">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
@@ -137,37 +84,20 @@ export function ProduccionView({
         <Card className="border-slate-200">
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm text-slate-500">Piezas</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalPiezas}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-200">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-amber-600" />
-              <span className="text-sm text-slate-500">En proceso</span>
+              <span className="text-sm text-slate-500">Horas estimadas</span>
             </div>
             <p className="text-2xl font-bold text-slate-900 mt-1">
-              {registros.filter(r => r.estado === 'en_proceso').length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-slate-500">Completados hoy</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-900 mt-1">
-              {registros.filter(r => {
-                if (r.estado !== 'completado' || !r.fechaFin) return false;
-                const hoy = new Date().toISOString().split('T')[0];
-                return r.fechaFin.startsWith(hoy);
-              }).length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              <span className="text-sm text-slate-500">Retrasados</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-900 mt-1">
-              {registros.filter(r => r.estado === 'retrasado').length}
+              {totalHorasPiso.toFixed(1)} h
             </p>
           </CardContent>
         </Card>
@@ -190,13 +120,13 @@ export function ProduccionView({
           <div className="text-center py-12 text-slate-500">
             <Factory className="w-12 h-12 mx-auto mb-3 text-slate-300" />
             <p>No hay proyectos en fabricación</p>
-            <p className="text-sm">Los proyectos aparecerán aquí cuando se conviertan a venta</p>
+            <p className="text-sm">Los proyectos aparecerán aquí cuando se conviertan a orden</p>
           </div>
         ) : (
           proyectosFiltrados.map((proyecto) => {
-            const progreso = calcularProgreso(proyecto.id);
-            const piezas = getPiezasDeProyecto(proyecto.id);
             const expandido = proyectoExpandido === proyecto.id;
+            const piezas = proyecto.piezas || [];
+            const materiales = materialesAplanados(proyecto);
 
             return (
               <Card key={proyecto.id} className="border-slate-200">
@@ -207,136 +137,135 @@ export function ProduccionView({
                     onClick={() => setProyectoExpandido(expandido ? null : proyecto.id)}
                   >
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Package className="w-4 h-4 text-blue-600" />
                         <span className="font-medium text-slate-900">{proyecto.proyectoNombre}</span>
-                        <Badge className={getEstadoColor(proyecto.estado)}>
+                        <Badge className={proyecto.estado === 'en_fabricacion' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}>
                           {proyecto.estado === 'en_fabricacion' ? 'En fabricación' : 'Fabricado'}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                      <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
                           {proyecto.clienteNombre}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {piezas.reduce((sum, p) => sum + p.registros.filter(r => r.estado === 'completado').length, 0)} / {piezas.reduce((sum, p) => sum + p.registros.length, 0)} procesos
+                          {horasEstimadas(proyecto).toFixed(1)} h estimadas
                         </span>
+                        <span>{piezas.length} pieza{piezas.length !== 1 ? 's' : ''}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-sm font-medium text-slate-900">{progreso}%</span>
-                      </div>
-                      {expandido ? (
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-400" />
-                      )}
-                    </div>
+                    {expandido ? (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    )}
                   </div>
 
-                  {/* Progreso */}
-                  <Progress value={progreso} className="h-2 mt-3" />
-
-                  {/* Detalle expandido */}
+                  {/* Detalle expandido: piezas con material y procesos de la cotización */}
                   {expandido && (
                     <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
-                      {piezas.map((pieza) => (
-                        <div key={pieza.id}>
-                          <h4 className="text-sm font-medium text-slate-700 mb-2">
-                            {pieza.nombre}
-                          </h4>
-                          <div className="space-y-2">
-                            {pieza.registros.map((registro) => (
-                              <div
-                                key={registro.id}
-                                className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Badge className={getEstadoColor(registro.estado)}>
-                                    {getEstadoLabel(registro.estado)}
-                                  </Badge>
-                                  <span className="text-sm text-slate-700">
-                                    {registro.procesoNombre}
+                      {piezas.length === 0 ? (
+                        <p className="text-sm text-slate-400">
+                          Este proyecto no tiene piezas detalladas.
+                        </p>
+                      ) : (
+                        piezas.map((pieza: any) => (
+                          <div key={pieza.id} className="border border-slate-200 rounded-lg p-3 space-y-3">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div>
+                                <span className="font-medium text-slate-900">{pieza.nombre}</span>
+                                {pieza.codigo && (
+                                  <span className="text-xs text-slate-400 ml-2">{pieza.codigo}</span>
+                                )}
+                              </div>
+                              <Badge variant="outline" className="text-slate-600">
+                                {pieza.cantidad} pzas
+                              </Badge>
+                            </div>
+
+                            {/* Material de la pieza */}
+                            {pieza.material && (
+                              <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-100 rounded p-2">
+                                <Package className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                                <div>
+                                  <span className="font-medium text-amber-900">
+                                    {pieza.material.nombre}
                                   </span>
-                                  {registro.operadorNombre && (
-                                    <span className="text-xs text-slate-500">
-                                      ({registro.operadorNombre})
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="text-right text-sm">
-                                    {registro.estado === 'completado' ? (
-                                      <>
-                                        <span className="text-slate-600">
-                                          {registro.tiempoRealMinutos} min
-                                        </span>
-                                        {registro.tiempoEstimadoMinutos > 0 && (
-                                          <span className={`text-xs ml-1 ${
-                                            registro.tiempoRealMinutos > registro.tiempoEstimadoMinutos
-                                              ? 'text-red-500'
-                                              : 'text-green-500'
-                                          }`}>
-                                            ({Math.round((registro.tiempoRealMinutos / registro.tiempoEstimadoMinutos - 1) * 100)}%)
-                                          </span>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span className="text-slate-400">
-                                        Est: {registro.tiempoEstimadoMinutos} min
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex gap-1">
-                                    {registro.estado === 'pendiente' && onIniciarProceso && (
-                                      <Button
-                                        size="sm"
-                                        className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700"
-                                        onClick={() => onIniciarProceso(registro.id)}
-                                      >
-                                        <Play className="w-3 h-3" />
-                                      </Button>
-                                    )}
-                                    {registro.estado === 'en_proceso' && (
-                                      <>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 text-xs"
-                                          onClick={() => {
-                                            const tiempo = prompt('Tiempo real en minutos:');
-                                            if (tiempo && onCompletarProceso) {
-                                              onCompletarProceso(registro.id, parseInt(tiempo));
-                                            }
-                                          }}
-                                        >
-                                          <CheckCircle className="w-3 h-3 mr-1" />
-                                          Terminar
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
+                                  <span className="text-amber-700 text-xs ml-2">
+                                    {[
+                                      pieza.material.diametro && `⌀${pieza.material.diametro}`,
+                                      pieza.material.longitud && `× ${pieza.material.longitud}`,
+                                      pieza.material.ancho && `${pieza.material.ancho}×${pieza.material.largo}`,
+                                      pieza.material.espesor && `esp. ${pieza.material.espesor}`,
+                                      pieza.material.unidadMedida,
+                                    ].filter(Boolean).join(' ')}
+                                  </span>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                            )}
 
-                      {onVerDetalle && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full mt-2"
-                          onClick={() => onVerDetalle(proyecto)}
-                        >
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          Ver comparativa cotización vs real
-                        </Button>
+                            {/* Procesos de la pieza */}
+                            <div className="space-y-1.5">
+                              {(pieza.procesos || []).map((proc: any) => (
+                                <div
+                                  key={proc.id}
+                                  className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Wrench className="w-3.5 h-3.5 text-slate-400" />
+                                    <span className="text-sm text-slate-700">{proc.nombre}</span>
+                                  </div>
+                                  <span className="text-sm text-slate-600">
+                                    {proc.tiempoMinutosPorPieza
+                                      ? `${proc.tiempoMinutosPorPieza} min/pza`
+                                      : `${minutosCotizados(proc)} min`}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
                       )}
+
+                      {/* Materiales consolidados (si hay a nivel proyecto) */}
+                      {materiales.length > 0 && piezas.length === 0 && (
+                        <div className="space-y-1.5">
+                          {materiales.map((m: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2 p-2 bg-amber-50 rounded-lg text-sm">
+                              <Package className="w-3.5 h-3.5 text-amber-600" />
+                              <span>{m.nombre}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Acciones */}
+                      <div className="flex gap-2">
+                        {onVerHojaViajera && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 border-slate-300"
+                            onClick={() => onVerHojaViajera(proyecto)}
+                          >
+                            <ClipboardList className="w-3 h-3 mr-1" />
+                            Hoja viajera
+                          </Button>
+                        )}
+                        {onVerDetalle && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 border-slate-300"
+                            onClick={() => onVerDetalle(proyecto)}
+                          >
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            Cotización vs real
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </CardContent>

@@ -180,11 +180,16 @@ export function ProyectosView({
     return coincideBusqueda && coincideEstado && coincideVendedor;
   });
 
-  // Cotizaciones que aún no tienen proyecto asociado (solo admin y vendedor pueden ver)
+  // Cotizaciones convertibles: SOLO estado 'cotizacion' (terminada y enviada)
+  // y que aún no tengan proyecto asociado. Borradores y órdenes no aplican.
   const cotizacionesPendientes = isAdmin
-    ? cotizaciones.filter(c => !proyectos.some(p => p.numeroCotizacion === c.numero))
+    ? cotizaciones.filter(c =>
+        c.estado === 'cotizacion' && !proyectos.some(p => p.numeroCotizacion === c.numero)
+      )
     : cotizaciones.filter(c =>
-        c.usuarioId === userId && !proyectos.some(p => p.numeroCotizacion === c.numero)
+        c.usuarioId === userId &&
+        c.estado === 'cotizacion' &&
+        !proyectos.some(p => p.numeroCotizacion === c.numero)
       );
 
   // Totales por estado (solo de proyectos visibles para el usuario)

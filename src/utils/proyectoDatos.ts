@@ -1,0 +1,51 @@
+// Utilidades para obtener procesos/materiales de un proyecto o cotización.
+// Los proyectos convertidos guardan la información dentro de piezas[]
+// (cada pieza tiene su material y sus procesos), no en los arreglos
+// de nivel superior. Estas funciones aplanan ambas estructuras.
+
+/** Todos los procesos: nivel superior + los de cada pieza */
+export function procesosAplanados(obj: any): any[] {
+  const top = Array.isArray(obj?.procesos) ? obj.procesos : [];
+  const dePiezas = Array.isArray(obj?.piezas)
+    ? obj.piezas.flatMap((pz: any) =>
+        Array.isArray(pz?.procesos)
+          ? pz.procesos.map((proc: any) => ({
+              ...proc,
+              piezaNombre: pz.nombre,
+              piezaCodigo: pz.codigo,
+            }))
+          : []
+      )
+    : [];
+  return [...top, ...dePiezas];
+}
+
+/** Todos los materiales: nivel superior + el de cada pieza */
+export function materialesAplanados(obj: any): any[] {
+  const top = Array.isArray(obj?.materiales) ? obj.materiales : [];
+  const dePiezas = Array.isArray(obj?.piezas)
+    ? obj.piezas
+        .filter((pz: any) => pz?.material)
+        .map((pz: any) => ({
+          ...pz.material,
+          piezaNombre: pz.nombre,
+          piezaCodigo: pz.codigo,
+        }))
+    : [];
+  return [...top, ...dePiezas];
+}
+
+/** Minutos cotizados de un proceso, tolerando ambos esquemas de campos */
+export function minutosCotizados(proc: any): number {
+  return Number(proc?.tiempoMinutos ?? proc?.tiempoMinutosCotizado ?? 0) || 0;
+}
+
+/** Minutos reales de un proceso (si ya se capturaron) */
+export function minutosReales(proc: any): number {
+  return Number(proc?.tiempoMinutosReal ?? 0) || 0;
+}
+
+/** Costo total cotizado de un proceso, tolerando ambos esquemas */
+export function costoCotizadoProc(proc: any): number {
+  return Number(proc?.costoTotal ?? proc?.costoTotalCotizado ?? 0) || 0;
+}

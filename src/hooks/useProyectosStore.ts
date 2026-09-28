@@ -77,6 +77,11 @@ export const useProyectosStore = () => {
           piezas: p.piezas || [],
           materiales: p.materiales || [],
           procesos: p.procesos || [],
+          materialesReales: p.materiales_reales || undefined,
+          procesosReales: p.procesos_reales || undefined,
+          costosAdicionalesReales: p.costos_adicionales_reales || undefined,
+          costoTotalReal: p.costo_total_real ? Number(p.costo_total_real) : undefined,
+          porcentajeUtilidadReal: p.porcentaje_utilidad_real ? Number(p.porcentaje_utilidad_real) : undefined,
           costosAdicionales: p.costos_adicionales || {
             disenoCAD: 0,
             programacionCNC: 0,
@@ -407,11 +412,17 @@ export const useProyectosStore = () => {
 
   const guardarDatosReales = useCallback(async (id: string, datos: any) => {
     const procesos = datos.procesosReales || datos.procesos || [];
+    const materiales = datos.materialesReales || [];
+    const costosAdicionales = datos.costosAdicionalesReales;
     const utilidadReal = datos.utilidadReal;
 
     const updateData: any = {};
-    if (procesos.length > 0) updateData.procesos = procesos;
+    if (procesos.length > 0) updateData.procesos_reales = procesos;
+    if (materiales.length > 0) updateData.materiales_reales = materiales;
+    if (costosAdicionales) updateData.costos_adicionales_reales = costosAdicionales;
+    if (datos.costoTotalReal !== undefined && datos.costoTotalReal !== null) updateData.costo_total_real = datos.costoTotalReal;
     if (utilidadReal !== undefined && utilidadReal !== null) updateData.utilidad_real = utilidadReal;
+    if (datos.porcentajeUtilidadReal !== undefined && datos.porcentajeUtilidadReal !== null) updateData.porcentaje_utilidad_real = datos.porcentajeUtilidadReal;
 
     const exitoso = await updateProyectoSeguro(
       id,
@@ -423,7 +434,9 @@ export const useProyectosStore = () => {
     if (exitoso) {
       setProyectos(prev => prev.map(p => p.id === id ? {
         ...p,
-        procesos: procesos.length > 0 ? procesos : p.procesos,
+        procesosReales: procesos.length > 0 ? procesos : p.procesosReales,
+        materialesReales: materiales.length > 0 ? materiales : p.materialesReales,
+        costosAdicionalesReales: costosAdicionales || p.costosAdicionalesReales,
         utilidadReal: utilidadReal !== undefined ? utilidadReal : p.utilidadReal
       } : p));
     }

@@ -497,7 +497,13 @@ export function CotizacionesView({
                                     <SelectContent>
                                       <SelectItem value="borrador">Borrador</SelectItem>
                                       <SelectItem value="cotizacion">Cotización</SelectItem>
-                                      <SelectItem value="orden">Orden</SelectItem>
+                                      {/* Orden solo se asigna al convertir con número de OC
+                                          desde Proyectos; aquí solo se muestra */}
+                                      {cot.estado === 'orden' && (
+                                        <SelectItem value="orden" disabled>
+                                          Orden (solo desde Proyectos)
+                                        </SelectItem>
+                                      )}
                                     </SelectContent>
                                   </Select>
                                 </td>

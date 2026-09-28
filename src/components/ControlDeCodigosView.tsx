@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { ProyectoVenta, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
+import { procesosAplanados, materialesAplanados, minutosCotizados, costoCotizadoProc } from '@/utils/proyectoDatos';
 
 interface ControlDeCodigosViewProps {
   proyecto: ProyectoVenta;
@@ -36,9 +37,47 @@ export function ControlDeCodigosView({
   onVolver, 
   onGuardarDatosReales 
 }: ControlDeCodigosViewProps) {
+  // Los proyectos convertidos guardan material y procesos DENTRO de cada
+  // pieza — aquí los aplanamos y los llevamos al esquema del proyecto.
+  const materialesCot = useMemo<MaterialProyecto[]>(() =>
+    materialesAplanados(proyecto).map((m: any) => ({
+      id: m.id || crypto.randomUUID(),
+      nombre: m.piezaNombre ? `${m.nombre} (${m.piezaNombre})` : (m.nombre || ''),
+      tipo: m.tipo || '',
+      forma: m.forma || '',
+      cantidad: Number(m.cantidad) || 0,
+      unidad: m.unidad || 'pieza',
+      costoUnitarioCotizado: Number(m.costoUnitario) || 0,
+      margenPorcentaje: Number(m.margenPorcentaje) || 0,
+      costoTotalCotizado: Number(m.costoTotal) || 0,
+    })), [proyecto]);
+
+  const procesosCot = useMemo<ProcesoProyecto[]>(() =>
+    procesosAplanados(proyecto).map((p: any) => ({
+      id: p.id || crypto.randomUUID(),
+      nombre: p.piezaNombre ? `${p.nombre} (${p.piezaNombre})` : (p.nombre || ''),
+      tipo: p.tipo || '',
+      tiempoMinutosCotizado: minutosCotizados(p),
+      costoPorHora: Number(p.costoPorHora) || 0,
+      costoManoObra: Number(p.costoManoObra) || 0,
+      costoTotalCotizado: costoCotizadoProc(p),
+    })), [proyecto]);
+
+  const costosCot = useMemo<CostosAdicionalesProyecto>(() => {
+    const ca: any = proyecto.costosAdicionales || {};
+    const num = (v: any) => Number(typeof v === 'object' && v !== null ? v.costo : v) || 0;
+    return {
+      disenoCAD: num(ca.diseno ?? ca.disenoCAD),
+      programacionCNC: num(ca.programacionCNC),
+      setup: num(ca.setup),
+      transporte: num(ca.envio ?? ca.transporte),
+      otro: num(ca.otro) + num(ca.pruebaDureza) + num(ca.estudioMaterial),
+    };
+  }, [proyecto]);
+
   // Inicializar materiales reales (copiar de cotizados si no existen)
   const [materialesReales, setMaterialesReales] = useState<MaterialProyecto[]>(
-    proyecto.materialesReales || proyecto.materiales.map(m => ({
+    proyecto.materialesReales || materialesCot.map(m => ({
       ...m,
       costoUnitarioReal: m.costoUnitarioCotizado,
       costoTotalReal: m.costoTotalCotizado
@@ -47,7 +86,7 @@ export function ControlDeCodigosView({
 
   // Inicializar procesos reales
   const [procesosReales, setProcesosReales] = useState<ProcesoProyecto[]>(
-    proyecto.procesosReales || proyecto.procesos.map(p => ({
+    proyecto.procesosReales || procesosCot.map(p => ({
       ...p,
       tiempoMinutosReal: p.tiempoMinutosCotizado,
       costoTotalReal: p.costoTotalCotizado
@@ -56,18 +95,18 @@ export function ControlDeCodigosView({
 
   // Inicializar costos adicionales reales
   const [costosReales, setCostosReales] = useState<CostosAdicionalesProyecto>(
-    proyecto.costosAdicionalesReales || { ...proyecto.costosAdicionales }
+    proyecto.costosAdicionalesReales || { ...costosCot }
   );
 
   // Calcular totales
   const totales = useMemo(() => {
-    const costoMaterialesCotizado = proyecto.materiales.reduce((sum, m) => sum + m.costoTotalCotizado, 0);
+    const costoMaterialesCotizado = materialesCot.reduce((sum, m) => sum + m.costoTotalCotizado, 0);
     const costoMaterialesReal = materialesReales.reduce((sum, m) => sum + (m.costoTotalReal || m.costoTotalCotizado), 0);
-    
-    const costoProcesosCotizado = proyecto.procesos.reduce((sum, p) => sum + p.costoTotalCotizado, 0);
+
+    const costoProcesosCotizado = procesosCot.reduce((sum, p) => sum + p.costoTotalCotizado, 0);
     const costoProcesosReal = procesosReales.reduce((sum, p) => sum + (p.costoTotalReal || p.costoTotalCotizado), 0);
-    
-    const costosAdicionalesCotizado = Object.values(proyecto.costosAdicionales).reduce((sum, v) => sum + v, 0);
+
+    const costosAdicionalesCotizado = Object.values(costosCot).reduce((sum, v) => sum + v, 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
     
     const costoTotalCotizado = costoMaterialesCotizado + costoProcesosCotizado + costosAdicionalesCotizado;
@@ -95,7 +134,7 @@ export function ControlDeCodigosView({
       porcentajeUtilidadCotizada,
       porcentajeUtilidadReal,
     };
-  }, [proyecto, materialesReales, procesosReales, costosReales]);
+  }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, procesosReales, costosReales]);
 
   // Actualizar material real
   const actualizarMaterialReal = (id: string, campo: 'costoUnitarioReal' | 'cantidad', valor: number) => {
@@ -439,7 +478,7 @@ export function ControlDeCodigosView({
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <p className="text-xs text-slate-500">Cotizado</p>
-                        <p className="font-medium">${(proyecto.costosAdicionales as any)[key].toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                        <p className="font-medium">${(costosCot as any)[key].toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-slate-500">Real</p>

@@ -907,9 +907,8 @@ function App() {
             <ProduccionView
               onVolver={irAHome}
               proyectos={proyectos}
-              registros={[]}
-              onIniciarProceso={(id) => console.log('Iniciar', id)}
-              onCompletarProceso={(id, tiempo) => console.log('Completar', id, tiempo)}
+              onVerDetalle={canViewControlCodigos() ? handleVerControlCodigos : undefined}
+              onVerHojaViajera={handleVerHojaViajera}
             />
           </>
         );

@@ -35,6 +35,7 @@ import type { ProyectoVenta } from '@/types/ventas';
 import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 import { GraficaCircular, GraficaComparacion, GraficaBarrasComparacion } from '@/components/GraficasCirculares';
+import { procesosAplanados, minutosCotizados, minutosReales } from '@/utils/proyectoDatos';
 
 interface DashboardEjecutivoProps {
   onVolver: () => void;
@@ -219,22 +220,19 @@ export function DashboardEjecutivo({
     });
 
     cotizacionesMes.forEach((cot) => {
-      const procesosCotizacion = (cot as any).procesos;
-      if (procesosCotizacion && Array.isArray(procesosCotizacion)) {
-        procesosCotizacion.forEach((p: any) => {
-          const tiempoHoras = (p?.tiempoMinutos || 0) / 60;
-          const tipo = p?.tipo;
-          if (tipo && horasCotizadas[tipo] !== undefined) {
-            horasCotizadas[tipo] += tiempoHoras;
-          }
-        });
-      }
+      procesosAplanados(cot).forEach((p: any) => {
+        const tiempoHoras = minutosCotizados(p) / 60;
+        const tipo = p?.tipo;
+        if (tipo && horasCotizadas[tipo] !== undefined) {
+          horasCotizadas[tipo] += tiempoHoras;
+        }
+      });
     });
 
     proyectosMes.forEach(p => {
-      p.procesos.forEach(proc => {
-        const tiempoHoras = (proc.tiempoMinutosCotizado || 0) / 60;
-        const tiempoRealHoras = (proc.tiempoMinutosReal || proc.tiempoMinutosCotizado || 0) / 60;
+      procesosAplanados(p).forEach(proc => {
+        const tiempoHoras = minutosCotizados(proc) / 60;
+        const tiempoRealHoras = (minutosReales(proc) || minutosCotizados(proc)) / 60;
 
         if (horasVendidas[proc.tipo] !== undefined) {
           horasVendidas[proc.tipo] += tiempoHoras;
@@ -280,10 +278,10 @@ export function DashboardEjecutivo({
     const totalPendiente = proyectosPendientes.reduce((sum, p) => sum + p.totalCotizado, 0);
 
     const horasVendidas = proyectosFiltrados.reduce((sum, p) =>
-      sum + p.procesos.reduce((h, proc) => h + (proc.tiempoMinutosCotizado || 0), 0) / 60, 0
+      sum + procesosAplanados(p).reduce((h, proc) => h + minutosCotizados(proc), 0) / 60, 0
     );
     const horasFabricadas = proyectosFabricadosMes.reduce((sum, p) =>
-      sum + p.procesos.reduce((h, proc) => h + (proc.tiempoMinutosCotizado || 0), 0) / 60, 0
+      sum + procesosAplanados(p).reduce((h, proc) => h + (minutosReales(proc) || minutosCotizados(proc)), 0) / 60, 0
     );
 
     return {
