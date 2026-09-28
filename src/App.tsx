@@ -17,7 +17,6 @@ import {
   CheckCircle,
   FileCheck,
   LogOut,
-  Shield,
   Loader2,
   ArrowLeft,
   CheckSquare,
@@ -793,21 +792,12 @@ function App() {
               onProduccion={irAProduccion}
               onPiezasCatalogo={irAPiezasCatalogo}
               onOrdenesCompra={irAOrdenesCompra}
+              onAdminUsuarios={irAAdminUsuarios}
+              esAdmin={canManageUsers() || canViewDashboard()}
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
               cobranzaVencidaCount={getVencidos().length}
             />
-            {canManageUsers() && (
-              <div className="mt-6">
-                <Button 
-                  onClick={irAAdminUsuarios}
-                  className="w-full bg-red-600 hover:bg-red-700"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Administración de Usuarios
-                </Button>
-              </div>
-            )}
           </>
         );
 

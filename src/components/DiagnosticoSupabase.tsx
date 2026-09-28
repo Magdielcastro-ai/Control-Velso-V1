@@ -9,101 +9,102 @@ interface TestResult {
   name: string;
   status: 'pending' | 'success' | 'error';
   message: string;
-  data?: any;
 }
+
+// Todas las tablas públicas de Supabase a verificar
+const TABLAS: { tabla: string; nombre: string }[] = [
+  { tabla: 'perfiles', nombre: 'Perfiles' },
+  { tabla: 'cotizaciones', nombre: 'Cotizaciones' },
+  { tabla: 'proyectos', nombre: 'Proyectos' },
+  { tabla: 'ordenes_compra', nombre: 'Órdenes de Compra' },
+  { tabla: 'proveedores', nombre: 'Proveedores' },
+  { tabla: 'clientes', nombre: 'Clientes' },
+  { tabla: 'contactos', nombre: 'Contactos' },
+  { tabla: 'talleres', nombre: 'Talleres' },
+  { tabla: 'materiales', nombre: 'Materiales' },
+  { tabla: 'catalogo_materiales', nombre: 'Catálogo Materiales' },
+  { tabla: 'catalogo_materiales_v2', nombre: 'Catálogo Materiales V2' },
+  { tabla: 'procesos', nombre: 'Procesos' },
+  { tabla: 'piezas_catalogo', nombre: 'Piezas Catálogo' },
+  { tabla: 'pendientes', nombre: 'Pendientes' },
+  { tabla: 'alertas', nombre: 'Alertas' },
+  { tabla: 'cobranza', nombre: 'Cobranza' },
+  { tabla: 'pagos_recibidos', nombre: 'Pagos Recibidos' },
+  { tabla: 'consecutivos_proyectos', nombre: 'Consecutivos Proyectos' },
+  { tabla: 'consecutivos_oc', nombre: 'Consecutivos OC' },
+  { tabla: 'cotizaciones_backup', nombre: 'Cotizaciones Backup (legacy)' },
+];
+
+const testInicial = (name: string): TestResult => ({ name, status: 'pending', message: 'Pendiente...' });
 
 export function DiagnosticoSupabase() {
   const [tests, setTests] = useState<TestResult[]>([
-    { name: 'Conexión con Supabase', status: 'pending', message: 'Pendiente...' },
-    { name: 'Autenticación', status: 'pending', message: 'Pendiente...' },
-    { name: 'Tabla Perfiles', status: 'pending', message: 'Pendiente...' },
-    { name: 'Tabla Cotizaciones', status: 'pending', message: 'Pendiente...' },
-    { name: 'Tabla Proyectos', status: 'pending', message: 'Pendiente...' },
-    { name: 'Tabla Clientes', status: 'pending', message: 'Pendiente...' },
-    { name: 'Tabla Talleres', status: 'pending', message: 'Pendiente...' },
-    { name: 'Políticas RLS', status: 'pending', message: 'Pendiente...' },
+    testInicial('Conexión con Supabase'),
+    testInicial('Autenticación'),
+    ...TABLAS.map(t => testInicial(`Tabla ${t.nombre}`)),
+    testInicial('Políticas RLS (escritura)'),
   ]);
   const [running, setRunning] = useState(false);
 
   const runTests = async () => {
     setRunning(true);
-    const newTests = [...tests];
-
-    // Test 1: Conexión con Supabase
-    try {
-      const { data, error } = await supabase.from('perfiles').select('count').limit(1);
-      if (error) throw error;
-      newTests[0] = { name: 'Conexión con Supabase', status: 'success', message: 'Conectado correctamente', data };
-    } catch (err: any) {
-      newTests[0] = { name: 'Conexión con Supabase', status: 'error', message: err.message };
-    }
+    // Reiniciar todos a pendiente
+    const newTests: TestResult[] = [
+      testInicial('Conexión con Supabase'),
+      testInicial('Autenticación'),
+      ...TABLAS.map(t => testInicial(`Tabla ${t.nombre}`)),
+      testInicial('Políticas RLS (escritura)'),
+    ];
     setTests([...newTests]);
 
-    // Test 2: Autenticación
+    const actualizar = (index: number, resultado: TestResult) => {
+      newTests[index] = resultado;
+      setTests([...newTests]);
+    };
+
+    // Test 0: Conexión con Supabase
+    try {
+      const { error } = await supabase.from('perfiles').select('count').limit(1);
+      if (error) throw error;
+      actualizar(0, { name: 'Conexión con Supabase', status: 'success', message: 'Conectado correctamente' });
+    } catch (err: any) {
+      actualizar(0, { name: 'Conexión con Supabase', status: 'error', message: err.message });
+    }
+
+    // Test 1: Autenticación
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) throw error;
-      newTests[1] = { name: 'Autenticación', status: 'success', message: `Usuario: ${user?.email || 'N/A'}`, data: user };
+      actualizar(1, { name: 'Autenticación', status: 'success', message: `Usuario: ${user?.email || 'N/A'}` });
     } catch (err: any) {
-      newTests[1] = { name: 'Autenticación', status: 'error', message: err.message };
+      actualizar(1, { name: 'Autenticación', status: 'error', message: err.message });
     }
-    setTests([...newTests]);
 
-    // Test 3: Tabla Perfiles
-    try {
-      const { data, error } = await supabase.from('perfiles').select('*').limit(5);
-      if (error) throw error;
-      newTests[2] = { name: 'Tabla Perfiles', status: 'success', message: `${data?.length || 0} registros encontrados`, data };
-    } catch (err: any) {
-      newTests[2] = { name: 'Tabla Perfiles', status: 'error', message: err.message };
+    // Tests de tablas: lectura con conteo exacto (sin traer filas)
+    for (let i = 0; i < TABLAS.length; i++) {
+      const { tabla, nombre } = TABLAS[i];
+      const idx = i + 2;
+      try {
+        const { count, error } = await supabase
+          .from(tabla)
+          .select('*', { count: 'exact', head: true });
+        if (error) throw error;
+        actualizar(idx, {
+          name: `Tabla ${nombre}`,
+          status: 'success',
+          message: `${count ?? 0} registros · acceso OK`,
+        });
+      } catch (err: any) {
+        actualizar(idx, { name: `Tabla ${nombre}`, status: 'error', message: err.message });
+      }
     }
-    setTests([...newTests]);
 
-    // Test 4: Tabla Cotizaciones
-    try {
-      const { data, error } = await supabase.from('cotizaciones').select('*').limit(5);
-      if (error) throw error;
-      newTests[3] = { name: 'Tabla Cotizaciones', status: 'success', message: `${data?.length || 0} registros encontrados`, data };
-    } catch (err: any) {
-      newTests[3] = { name: 'Tabla Cotizaciones', status: 'error', message: err.message };
-    }
-    setTests([...newTests]);
-
-    // Test 5: Tabla Proyectos
-    try {
-      const { data, error } = await supabase.from('proyectos').select('*').limit(5);
-      if (error) throw error;
-      newTests[4] = { name: 'Tabla Proyectos', status: 'success', message: `${data?.length || 0} registros encontrados`, data };
-    } catch (err: any) {
-      newTests[4] = { name: 'Tabla Proyectos', status: 'error', message: err.message };
-    }
-    setTests([...newTests]);
-
-    // Test 6: Tabla Clientes
-    try {
-      const { data, error } = await supabase.from('clientes').select('*').limit(5);
-      if (error) throw error;
-      newTests[5] = { name: 'Tabla Clientes', status: 'success', message: `${data?.length || 0} registros encontrados`, data };
-    } catch (err: any) {
-      newTests[5] = { name: 'Tabla Clientes', status: 'error', message: err.message };
-    }
-    setTests([...newTests]);
-
-    // Test 7: Tabla Talleres
-    try {
-      const { data, error } = await supabase.from('talleres').select('*').limit(5);
-      if (error) throw error;
-      newTests[6] = { name: 'Tabla Talleres', status: 'success', message: `${data?.length || 0} registros encontrados`, data };
-    } catch (err: any) {
-      newTests[6] = { name: 'Tabla Talleres', status: 'error', message: err.message };
-    }
-    setTests([...newTests]);
-
-    // Test 8: Insertar y eliminar una cotización de prueba
+    // Último test: INSERT y DELETE de prueba en cotizaciones
+    const idxRLS = TABLAS.length + 2;
     try {
       const testId = crypto.randomUUID();
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { error: insertError } = await supabase.from('cotizaciones').insert([{
         id: testId,
         numero: 'TEST-001',
@@ -113,28 +114,27 @@ export function DiagnosticoSupabase() {
         total: 100,
         estado: 'borrador',
       }]);
-      
       if (insertError) throw insertError;
-      
-      // Si se insertó, eliminarlo
+
       const { error: deleteError } = await supabase.from('cotizaciones').delete().eq('id', testId);
       if (deleteError) throw deleteError;
-      
-      newTests[7] = { name: 'Políticas RLS', status: 'success', message: 'INSERT y DELETE funcionan correctamente' };
+
+      actualizar(idxRLS, { name: 'Políticas RLS (escritura)', status: 'success', message: 'INSERT y DELETE funcionan correctamente' });
     } catch (err: any) {
-      newTests[7] = { name: 'Políticas RLS', status: 'error', message: err.message };
+      actualizar(idxRLS, { name: 'Políticas RLS (escritura)', status: 'error', message: err.message });
     }
-    setTests([...newTests]);
 
     setRunning(false);
   };
 
   useEffect(() => {
     runTests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const successCount = tests.filter(t => t.status === 'success').length;
   const errorCount = tests.filter(t => t.status === 'error').length;
+  const pendingCount = tests.filter(t => t.status === 'pending').length;
 
   return (
     <div className="space-y-4 p-4">
@@ -146,7 +146,7 @@ export function DiagnosticoSupabase() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="text-sm">{successCount} OK</span>
@@ -155,8 +155,14 @@ export function DiagnosticoSupabase() {
               <XCircle className="w-5 h-5 text-red-600" />
               <span className="text-sm">{errorCount} Errores</span>
             </div>
-            <Button 
-              onClick={runTests} 
+            {pendingCount > 0 && (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                <span className="text-sm text-slate-500">{pendingCount} pendientes</span>
+              </div>
+            )}
+            <Button
+              onClick={runTests}
               disabled={running}
               size="sm"
               className="ml-auto"
@@ -167,8 +173,8 @@ export function DiagnosticoSupabase() {
 
           <div className="space-y-2">
             {tests.map((test, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`p-3 rounded-lg border ${
                   test.status === 'success' ? 'bg-green-50 border-green-200' :
                   test.status === 'error' ? 'bg-red-50 border-red-200' :
@@ -182,7 +188,7 @@ export function DiagnosticoSupabase() {
                     {test.status === 'pending' && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
                     <span className="font-medium">{test.name}</span>
                   </div>
-                  <Badge 
+                  <Badge
                     variant={test.status === 'success' ? 'default' : test.status === 'error' ? 'destructive' : 'secondary'}
                   >
                     {test.status === 'success' ? 'OK' : test.status === 'error' ? 'Error' : '...'}
@@ -195,11 +201,6 @@ export function DiagnosticoSupabase() {
                 }`}>
                   {test.message}
                 </p>
-                {test.data && (
-                  <pre className="text-xs bg-slate-100 p-2 rounded mt-2 overflow-auto max-h-32">
-                    {JSON.stringify(test.data, null, 2)}
-                  </pre>
-                )}
               </div>
             ))}
           </div>

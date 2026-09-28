@@ -1,20 +1,21 @@
 // src/components/HomeVelso.tsx
-// v2.1 - Forzar rebuild
+// Home organizado por categorías
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Factory, 
-  Users, 
-  FileText, 
-  Package, 
-  Settings, 
-  DollarSign, 
+import {
+  Factory,
+  Users,
+  FileText,
+  Package,
+  Settings,
+  DollarSign,
   Plus,
   Activity,
   CheckSquare,
   LayoutDashboard,
-  ClipboardList
+  ClipboardList,
+  Shield,
 } from 'lucide-react';
 
 interface HomeVelsoProps {
@@ -26,14 +27,67 @@ interface HomeVelsoProps {
   onCotizaciones: () => void;
   onNuevaCotizacion: () => void;
   onDiagnostico: () => void;
-  // NUEVOS PROPS VELSO OS v2
   onPendientes: () => void;
   onCobranza: () => void;
   onProduccion: () => void;
-  onPiezasCatalogo: () => void;    onOrdenesCompra: () => void;
+  onPiezasCatalogo: () => void;
+  onOrdenesCompra: () => void;
+  onAdminUsuarios?: () => void;
+  esAdmin?: boolean;
   alertasCount: number;
   pendientesCount: number;
   cobranzaVencidaCount: number;
+}
+
+interface ModuloCard {
+  titulo: string;
+  descripcion: string;
+  icono: React.ElementType;
+  onClick: () => void;
+  colorIcono: string;
+  badge?: number;
+  badgeColor?: string;
+  badgeLabel?: string;
+}
+
+function TarjetaModulo({ modulo }: { modulo: ModuloCard }) {
+  const Icono = modulo.icono;
+  return (
+    <Card
+      className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
+      onClick={modulo.onClick}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${modulo.colorIcono}`}>
+            <Icono className="w-5 h-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium text-slate-900 text-sm truncate">{modulo.titulo}</h3>
+            <p className="text-xs text-slate-500 truncate">{modulo.descripcion}</p>
+          </div>
+          {modulo.badge !== undefined && modulo.badge > 0 && (
+            <Badge className={`${modulo.badgeColor || 'bg-slate-600'} text-white shrink-0`}>
+              {modulo.badge} {modulo.badgeLabel}
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SeccionCategoria({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
+        {titulo}
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function HomeVelso({
@@ -45,242 +99,165 @@ export function HomeVelso({
   onCotizaciones,
   onNuevaCotizacion,
   onDiagnostico,
-  // NUEVOS
   onPendientes,
   onCobranza,
   onProduccion,
-  onPiezasCatalogo,    onOrdenesCompra,
+  onPiezasCatalogo,
+  onOrdenesCompra,
+  onAdminUsuarios,
+  esAdmin = false,
   alertasCount,
   pendientesCount,
   cobranzaVencidaCount,
 }: HomeVelsoProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* Header */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-2">
         <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <Factory className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">VELSO OS</h1>
         <p className="text-slate-500">Sistema Integral de Control</p>
-        <p className="text-xs text-slate-400 mt-1">v2.0 - Dashboard Ejecutivo</p>
       </div>
 
-      {/* Botón principal: Nueva Cotización */}
-      <button
-        onClick={onNuevaCotizacion}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 flex items-center gap-4 transition-all hover:shadow-lg group"
-      >
-        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-          <Plus className="w-6 h-6" />
-        </div>
-        <div className="text-left">
-          <h3 className="font-semibold text-lg">Nueva Cotización</h3>
-          <p className="text-blue-100 text-sm">Iniciar proceso de cotización completo</p>
-        </div>
-        <div className="ml-auto">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
-            <Plus className="w-4 h-4" />
+      {/* ─── PANEL ─── */}
+      <SeccionCategoria titulo="Panel">
+        {esAdmin && (
+          <TarjetaModulo modulo={{
+            titulo: 'Dashboard',
+            descripcion: 'Pipeline, ventas, producción y cobranza',
+            icono: LayoutDashboard,
+            onClick: onDashboard,
+            colorIcono: 'bg-blue-600',
+            badge: alertasCount,
+            badgeColor: 'bg-red-600 animate-pulse',
+            badgeLabel: 'alertas',
+          }} />
+        )}
+        <TarjetaModulo modulo={{
+          titulo: 'Cobranza',
+          descripcion: 'Facturas por cobrar y vencidas',
+          icono: DollarSign,
+          onClick: onCobranza,
+          colorIcono: 'bg-green-600',
+          badge: cobranzaVencidaCount,
+          badgeColor: 'bg-red-600 animate-pulse',
+          badgeLabel: 'vencidas',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Mis Pendientes',
+          descripcion: 'Bullet journal e impresión',
+          icono: CheckSquare,
+          onClick: onPendientes,
+          colorIcono: 'bg-orange-500',
+          badge: pendientesCount,
+          badgeColor: 'bg-orange-600',
+          badgeLabel: 'hoy',
+        }} />
+      </SeccionCategoria>
+
+      {/* ─── VENTAS ─── */}
+      <SeccionCategoria titulo="Ventas">
+        {/* Botón principal: Nueva Cotización */}
+        <button
+          onClick={onNuevaCotizacion}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-4 flex items-center gap-3 transition-all hover:shadow-lg sm:col-span-2 lg:col-span-2 group"
+        >
+          <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+            <Plus className="w-5 h-5" />
           </div>
-        </div>
-      </button>
+          <div className="text-left">
+            <h3 className="font-semibold">Nueva Cotización</h3>
+            <p className="text-blue-100 text-xs">Iniciar proceso de cotización completo</p>
+          </div>
+          <Plus className="w-5 h-5 ml-auto opacity-60 group-hover:opacity-100 transition-opacity" />
+        </button>
+        <TarjetaModulo modulo={{
+          titulo: 'Cotizaciones',
+          descripcion: 'Historial y estados',
+          icono: FileText,
+          onClick: onCotizaciones,
+          colorIcono: 'bg-slate-600',
+        }} />
+      </SeccionCategoria>
 
-      {/* NUEVO: Dashboard consolidado (solo admins) - Principal */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card 
-          className="border-blue-200 hover:shadow-lg transition-all cursor-pointer bg-blue-50/50"
-          onClick={onDashboard}
-        >
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                  <LayoutDashboard className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">Dashboard</h3>
-                  <p className="text-sm text-slate-500">Pipeline, ventas, producción y cobranza</p>
-                </div>
-              </div>
-              {alertasCount > 0 && (
-                <Badge className="bg-red-600 text-white animate-pulse">
-                  {alertasCount} alertas
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* ─── OPERACIÓN ─── */}
+      <SeccionCategoria titulo="Operación">
+        <TarjetaModulo modulo={{
+          titulo: 'Proyectos',
+          descripcion: 'Ventas y seguimiento',
+          icono: ClipboardList,
+          onClick: onProyectos,
+          colorIcono: 'bg-indigo-600',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Órdenes de Compra',
+          descripcion: 'Gastos e insumos',
+          icono: Package,
+          onClick: onOrdenesCompra,
+          colorIcono: 'bg-cyan-600',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Producción',
+          descripcion: 'Tiempos y trazabilidad',
+          icono: Factory,
+          onClick: onProduccion,
+          colorIcono: 'bg-blue-500',
+        }} />
+      </SeccionCategoria>
 
-        {/* Pendientes */}
-        <Card 
-          className="border-orange-200 hover:shadow-lg transition-all cursor-pointer"
-          onClick={onPendientes}
-        >
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
-                  <CheckSquare className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">Mis Pendientes</h3>
-                  <p className="text-sm text-slate-500">Tareas del día y seguimientos</p>
-                </div>
-              </div>
-              {pendientesCount > 0 && (
-                <Badge className="bg-orange-600 text-white">
-                  {pendientesCount} hoy
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* ─── CATÁLOGOS ─── */}
+      <SeccionCategoria titulo="Catálogos">
+        <TarjetaModulo modulo={{
+          titulo: 'Clientes',
+          descripcion: 'Empresas y contactos',
+          icono: Users,
+          onClick: onClientes,
+          colorIcono: 'bg-violet-600',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Piezas',
+          descripcion: 'Catálogo de piezas',
+          icono: Package,
+          onClick: onPiezasCatalogo,
+          colorIcono: 'bg-slate-600',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Materiales',
+          descripcion: 'Catálogo de insumos',
+          icono: Package,
+          onClick: onMateriales,
+          colorIcono: 'bg-amber-600',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Procesos',
+          descripcion: 'Catálogo y costos',
+          icono: Settings,
+          onClick: onProcesos,
+          colorIcono: 'bg-teal-600',
+        }} />
+      </SeccionCategoria>
 
-        {/* Cobranza */}
-        <Card 
-          className="border-green-200 hover:shadow-lg transition-all cursor-pointer"
-          onClick={onCobranza}
-        >
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">Cobranza</h3>
-                  <p className="text-sm text-slate-500">Facturas por cobrar y vencidas</p>
-                </div>
-              </div>
-              {cobranzaVencidaCount > 0 && (
-                <Badge className="bg-red-600 text-white animate-pulse">
-                  {cobranzaVencidaCount} vencidas
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Grid de módulos secundarios */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card 
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onClientes}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Users className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Clientes</h3>
-              <p className="text-xs text-slate-500">Catálogo y contactos</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onProyectos}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <ClipboardList className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Proyectos</h3>
-              <p className="text-xs text-slate-500">Ventas y seguimiento</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer bg-blue-50"
-          onClick={onProduccion}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Factory className="w-8 h-8 text-blue-600" />
-              <h3 className="font-medium text-blue-900 text-sm">Producción</h3>
-              <p className="text-xs text-blue-600">Tiempos y trazabilidad</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onCotizaciones}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <FileText className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Cotizaciones</h3>
-              <p className="text-xs text-slate-500">Historial y estados</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onMateriales}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Package className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Materiales</h3>
-              <p className="text-xs text-slate-500">Catálogo de insumos</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onPiezasCatalogo}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Package className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Piezas</h3>
-              <p className="text-xs text-slate-500">Catálogo de piezas</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onProcesos}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Settings className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Procesos</h3>
-              <p className="text-xs text-slate-500">Catálogo y costos</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onOrdenesCompra}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Package className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Órdenes de Compra</h3>
-              <p className="text-xs text-slate-500">Gastos e insumos</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-slate-200 hover:shadow-md transition-all cursor-pointer"
-          onClick={onDiagnostico}
-        >
-          <CardContent className="p-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Activity className="w-8 h-8 text-slate-600" />
-              <h3 className="font-medium text-slate-900 text-sm">Diagnóstico</h3>
-              <p className="text-xs text-slate-500">Estado de Supabase</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* ─── SISTEMA ─── */}
+      <SeccionCategoria titulo="Sistema">
+        <TarjetaModulo modulo={{
+          titulo: 'Diagnóstico',
+          descripcion: 'Estado de Supabase',
+          icono: Activity,
+          onClick: onDiagnostico,
+          colorIcono: 'bg-slate-500',
+        }} />
+        {esAdmin && onAdminUsuarios && (
+          <TarjetaModulo modulo={{
+            titulo: 'Administración de Usuarios',
+            descripcion: 'Roles y accesos',
+            icono: Shield,
+            onClick: onAdminUsuarios,
+            colorIcono: 'bg-red-600',
+          }} />
+        )}
+      </SeccionCategoria>
 
       {/* Footer */}
       <div className="text-center pt-4 border-t border-slate-200">
