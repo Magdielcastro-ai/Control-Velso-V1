@@ -174,6 +174,8 @@ function App() {
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [datosCargados, setDatosCargados] = useState(false);
+  const [cargandoDatos, setCargandoDatos] = useState(false);
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
 
   // Auth con todos los permisos
   const { 
@@ -339,6 +341,7 @@ function App() {
       refrescarOrdenes(),
     ]);
     setDatosCargados(true);
+    setUltimaActualizacion(new Date());
     toast.success('Datos sincronizados correctamente');
   };
 
@@ -363,8 +366,26 @@ function App() {
   const irADashboard = () => {
     if (canViewDashboard()) {
       setVistaActual('dashboard');
+      recargarDatosDashboard();
     } else {
       toast.error('Solo los administradores pueden ver el dashboard');
+    }
+  };
+
+  // Leer datos frescos de Supabase al entrar al dashboard y
+  // registrar la hora en que terminó la sincronización
+  const recargarDatosDashboard = async () => {
+    setCargandoDatos(true);
+    try {
+      await Promise.all([
+        refrescarProyectos(),
+        refrescarCotizaciones(),
+        refrescarOrdenes(),
+        refrescarClientes(),
+      ]);
+    } finally {
+      setUltimaActualizacion(new Date());
+      setCargandoDatos(false);
     }
   };
 
@@ -818,6 +839,8 @@ function App() {
               cotizaciones={cotizacionesGuardadas}
               horasDisponibles={horasDisponibles}
               totalesCobranza={getTotales()}
+              cargando={cargandoDatos}
+              ultimaActualizacion={ultimaActualizacion}
               onIrAPendientes={irAPendientes}
               onIrACobranza={irACobranza}
               onIrAProyectos={irAProyectos}

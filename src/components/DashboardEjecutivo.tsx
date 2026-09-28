@@ -57,6 +57,9 @@ interface DashboardEjecutivoProps {
   onIrAPendientes: () => void;
   onIrACobranza: () => void;
   onIrAProyectos: () => void;
+  // Estado de sincronización con Supabase
+  cargando?: boolean;
+  ultimaActualizacion?: Date | null;
   // Datos adicionales de catálogos (opcionales)
   talleresCount?: number;
   materialesCount?: number;
@@ -80,6 +83,8 @@ export function DashboardEjecutivo({
   onIrAPendientes,
   onIrACobranza,
   onIrAProyectos,
+  cargando = false,
+  ultimaActualizacion = null,
   talleresCount = 0,
   materialesCount = 0,
   clientesCount = 0,
@@ -341,13 +346,22 @@ export function DashboardEjecutivo({
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
             <p className="text-sm text-slate-500">
-              {hayDatos 
-                ? mesSeleccionado !== null
-                  ? `${proyectosFiltrados.length} proyectos en ${MESES[mesSeleccionado]} ${anioSeleccionado} · $${metricas.totalVendido.toLocaleString()} vendido`
-                  : `${proyectos.length} proyectos · $${metricas.totalVendido.toLocaleString()} vendido`
-                : 'Cargando datos de Supabase...'
+              {cargando
+                ? 'Cargando datos de Supabase...'
+                : hayDatos
+                  ? mesSeleccionado !== null
+                    ? `${proyectosFiltrados.length} proyectos en ${MESES[mesSeleccionado]} ${anioSeleccionado} · $${metricas.totalVendido.toLocaleString()} vendido`
+                    : `${proyectos.length} proyectos · $${metricas.totalVendido.toLocaleString()} vendido`
+                  : 'Sin proyectos registrados'
               }
             </p>
+            {/* Leyenda de sincronización — visible en todas las pestañas */}
+            {!cargando && ultimaActualizacion && (
+              <p className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
+                <CheckCircle className="w-3 h-3" />
+                Actualizado {ultimaActualizacion.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
         </div>
 
@@ -409,19 +423,25 @@ export function DashboardEjecutivo({
         </div>
       </div>
 
-      {/* Estado de carga */}
-      {!hayDatos && (
+      {/* Estado de carga — solo mientras se lee Supabase */}
+      {cargando && (
         <Card className="border-blue-200 bg-blue-50/50">
           <CardContent className="p-8 text-center">
             <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-blue-600" />
             <p className="text-lg font-medium text-slate-700">Cargando datos de Supabase...</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sin datos — la carga ya terminó, no hay nada que mostrar */}
+      {!cargando && !hayDatos && (
+        <Card className="border-slate-200">
+          <CardContent className="p-8 text-center">
+            <CheckCircle className="w-10 h-10 mx-auto mb-3 text-green-500" />
+            <p className="text-lg font-medium text-slate-700">Datos actualizados</p>
             <p className="text-sm text-slate-500 mt-1">
-              Si tienes proyectos vendidos, aparecerán en un momento.
+              No hay proyectos registrados todavía. Cuando conviertas una cotización a orden, aparecerá aquí.
             </p>
-            <div className="mt-4 text-xs text-slate-400 space-y-1">
-              <p>Proyectos: {proyectos.length}</p>
-              <p>Pendientes: {pendientesHoy.length}</p>
-            </div>
           </CardContent>
         </Card>
       )}
