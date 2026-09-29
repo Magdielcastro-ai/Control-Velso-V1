@@ -163,20 +163,20 @@ export const useCotizacionStore = () => {
       console.log('[useCotizacionStore] Refrescando desde Supabase...');
       const { data, error } = await supabase
         .from('cotizaciones')
-        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, moneda, tipo_cambio, total, total_mxn, estado, usuario_id, piezas')
+        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, moneda, tipo_cambio, total, total_mxn, estado, usuario_id, piezas, materiales, procesos, costos_adicionales, cliente_id, margen_utilidad, iva_porcentaje')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data) {
         const cotizacionesFormateadas: CotizacionGuardada[] = data.map(c => {
-          let cantidadPiezas = 1;
+          let piezasParsed: any[] = [];
           if (c.piezas) {
             try {
-              const piezas = typeof c.piezas === 'string' ? JSON.parse(c.piezas) : c.piezas;
-              cantidadPiezas = Array.isArray(piezas) ? piezas.length : 1;
+              const parsed = typeof c.piezas === 'string' ? JSON.parse(c.piezas) : c.piezas;
+              piezasParsed = Array.isArray(parsed) ? parsed : [];
             } catch (e) {
-              cantidadPiezas = 1;
+              piezasParsed = [];
             }
           }
 
@@ -186,6 +186,7 @@ export const useCotizacionStore = () => {
             fecha: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
             tipo: c.tipo || 'pieza_unica',
             clienteNombre: c.cliente_nombre || 'Sin cliente',
+            clienteId: c.cliente_id || undefined,
             proyectoNombre: c.proyecto_nombre || 'Sin nombre',
             moneda: c.moneda || 'MXN',
             tipoCambio: c.tipo_cambio || 1,
@@ -193,7 +194,13 @@ export const useCotizacionStore = () => {
             totalMXN: c.total_mxn || Number(c.total) || 0,
             estado: c.estado || 'borrador',
             usuarioId: c.usuario_id,
-            cantidadPiezas,
+            cantidadPiezas: piezasParsed.length || 1,
+            margenUtilidad: Number(c.margen_utilidad) || 30,
+            ivaPorcentaje: Number(c.iva_porcentaje) || 16,
+            piezas: piezasParsed,
+            materiales: c.materiales || [],
+            procesos: c.procesos || [],
+            costosAdicionales: c.costos_adicionales || undefined,
           };
         });
 

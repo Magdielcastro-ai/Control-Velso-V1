@@ -91,14 +91,18 @@
   /* Imprimir solo el área marcada (bullet journal de pendientes).
      Se activa con la clase 'imprimiendo-pendientes' en <body> para no
      afectar la impresión de cotizaciones y órdenes de compra */
-  body.imprimiendo-pendientes * {
+  body.imprimiendo-pendientes *,
+  body.imprimiendo-hoja-viajera * {
     visibility: hidden;
   }
   body.imprimiendo-pendientes .area-impresion,
-  body.imprimiendo-pendientes .area-impresion * {
+  body.imprimiendo-pendientes .area-impresion *,
+  body.imprimiendo-hoja-viajera .area-impresion,
+  body.imprimiendo-hoja-viajera .area-impresion * {
     visibility: visible;
   }
-  body.imprimiendo-pendientes .area-impresion {
+  body.imprimiendo-pendientes .area-impresion,
+  body.imprimiendo-hoja-viajera .area-impresion {
     position: absolute;
     left: 0;
     top: 0;

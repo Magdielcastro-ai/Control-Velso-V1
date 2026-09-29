@@ -23,14 +23,32 @@ interface HojaViajeraViewProps {
 
 export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
   const [piezaExpandida, setPiezaExpandida] = useState<string | null>(null);
+  const [piezaAImprimir, setPiezaAImprimir] = useState<any | null>(null);
 
   const togglePieza = (piezaId: string) => {
     setPiezaExpandida(piezaExpandida === piezaId ? null : piezaId);
   };
 
+  // Imprime la hoja viajera de UNA pieza con espacios en blanco
+  // para capturar las horas reales a mano en piso
+  const handleImprimirPieza = (pieza: any) => {
+    setPiezaAImprimir(pieza);
+    document.body.classList.add('imprimiendo-hoja-viajera');
+    // Esperar a que React pinte el área de impresión
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('imprimiendo-hoja-viajera');
+      setPiezaAImprimir(null);
+    }, 100);
+  };
+
   const handleImprimir = () => {
     window.print();
   };
+
+  const fechaHoy = new Date().toLocaleDateString('es-MX', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
 
   return (
     <div className="space-y-6">
@@ -86,11 +104,11 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
           <Card key={pieza.id} className="border-slate-200">
             <CardContent className="p-0">
               {/* Header de la pieza - siempre visible */}
-              <button
-                onClick={() => togglePieza(pieza.id)}
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
+              <div className="w-full p-4 flex items-center justify-between">
+                <button
+                  onClick={() => togglePieza(pieza.id)}
+                  className="flex items-center gap-3 flex-1 text-left hover:bg-slate-50 transition-colors rounded-lg py-1"
+                >
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                     <Package className="w-4 h-4 text-blue-600" />
                   </div>
@@ -108,18 +126,29 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                       Cantidad: {pieza.cantidad} piezas
                     </p>
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-500">
                     {pieza.procesos?.length || 0} procesos
                   </span>
-                  {piezaExpandida === pieza.id ? (
-                    <ChevronUp className="w-5 h-5 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-slate-400" />
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-slate-300 no-print"
+                    onClick={() => handleImprimirPieza(pieza)}
+                  >
+                    <Printer className="w-3.5 h-3.5 mr-1" />
+                    Imprimir hoja
+                  </Button>
+                  <button onClick={() => togglePieza(pieza.id)} className="no-print">
+                    {piezaExpandida === pieza.id ? (
+                      <ChevronUp className="w-5 h-5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-slate-400" />
+                    )}
+                  </button>
                 </div>
-              </button>
+              </div>
 
               {/* Detalle de la pieza - expandible */}
               {piezaExpandida === pieza.id && (
@@ -202,6 +231,123 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
           </Card>
         ))}
       </div>
+
+      {/* ─── ÁREA DE IMPRESIÓN: hoja viajera de UNA pieza ─── */}
+      {piezaAImprimir && (
+        <div className="area-impresion hidden print:block text-slate-900">
+          {/* Encabezado */}
+          <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3 mb-3">
+            <div>
+              <h1 className="text-xl font-bold">HOJA VIAJERA</h1>
+              <p className="text-sm text-slate-600">Soluciones Integrales Velso</p>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-bold">{proyecto.codigoProyecto}</p>
+              <p className="text-xs text-slate-500">{fechaHoy}</p>
+            </div>
+          </div>
+
+          {/* Datos del proyecto y la pieza */}
+          <table className="w-full text-xs border border-slate-300 mb-3">
+            <tbody>
+              <tr className="border-b border-slate-300">
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold w-28">Pieza</td>
+                <td className="px-2 py-1.5 font-bold">{piezaAImprimir.nombre}</td>
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold w-28">Código pieza</td>
+                <td className="px-2 py-1.5">{piezaAImprimir.codigo || '—'}</td>
+              </tr>
+              <tr className="border-b border-slate-300">
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold">Cantidad</td>
+                <td className="px-2 py-1.5">{piezaAImprimir.cantidad} pzas</td>
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold">Proyecto</td>
+                <td className="px-2 py-1.5">{proyecto.proyectoNombre}</td>
+              </tr>
+              <tr className="border-b border-slate-300">
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold">Cliente</td>
+                <td className="px-2 py-1.5">{proyecto.clienteNombre}</td>
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold">Orden de compra</td>
+                <td className="px-2 py-1.5">{proyecto.ordenCompra || '—'}</td>
+              </tr>
+              <tr>
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold">Cotización</td>
+                <td className="px-2 py-1.5">{proyecto.numeroCotizacion}</td>
+                <td className="px-2 py-1.5 bg-slate-100 font-semibold">Material</td>
+                <td className="px-2 py-1.5">
+                  {piezaAImprimir.material?.nombre || '—'}
+                  <span className="text-slate-500">
+                    {' '}
+                    {[
+                      piezaAImprimir.material?.diametro && `⌀${piezaAImprimir.material.diametro}`,
+                      piezaAImprimir.material?.longitud && `× ${piezaAImprimir.material.longitud}`,
+                      piezaAImprimir.material?.largo && `largo ${piezaAImprimir.material.largo}`,
+                      piezaAImprimir.material?.ancho && `ancho ${piezaAImprimir.material.ancho}`,
+                      piezaAImprimir.material?.espesor && `esp. ${piezaAImprimir.material.espesor}`,
+                      piezaAImprimir.material?.unidadMedida,
+                    ].filter(Boolean).join(' ')}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Procesos: cotizado fijo + columnas en blanco para captura física */}
+          <table className="w-full text-xs border border-slate-300 mb-3">
+            <thead>
+              <tr className="bg-slate-800 text-white">
+                <th className="px-2 py-1.5 text-left w-8">#</th>
+                <th className="px-2 py-1.5 text-left">PROCESO</th>
+                <th className="px-2 py-1.5 text-right w-20">MIN/PZA COT.</th>
+                <th className="px-2 py-1.5 text-right w-20">MIN TOTAL COT.</th>
+                <th className="px-2 py-1.5 text-center w-20">HORA INICIO</th>
+                <th className="px-2 py-1.5 text-center w-20">HORA FIN</th>
+                <th className="px-2 py-1.5 text-center w-20">MIN REALES</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(piezaAImprimir.procesos || []).map((proc: any, idx: number) => (
+                <tr key={proc.id || idx} className="border-b border-slate-200">
+                  <td className="px-2 py-3">{idx + 1}</td>
+                  <td className="px-2 py-3 font-medium">{proc.nombre}</td>
+                  <td className="px-2 py-3 text-right">{proc.tiempoMinutosPorPieza ?? '—'}</td>
+                  <td className="px-2 py-3 text-right">{proc.tiempoMinutos ?? '—'}</td>
+                  <td className="px-2 py-3" />
+                  <td className="px-2 py-3" />
+                  <td className="px-2 py-3" />
+                </tr>
+              ))}
+              {/* Fila de totales */}
+              <tr className="bg-slate-100 font-semibold">
+                <td className="px-2 py-2" colSpan={2}>TOTALES</td>
+                <td className="px-2 py-2 text-right">
+                  {(piezaAImprimir.procesos || []).reduce((s: number, p: any) => s + (Number(p.tiempoMinutosPorPieza) || 0), 0)}
+                </td>
+                <td className="px-2 py-2 text-right">
+                  {(piezaAImprimir.procesos || []).reduce((s: number, p: any) => s + (Number(p.tiempoMinutos) || 0), 0)}
+                </td>
+                <td className="px-2 py-2" colSpan={3} />
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Captura manual */}
+          <table className="w-full text-xs border border-slate-300">
+            <tbody>
+              <tr className="border-b border-slate-300">
+                <td className="px-2 py-3 bg-slate-100 font-semibold w-28">Operador</td>
+                <td className="px-2 py-3 w-1/3" />
+                <td className="px-2 py-3 bg-slate-100 font-semibold w-28">Fecha</td>
+                <td className="px-2 py-3" />
+              </tr>
+              <tr>
+                <td className="px-2 py-3 bg-slate-100 font-semibold align-top">Notas</td>
+                <td className="px-2 py-3" colSpan={3}>
+                  <div className="h-16" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Estilos para impresión */}
       <style>{`
