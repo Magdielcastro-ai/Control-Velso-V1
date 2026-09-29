@@ -185,6 +185,7 @@ export const useProyectosStore = () => {
     procesos: any[];
     costosAdicionales: any;
     cotizacionId?: string;
+    codigoManual?: string;
   }) => {
     console.log('[useProyectosStore] === CONVERTIR A VENTA ===');
     console.log('[useProyectosStore] Datos recibidos:', datos);
@@ -196,21 +197,48 @@ export const useProyectosStore = () => {
         return false;
       }
 
-      // 1. Generar código de proyecto via RPC
-      console.log('[useProyectosStore] Generando código para tipo:', datos.tipoProyecto);
-      const { data: codigoData, error: codigoError } = await supabase
-        .rpc('generar_codigo_proyecto', {
-          tipo: datos.tipoProyecto
-        });
+      // 1. Código de proyecto: manual si el usuario lo capturó,
+      //    si no, consecutivo automático MAQ-26-0001 / SUM-26-0002
+      let codigoProyecto = datos.codigoManual?.trim() || '';
+      if (!codigoProyecto) {
+        console.log('[useProyectosStore] Generando código para tipo:', datos.tipoProyecto);
+        const { data: codigoData, error: codigoError } = await supabase
+          .rpc('generar_codigo_proyecto_v2', {
+            tipo: datos.tipoProyecto
+          });
 
-      if (codigoError) {
-        console.error('[useProyectosStore] ERROR generando código:', codigoError);
-        toast.error('Error generando código de proyecto: ' + codigoError.message);
-        return false;
+        if (codigoError) {
+          console.error('[useProyectosStore] ERROR generando código:', codigoError);
+          toast.error('Error generando código de proyecto: ' + codigoError.message);
+          return false;
+        }
+        codigoProyecto = codigoData || '';
       }
+      console.log('[useProyectosStore] Código:', codigoProyecto);
 
-      const codigoProyecto = codigoData || '';
-      console.log('[useProyectosStore] Código generado:', codigoProyecto);
+      // Guardar cada pieza con el código del proyecto (tabla piezas_proyecto)
+      const guardarPiezasProyecto = async (proyectoId: string) => {
+        if (!datos.piezas || datos.piezas.length === 0) return;
+        const filas = datos.piezas.map((pz: any) => ({
+          proyecto_id: proyectoId,
+          codigo_proyecto: codigoProyecto,
+          pieza_id: pz.id,
+          codigo_pieza: pz.codigo || '',
+          nombre: pz.nombre || 'Pieza',
+          cantidad: Number(pz.cantidad) || 1,
+          material: pz.material || {},
+          procesos: pz.procesos || [],
+          horas_cotizadas: (pz.procesos || []).reduce(
+            (s: number, pr: any) => s + (Number(pr.tiempoMinutos) || 0), 0
+          ) / 60,
+          usuario_id: userData.user.id,
+        }));
+        const { error } = await supabase.from('piezas_proyecto').insert(filas);
+        if (error) {
+          console.error('[useProyectosStore] Error guardando piezas:', error.message);
+          toast.error('Proyecto creado, pero falló el registro de piezas: ' + error.message);
+        }
+      };
 
       // 2. Construir datos del proyecto
       const proyectoData: any = {
@@ -270,6 +298,8 @@ export const useProyectosStore = () => {
           }
 
           if (retryData) {
+            await guardarPiezasProyecto(retryData.id);
+
             const nuevoProyecto: ProyectoVenta = {
               id: retryData.id,
               codigoProyecto: retryData.codigo_proyecto || '',
@@ -307,6 +337,8 @@ export const useProyectosStore = () => {
       }
 
       if (data) {
+        await guardarPiezasProyecto(data.id);
+
         const nuevoProyecto: ProyectoVenta = {
           id: data.id,
           codigoProyecto: data.codigo_proyecto || '',

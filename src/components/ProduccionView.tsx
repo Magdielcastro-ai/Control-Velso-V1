@@ -15,7 +15,9 @@ import {
   User,
   ClipboardList,
   Wrench,
+  Save,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ProyectoVenta } from '@/types/ventas';
 import { procesosAplanados, materialesAplanados, minutosCotizados } from '@/utils/proyectoDatos';
 
@@ -24,6 +26,7 @@ interface ProduccionViewProps {
   proyectos: ProyectoVenta[];
   onVerDetalle?: (proyecto: ProyectoVenta) => void;
   onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
+  onGuardarHorasReales?: (proyecto: ProyectoVenta, procesosReales: any[]) => Promise<void> | void;
 }
 
 export function ProduccionView({
@@ -31,9 +34,13 @@ export function ProduccionView({
   proyectos,
   onVerDetalle,
   onVerHojaViajera,
+  onGuardarHorasReales,
 }: ProduccionViewProps) {
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  // Captura de horas reales: { [proyectoId]: { [procesoId]: minutosComoTexto } }
+  const [horasRealesCaptura, setHorasRealesCaptura] = useState<Record<string, Record<string, string>>>({});
+  const [guardando, setGuardando] = useState<string | null>(null);
 
   // Proyectos activos en piso: en fabricación o fabricados pendientes de entrega
   const proyectosEnFabricacion = proyectos.filter(p =>
@@ -52,6 +59,61 @@ export function ProduccionView({
 
   const totalHorasPiso = proyectosEnFabricacion.reduce((sum, p) => sum + horasEstimadas(p), 0);
   const totalPiezas = proyectosEnFabricacion.reduce((sum, p) => sum + (p.piezas?.length || 0), 0);
+
+  // ─── Captura de horas reales ───
+  // Las horas cotizadas son de solo lectura; las reales se capturan,
+  // pueden guardarse parcialmente y corregirse las ya guardadas.
+  const minutosRealesGuardados = (proyecto: ProyectoVenta, procesoId: string): number | null => {
+    const guardado = (proyecto.procesosReales || []).find((p: any) => p.id === procesoId);
+    const val = guardado?.tiempoMinutosReal;
+    return val !== undefined && val !== null ? Number(val) : null;
+  };
+
+  const getValorCaptura = (proyecto: ProyectoVenta, procesoId: string): string => {
+    const editado = horasRealesCaptura[proyecto.id]?.[procesoId];
+    if (editado !== undefined) return editado;
+    const guardado = minutosRealesGuardados(proyecto, procesoId);
+    return guardado !== null ? String(guardado) : '';
+  };
+
+  const setValorCaptura = (proyectoId: string, procesoId: string, valor: string) => {
+    setHorasRealesCaptura(prev => ({
+      ...prev,
+      [proyectoId]: { ...(prev[proyectoId] || {}), [procesoId]: valor },
+    }));
+  };
+
+  const handleGuardarHoras = async (proyecto: ProyectoVenta) => {
+    if (!onGuardarHorasReales) return;
+    const procesosReales = procesosAplanados(proyecto)
+      .map((p: any) => {
+        const texto = getValorCaptura(proyecto, p.id);
+        if (texto === '') return null; // sin captura: no se envía
+        const minutos = Number(texto) || 0;
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          tipo: p.tipo,
+          piezaNombre: p.piezaNombre,
+          tiempoMinutosCotizado: minutosCotizados(p),
+          tiempoMinutosReal: minutos,
+          costoPorHora: Number(p.costoPorHora) || 0,
+          costoManoObra: Number(p.costoManoObra) || 0,
+          costoTotalCotizado: Number(p.costoTotal ?? p.costoTotalCotizado) || 0,
+          costoTotalReal: (minutos / 60) * (Number(p.costoPorHora) || 0) + (Number(p.costoManoObra) || 0),
+        };
+      })
+      .filter(Boolean);
+
+    if (procesosReales.length === 0) {
+      toast.error('Captura al menos una hora real antes de guardar');
+      return;
+    }
+
+    setGuardando(proyecto.id);
+    await onGuardarHorasReales(proyecto, procesosReales);
+    setGuardando(null);
+  };
 
   return (
     <div className="space-y-4">
@@ -206,24 +268,49 @@ export function ProduccionView({
                               </div>
                             )}
 
-                            {/* Procesos de la pieza */}
+                            {/* Procesos de la pieza: cotizado (fijo) + captura real */}
                             <div className="space-y-1.5">
-                              {(pieza.procesos || []).map((proc: any) => (
-                                <div
-                                  key={proc.id}
-                                  className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Wrench className="w-3.5 h-3.5 text-slate-400" />
-                                    <span className="text-sm text-slate-700">{proc.nombre}</span>
+                              {(pieza.procesos || []).map((proc: any) => {
+                                const realGuardado = minutosRealesGuardados(proyecto, proc.id);
+                                return (
+                                  <div
+                                    key={proc.id}
+                                    className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2 flex-wrap"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span className="text-sm text-slate-700 truncate">{proc.nombre}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span
+                                        className="text-sm text-slate-500"
+                                        title="Horas cotizadas — no modificables"
+                                      >
+                                        {proc.tiempoMinutosPorPieza
+                                          ? `${proc.tiempoMinutosPorPieza} min/pza`
+                                          : `${minutosCotizados(proc)} min`} cotizado
+                                      </span>
+                                      {onGuardarHorasReales && (
+                                        <div className="flex items-center gap-1">
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            placeholder="min reales"
+                                            value={getValorCaptura(proyecto, proc.id)}
+                                            onChange={(e) => setValorCaptura(proyecto.id, proc.id, e.target.value)}
+                                            className="h-7 w-24 text-sm text-right"
+                                          />
+                                          {realGuardado !== null && (
+                                            <span className="text-[10px] text-green-600" title="Ya capturado — puedes corregirlo y volver a guardar">
+                                              ✓
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <span className="text-sm text-slate-600">
-                                    {proc.tiempoMinutosPorPieza
-                                      ? `${proc.tiempoMinutosPorPieza} min/pza`
-                                      : `${minutosCotizados(proc)} min`}
-                                  </span>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         ))
@@ -242,7 +329,18 @@ export function ProduccionView({
                       )}
 
                       {/* Acciones */}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {onGuardarHorasReales && (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            disabled={guardando === proyecto.id}
+                            onClick={() => handleGuardarHoras(proyecto)}
+                          >
+                            <Save className="w-3 h-3 mr-1" />
+                            {guardando === proyecto.id ? 'Guardando...' : 'Guardar horas reales'}
+                          </Button>
+                        )}
                         {onVerHojaViajera && (
                           <Button
                             variant="outline"

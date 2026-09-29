@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Loader2, ArrowLeft, FileText, Calendar, Building2, Search, CheckCircle, Clock, Trash2, 
@@ -16,7 +15,6 @@ interface CotizacionesViewProps {
   onVolver: () => void;
   userRol?: string;
   onCargarCotizacion: (id: string) => void;
-  onConvertirAVenta?: (cotizacion: any, ordenCompra: string) => void;
   onCambiarEstado?: (cotizacion: any, nuevoEstado: string) => Promise<void> | void;
 }
 
@@ -56,16 +54,12 @@ export function CotizacionesView({
   onVolver,
   userRol = 'vendedor',
   onCargarCotizacion,
-  onConvertirAVenta,
   onCambiarEstado
 }: CotizacionesViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
   const [vendedorFiltro, setVendedorFiltro] = useState<string>('todos');
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
-  const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<any>(null);
-  const [ordenCompra, setOrdenCompra] = useState('');
-  const [dialogoConvertir, setDialogoConvertir] = useState(false);
   const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(new Set());
 
   const { 
@@ -206,21 +200,6 @@ export function CotizacionesView({
     });
   };
 
-  const handleConvertir = async () => {
-    if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
-    
-    try {
-      await updateEstado(cotizacionSeleccionada.id, 'orden');
-      onConvertirAVenta(cotizacionSeleccionada, ordenCompra);
-      setOrdenCompra('');
-      setCotizacionSeleccionada(null);
-      setDialogoConvertir(false);
-      toast.success('Cotización convertida a venta');
-    } catch (err) {
-      toast.error('Error al convertir cotización');
-    }
-  };
-
   const handleEliminar = async (id: string) => {
     if (!confirm('¿Estás seguro de eliminar esta cotización?')) return;
 
@@ -257,13 +236,6 @@ export function CotizacionesView({
     } catch (err) {
       toast.error('Error al actualizar estado');
     }
-  };
-
-  // Obtener nombre del vendedor
-  const getNombreVendedor = (usuarioId: string | undefined) => {
-    if (!usuarioId) return 'Desconocido';
-    const vendedor = vendedores.find(v => v.id === usuarioId);
-    return vendedor?.nombre || 'Desconocido';
   };
 
   // Estadísticas (en MXN - globales)
@@ -518,66 +490,6 @@ export function CotizacionesView({
                                       <Eye className="w-4 h-4 text-blue-600" />
                                     </Button>
 
-                                    {!comprada && onConvertirAVenta && (
-                                      <Dialog open={dialogoConvertir && cotizacionSeleccionada?.id === cot.id} 
-                                             onOpenChange={(open) => {
-                                               if (!open) {
-                                                 setDialogoConvertir(false);
-                                                 setCotizacionSeleccionada(null);
-                                               }
-                                             }}>
-                                        <DialogTrigger asChild>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 w-8 p-0"
-                                            onClick={() => {
-                                              setCotizacionSeleccionada(cot);
-                                              setDialogoConvertir(true);
-                                            }}
-                                          >
-                                            <CheckCircle className="w-4 h-4 text-green-600" />
-                                          </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                          <DialogHeader>
-                                            <DialogTitle>Convertir Cotización a Venta</DialogTitle>
-                                          </DialogHeader>
-                                          <div className="space-y-4 pt-4">
-                                            <div className="bg-slate-50 p-3 rounded-lg">
-                                              <p className="text-sm text-slate-600">Cotización:</p>
-                                              <p className="font-semibold">{cot.numero}</p>
-                                              <p className="text-sm">{cot.empresa} - {cot.proyecto_nombre}</p>
-                                              <p className="text-lg font-bold text-green-600">
-                                                {formatearMonedaLista(cot.total, cot.moneda || 'MXN', cot.tipo_cambio || 1)}
-                                              </p>
-                                              {isAdmin && (
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                  <User className="w-3 h-3 inline mr-1" />
-                                                  Vendedor: {getNombreVendedor(cot.usuario_id)}
-                                                </p>
-                                              )}
-                                            </div>
-                                            <div className="space-y-2">
-                                              <label className="text-sm font-medium">Número de Orden de Compra *</label>
-                                              <Input
-                                                value={ordenCompra}
-                                                onChange={(e) => setOrdenCompra(e.target.value)}
-                                                placeholder="Ej: OC-2024-001"
-                                              />
-                                            </div>
-                                            <Button 
-                                              onClick={handleConvertir}
-                                              disabled={!ordenCompra}
-                                              className="w-full bg-green-600 hover:bg-green-700"
-                                            >
-                                              Confirmar Compra
-                                            </Button>
-                                          </div>
-                                        </DialogContent>
-                                      </Dialog>
-                                    )}
-                                    
                                     <Button
                                       variant="ghost"
                                       size="sm"

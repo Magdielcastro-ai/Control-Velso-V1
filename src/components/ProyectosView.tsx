@@ -43,7 +43,8 @@ interface ProyectosViewProps {
   onConvertirAVenta?: (
     cotizacion: CotizacionGuardada,
     ordenCompra: string,
-    tipoProyecto: 'suministro' | 'maquinado'
+    tipoProyecto: 'suministro' | 'maquinado',
+    codigoManual?: string
   ) => void;
   onEliminarProyecto?: (id: string) => void;
   onMarcarFabricado?: (id: string) => void;
@@ -128,6 +129,7 @@ export function ProyectosView({
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<CotizacionGuardada | null>(null);
   const [ordenCompra, setOrdenCompra] = useState('');
   const [tipoProyecto, setTipoProyecto] = useState<'suministro' | 'maquinado'>('maquinado');
+  const [codigoManual, setCodigoManual] = useState('');
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
   
@@ -212,11 +214,12 @@ export function ProyectosView({
 
   const handleConvertir = () => {
     if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
-    
-    onConvertirAVenta(cotizacionSeleccionada, ordenCompra, tipoProyecto);
+
+    onConvertirAVenta(cotizacionSeleccionada, ordenCompra, tipoProyecto, codigoManual || undefined);
 
     setOrdenCompra('');
     setTipoProyecto('maquinado');
+    setCodigoManual('');
     setCotizacionSeleccionada(null);
     setDialogoConvertir(false);
   };
@@ -362,6 +365,18 @@ export function ProyectosView({
                     onChange={(e) => setOrdenCompra(e.target.value)}
                     placeholder="Ej: OC-2024-001"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Código de proyecto (opcional)</Label>
+                  <Input
+                    value={codigoManual}
+                    onChange={(e) => setCodigoManual(e.target.value)}
+                    placeholder={tipoProyecto === 'suministro' ? 'SUM-26-0001 (automático si se deja vacío)' : 'MAQ-26-0001 (automático si se deja vacío)'}
+                  />
+                  <p className="text-xs text-slate-400">
+                    Las piezas heredan este código. El 0007 de cada año está reservado para gastos internos.
+                  </p>
                 </div>
 
                 <Button 

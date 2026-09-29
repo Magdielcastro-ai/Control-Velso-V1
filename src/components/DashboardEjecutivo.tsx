@@ -280,9 +280,17 @@ export function DashboardEjecutivo({
     const horasVendidas = proyectosFiltrados.reduce((sum, p) =>
       sum + procesosAplanados(p).reduce((h, proc) => h + minutosCotizados(proc), 0) / 60, 0
     );
-    const horasFabricadas = proyectosFabricadosMes.reduce((sum, p) =>
-      sum + procesosAplanados(p).reduce((h, proc) => h + (minutosReales(proc) || minutosCotizados(proc)), 0) / 60, 0
+    // Horas REALES capturadas por producción (procesos_reales con tiempoMinutosReal).
+    // Sin captura real = 0, para no inflar la eficiencia con lo cotizado.
+    const horasReales = proyectosFiltrados.reduce((sum, p) =>
+      sum + (p.procesosReales || []).reduce((h: number, proc: any) =>
+        h + (Number(proc.tiempoMinutosReal) || 0), 0) / 60, 0
     );
+    // Eficiencia: cotizadas / reales. ≥100% = fabricamos en igual o menos
+    // tiempo del cotizado (dentro de rango). <100% = nos pasamos.
+    const eficiencia = horasReales > 0 && horasVendidas > 0
+      ? (horasVendidas / horasReales) * 100
+      : null;
 
     return {
       proyectosFabricadosMes,
@@ -291,7 +299,9 @@ export function DashboardEjecutivo({
       totalFabricado,
       totalPendiente,
       horasVendidas,
-      horasFabricadas,
+      horasFabricadas: horasReales,
+      horasReales,
+      eficiencia,
     };
   }, [proyectosFiltrados]);
 
@@ -1006,8 +1016,8 @@ export function DashboardEjecutivo({
             </Card>
           </div>
 
-          {/* Horas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Horas: cotizadas vs reales con eficiencia */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -1020,7 +1030,7 @@ export function DashboardEjecutivo({
                   {datosProduccion.horasVendidas.toFixed(1)}h
                 </p>
                 <p className="text-sm text-slate-500">
-                  Total de horas en proyectos del período
+                  Originales de la cotización (no modificables)
                 </p>
               </CardContent>
             </Card>
@@ -1029,17 +1039,52 @@ export function DashboardEjecutivo({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <TrendingUp className="w-5 h-5 text-green-600" />
-                  Horas Fabricadas
+                  Horas Fabricadas (reales)
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-green-600">
-                  {datosProduccion.horasFabricadas.toFixed(1)}h
+                  {datosProduccion.horasReales.toFixed(1)}h
                 </p>
                 <p className="text-sm text-slate-500">
-                  {datosProduccion.horasVendidas > 0
-                    ? `${((datosProduccion.horasFabricadas / datosProduccion.horasVendidas) * 100).toFixed(1)}% completado`
-                    : 'Sin horas pendientes'}
+                  {datosProduccion.horasReales > 0
+                    ? 'Capturadas por producción'
+                    : 'Aún sin captura de horas reales'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className={
+              datosProduccion.eficiencia === null
+                ? 'border-slate-200'
+                : datosProduccion.eficiencia >= 100
+                  ? 'border-green-300 bg-green-50/40'
+                  : 'border-red-300 bg-red-50/40'
+            }>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="w-5 h-5 text-purple-600" />
+                  Eficiencia
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-3xl font-bold ${
+                  datosProduccion.eficiencia === null
+                    ? 'text-slate-400'
+                    : datosProduccion.eficiencia >= 100
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                }`}>
+                  {datosProduccion.eficiencia === null
+                    ? '—'
+                    : `${datosProduccion.eficiencia.toFixed(1)}%`}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {datosProduccion.eficiencia === null
+                    ? 'Se calcula al capturar horas reales'
+                    : datosProduccion.eficiencia >= 100
+                      ? 'Dentro o mejor de lo cotizado'
+                      : 'Por encima del tiempo cotizado'}
                 </p>
               </CardContent>
             </Card>

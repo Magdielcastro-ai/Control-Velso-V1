@@ -512,7 +512,8 @@ function App() {
   const handleConvertirCotizacionAVenta = async (
     cotizacion: CotizacionGuardada,
     ordenCompra: string,
-    tipoProyecto: 'suministro' | 'maquinado' = 'maquinado'
+    tipoProyecto: 'suministro' | 'maquinado' = 'maquinado',
+    codigoManual?: string
   ) => {
     if (!canConvertirAVenta()) {
       toast.error('No tienes permiso para convertir cotizaciones');
@@ -542,6 +543,7 @@ function App() {
         pruebaDureza: { costo: 0, incluidoGratis: false },
       },
       cotizacionId: cotizacion.id,
+      codigoManual,
     });
     if (exito) {
       toast.success('Cotización convertida a venta exitosamente');
@@ -909,6 +911,10 @@ function App() {
               proyectos={proyectos}
               onVerDetalle={canViewControlCodigos() ? handleVerControlCodigos : undefined}
               onVerHojaViajera={handleVerHojaViajera}
+              onGuardarHorasReales={async (proyecto, procesosReales) => {
+                await guardarDatosReales(proyecto.id, { procesosReales });
+                toast.success(`Horas reales guardadas en ${proyecto.codigoProyecto}`);
+              }}
             />
           </>
         );
@@ -1075,7 +1081,6 @@ function App() {
               onVolver={irAHome}
               userRol={user.rol}
               onCargarCotizacion={handleCargarCotizacion}
-              onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
               onCambiarEstado={handleCambiarEstadoCotizacion}
             />
           </>
