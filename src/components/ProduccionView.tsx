@@ -37,8 +37,10 @@ export function ProduccionView({
 }: ProduccionViewProps) {
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  // Captura por proceso: { [proyectoId]: { [procesoId]: { minutos, operador } } }
-  const [captura, setCaptura] = useState<Record<string, Record<string, { minutos: string; operador: string }>>>({});
+  // Línea de captura: minutos + operador (cada proceso puede tener varias)
+  type LineaCaptura = { minutos: string; operador: string };
+  // Captura por proceso: { [proyectoId]: { [captureId]: { lineas } } }
+  const [captura, setCaptura] = useState<Record<string, Record<string, { lineas: LineaCaptura[] }>>>({});
   const [guardando, setGuardando] = useState<string | null>(null);
   // Herramientas/dispositivos extra por pieza (afectan el costo real)
   interface ExtraCaptura {
@@ -83,41 +85,57 @@ export function ProduccionView({
   const totalHorasPiso = proyectosEnFabricacion.reduce((sum, p) => sum + horasEstimadas(p), 0);
   const totalPiezas = proyectosEnFabricacion.reduce((sum, p) => sum + (p.piezas?.length || 0), 0);
 
-  // ─── Captura de horas reales + operador ───
-  // Las horas cotizadas son de solo lectura; las reales se capturan,
-  // pueden guardarse parcialmente y corregirse las ya guardadas.
-  // La llave es captureId (pieza:proceso) — las plantillas repiten id.
+  // ─── Captura de horas reales + operador, con líneas múltiples ───
+  // Cada proceso puede tener varias líneas (varios operadores o varias
+  // fechas); el real del proceso es la SUMA de sus líneas y NO afecta
+  // las horas cotizadas. La llave es captureId (pieza:proceso).
   const registroGuardado = (proyecto: ProyectoVenta, proc: any): any | null =>
     buscarReal(proyecto.procesosReales, proc);
 
-  const getCaptura = (proyecto: ProyectoVenta, proc: any): { minutos: string; operador: string } => {
+  const getLineas = (proyecto: ProyectoVenta, proc: any): LineaCaptura[] => {
     const editado = captura[proyecto.id]?.[proc.captureId];
-    if (editado !== undefined) return editado;
+    if (editado !== undefined) return editado.lineas;
     const guardado = registroGuardado(proyecto, proc);
-    return {
-      minutos: guardado?.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
-      operador: guardado?.operadorNombre || '',
-    };
+    if (!guardado) return [{ minutos: '', operador: '' }];
+    if (Array.isArray(guardado.lineas) && guardado.lineas.length > 0) {
+      return guardado.lineas.map((l: any) => ({
+        minutos: l.minutos != null ? String(l.minutos) : '',
+        operador: l.operador || '',
+      }));
+    }
+    return [{
+      minutos: guardado.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
+      operador: guardado.operadorNombre || '',
+    }];
   };
 
-  const actualizarCaptura = (proyecto: ProyectoVenta, proc: any, campo: 'minutos' | 'operador', valor: string) => {
-    setCaptura(prev => {
-      // Si no hay captura local, arrancar desde lo YA GUARDADO para
-      // no borrar el otro campo (bug: editar minutos borraba operador)
-      const guardado = registroGuardado(proyecto, proc);
-      const actual = prev[proyecto.id]?.[proc.captureId] || {
-        minutos: guardado?.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
-        operador: guardado?.operadorNombre || '',
-      };
-      return {
-        ...prev,
-        [proyecto.id]: {
-          ...(prev[proyecto.id] || {}),
-          [proc.captureId]: { ...actual, [campo]: valor },
-        },
-      };
-    });
+  // Escribe una línea arrancando desde lo guardado (no se pisan campos)
+  const setLineas = (proyecto: ProyectoVenta, proc: any, lineas: LineaCaptura[]) => {
+    setCaptura(prev => ({
+      ...prev,
+      [proyecto.id]: {
+        ...(prev[proyecto.id] || {}),
+        [proc.captureId]: { lineas },
+      },
+    }));
   };
+
+  const actualizarLinea = (proyecto: ProyectoVenta, proc: any, idx: number, campo: 'minutos' | 'operador', valor: string) => {
+    const lineas = getLineas(proyecto, proc).map((l, i) => i === idx ? { ...l, [campo]: valor } : l);
+    setLineas(proyecto, proc, lineas);
+  };
+
+  const agregarLinea = (proyecto: ProyectoVenta, proc: any) => {
+    setLineas(proyecto, proc, [...getLineas(proyecto, proc), { minutos: '', operador: '' }]);
+  };
+
+  const quitarLinea = (proyecto: ProyectoVenta, proc: any, idx: number) => {
+    const lineas = getLineas(proyecto, proc).filter((_, i) => i !== idx);
+    setLineas(proyecto, proc, lineas.length > 0 ? lineas : [{ minutos: '', operador: '' }]);
+  };
+
+  const minutosCapturados = (proyecto: ProyectoVenta, proc: any): number =>
+    getLineas(proyecto, proc).reduce((s, l) => s + (Number(l.minutos) || 0), 0);
 
   // Hay capturas sin guardar (difieren de lo persistido)
   const hayCambiosSinGuardar =
@@ -198,9 +216,15 @@ export function ProduccionView({
     // Nuevas entradas desde la captura (procesos cotizados con tiempo real)
     const nuevas = procesosAplanados(proyecto)
       .map((p: any) => {
-        const cap = getCaptura(proyecto, p);
-        if (cap.minutos === '') return null; // sin captura: no se envía
-        const minutos = Number(cap.minutos) || 0;
+        const lineas = getLineas(proyecto, p).filter(l => l.minutos !== '');
+        if (lineas.length === 0) return null; // sin captura: no se envía
+        const minutos = lineas.reduce((s, l) => s + (Number(l.minutos) || 0), 0);
+        const operadores = [...new Set(lineas.map(l => l.operador.trim()).filter(Boolean))];
+        const minCot = minutosCotizados(p);
+        const costoCot = Number(p.costoTotal ?? p.costoTotalCotizado) || 0;
+        // Costo real PROPORCIONAL al cotizado: mismos minutos = mismo costo.
+        // Más minutos = más costo (baja utilidad); menos = sube.
+        const costoTotalReal = minCot > 0 ? (minutos / minCot) * costoCot : costoCot;
         return {
           id: p.captureId,           // llave compuesta pieza:proceso
           procesoId: p.id,
@@ -208,13 +232,14 @@ export function ProduccionView({
           tipo: p.tipo,
           piezaId: p.piezaId || null,
           piezaNombre: p.piezaNombre,
-          tiempoMinutosCotizado: minutosCotizados(p),
+          tiempoMinutosCotizado: minCot,
           tiempoMinutosReal: minutos,
-          operadorNombre: cap.operador.trim(),
+          operadorNombre: operadores.join(' / '),
+          lineas: lineas.map(l => ({ minutos: Number(l.minutos) || 0, operador: l.operador.trim() })),
           costoPorHora: Number(p.costoPorHora) || 0,
           costoManoObra: Number(p.costoManoObra) || 0,
-          costoTotalCotizado: Number(p.costoTotal ?? p.costoTotalCotizado) || 0,
-          costoTotalReal: (minutos / 60) * (Number(p.costoPorHora) || 0) + (Number(p.costoManoObra) || 0),
+          costoTotalCotizado: costoCot,
+          costoTotalReal,
         };
       })
       .filter(Boolean) as any[];
@@ -451,56 +476,80 @@ export function ProduccionView({
                               </div>
                             )}
 
-                            {/* Procesos de la pieza: cotizado (fijo) + captura real + operador */}
+                            {/* Procesos de la pieza: cotizado (fijo) + líneas reales */}
                             <div className="space-y-1.5">
                               {(pieza.procesos || []).map((proc: any) => {
                                 const procConLlave = { ...proc, captureId: `${pieza.id}:${proc.id}`, piezaId: pieza.id, piezaNombre: pieza.nombre };
                                 const regGuardado = registroGuardado(proyecto, procConLlave);
-                                const cap = getCaptura(proyecto, procConLlave);
+                                const lineas = getLineas(proyecto, procConLlave);
                                 const totalCot = minutosCotizados(proc);
+                                const totalReal = minutosCapturados(proyecto, procConLlave);
                                 return (
-                                  <div
-                                    key={proc.id}
-                                    className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2 flex-wrap"
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                      <span className="text-sm text-slate-700 truncate">{proc.nombre}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-wrap">
+                                  <div key={proc.id} className="p-2 bg-slate-50 rounded-lg space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span className="text-sm text-slate-700 truncate">{proc.nombre}</span>
+                                        {regGuardado && (
+                                          <span className="text-[10px] text-green-600" title="Ya capturado — puedes corregirlo y volver a guardar">✓</span>
+                                        )}
+                                      </div>
                                       <span
-                                        className="text-sm text-slate-500"
+                                        className="text-xs text-slate-500"
                                         title="Horas cotizadas — no modificables"
                                       >
                                         {proc.tiempoMinutosPorPieza
                                           ? `${proc.tiempoMinutosPorPieza} min/pza · ${totalCot} min totales`
                                           : `${totalCot} min`} cotizado
+                                        {totalReal > 0 && (
+                                          <span className={`ml-2 font-medium ${totalReal > totalCot ? 'text-red-600' : 'text-green-600'}`}>
+                                            · {totalReal} min reales
+                                          </span>
+                                        )}
                                       </span>
-                                      {onGuardarHorasReales && (
-                                        <>
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            placeholder="min reales"
-                                            value={cap.minutos}
-                                            onChange={(e) => actualizarCaptura(proyecto, procConLlave, 'minutos', e.target.value)}
-                                            className="h-7 w-24 text-sm text-right"
-                                          />
-                                          <Input
-                                            type="text"
-                                            placeholder="Operador"
-                                            value={cap.operador}
-                                            onChange={(e) => actualizarCaptura(proyecto, procConLlave, 'operador', e.target.value)}
-                                            className="h-7 w-28 text-sm"
-                                          />
-                                          {regGuardado && (
-                                            <span className="text-[10px] text-green-600" title="Ya capturado — puedes corregirlo y volver a guardar">
-                                              ✓
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
                                     </div>
+
+                                    {onGuardarHorasReales && (
+                                      <div className="space-y-1">
+                                        {lineas.map((linea, idx) => (
+                                          <div key={idx} className="flex items-center gap-2 flex-wrap">
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              placeholder="min reales"
+                                              value={linea.minutos}
+                                              onChange={(e) => actualizarLinea(proyecto, procConLlave, idx, 'minutos', e.target.value)}
+                                              className="h-7 w-24 text-sm text-right"
+                                            />
+                                            <Input
+                                              type="text"
+                                              placeholder="Operador"
+                                              value={linea.operador}
+                                              onChange={(e) => actualizarLinea(proyecto, procConLlave, idx, 'operador', e.target.value)}
+                                              className="h-7 w-28 text-sm"
+                                            />
+                                            {lineas.length > 1 && (
+                                              <button
+                                                onClick={() => quitarLinea(proyecto, procConLlave, idx)}
+                                                className="text-red-400 hover:text-red-600 text-xs px-1"
+                                                title="Quitar línea"
+                                              >
+                                                ✕
+                                              </button>
+                                            )}
+                                            {idx === lineas.length - 1 && (
+                                              <button
+                                                onClick={() => agregarLinea(proyecto, procConLlave)}
+                                                className="text-blue-600 hover:text-blue-700 text-xs px-1"
+                                                title="Agregar línea (otro operador u otra fecha)"
+                                              >
+                                                + línea
+                                              </button>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}

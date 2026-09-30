@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto } from '@/types/ventas';
+import { procesosAplanados, minutosCotizados } from '@/utils/proyectoDatos';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
 import type { OrdenCompra } from '@/types/ordenesCompra';
@@ -253,9 +254,9 @@ export function ProyectosView({
     setDialogoFacturar(false);
   };
 
-  // Calcular horas totales de un proyecto
+  // Calcular horas totales de un proyecto (los procesos viven en las piezas)
   const calcularHorasTotales = (proyecto: ProyectoVenta) => {
-    const minutos = proyecto.procesos.reduce((sum, p) => sum + (p.tiempoMinutosCotizado || 0), 0);
+    const minutos = procesosAplanados(proyecto).reduce((sum, p) => sum + minutosCotizados(p), 0);
     return (minutos / 60).toFixed(1);
   };
 

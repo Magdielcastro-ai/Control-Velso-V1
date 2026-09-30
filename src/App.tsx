@@ -755,6 +755,12 @@ function App() {
 
   // Renderizar vista actual
   const renderVista = () => {
+    // Siempre usar la versión FRESCA del proyecto (con horas reales
+    // recién guardadas), no la copia congelada al abrir la vista
+    const proyectoFresco = proyectoSeleccionado
+      ? (proyectos.find(p => p.id === proyectoSeleccionado.id) || proyectoSeleccionado)
+      : null;
+
     switch (vistaActual) {
       case 'home':
         return (
@@ -984,9 +990,9 @@ function App() {
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
             />
-            {proyectoSeleccionado ? (
+            {proyectoFresco ? (
               <HojaViajeraView
-                proyecto={proyectoSeleccionado}
+                proyecto={proyectoFresco}
                 onVolver={handleVolverDeHojaViajera}
               />
             ) : null}
@@ -1002,9 +1008,9 @@ function App() {
               alertasCount={alertasCount}
               pendientesCount={pendientesCount}
             />
-            {proyectoSeleccionado ? (
+            {proyectoFresco ? (
               <ControlDeCodigosView
-                proyecto={proyectoSeleccionado}
+                proyecto={proyectoFresco}
                 onVolver={handleVolverDeControlCodigos}
                 onGuardarDatosReales={guardarDatosReales}
               />
