@@ -472,42 +472,6 @@ function App() {
   };
 
   // Convertir cotización a venta desde RESUMEN (usa cotización actual del store)
-  const handleConvertirAVentaDesdeResumen = async (datos: {
-    ordenCompra: string;
-    tipoProyecto: 'suministro' | 'maquinado';
-  }) => {
-    if (!canConvertirAVenta()) {
-      toast.error('No tienes permiso para convertir cotizaciones');
-      return;
-    }
-
-    const exito = await convertirAVenta({
-      numeroCotizacion: cotizacion.numero,
-      ordenCompra: datos.ordenCompra,
-      tipoProyecto: datos.tipoProyecto,
-      clienteId: cotizacion.datosCliente.clienteId || '',
-      clienteNombre: cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre,
-      proyectoNombre: cotizacion.proyecto.nombre,
-      totalCotizado: cotizacion.total,
-      margenUtilidad: cotizacion.margenUtilidad || 30,
-      ivaPorcentaje: cotizacion.ivaPorcentaje || 16,
-      piezas: cotizacion.piezas || [],
-      materiales: cotizacion.materiales || [],
-      procesos: cotizacion.procesos || [],
-      costosAdicionales: cotizacion.costosAdicionales || {
-        envio: { costo: 0, incluidoGratis: false },
-        diseno: { costo: 0, incluidoGratis: false },
-        estudioMaterial: { costo: 0, incluidoGratis: false },
-        pruebaDureza: { costo: 0, incluidoGratis: false },
-      },
-      cotizacionId: cotizacion.id,
-    });
-
-    if (exito) {
-      toast.success('Cotización convertida a venta exitosamente');
-    }
-  };
-
   // Convertir cotización a venta desde la vista de cotizaciones
   const handleConvertirCotizacionAVenta = async (
     cotizacion: CotizacionGuardada,
@@ -1338,11 +1302,7 @@ function App() {
                   />
                 )}
                 {pasoActual === 'resumen' && (
-                  <ResumenStep
-                    cotizacion={cotizacion}
-                    onConvertirAVenta={canConvertirAVenta() ? handleConvertirAVentaDesdeResumen : undefined}
-                    puedeConvertirAVenta={canConvertirAVenta()}
-                  />
+                  <ResumenStep cotizacion={cotizacion} />
                 )}
               </CardContent>
             </Card>

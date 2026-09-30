@@ -6,9 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
-  TrendingUp, 
   Clock, 
-  DollarSign, 
   Package, 
   Settings,
   Save,
@@ -118,13 +116,21 @@ export function ControlDeCodigosView({
     
     const costoTotalCotizado = costoMaterialesCotizado + costoProcesosCotizado + costosAdicionalesCotizado;
     const costoTotalReal = costoMaterialesReal + costoProcesosReal + costosAdicionalesReal;
-    
-    const totalFacturado = proyecto.totalFacturado || proyecto.totalCotizado;
-    const utilidadCotizada = proyecto.totalCotizado - costoTotalCotizado;
-    const utilidadReal = totalFacturado - costoTotalReal;
-    
-    const porcentajeUtilidadCotizada = proyecto.totalCotizado > 0 ? (utilidadCotizada / proyecto.totalCotizado) * 100 : 0;
-    const porcentajeUtilidadReal = totalFacturado > 0 ? (utilidadReal / totalFacturado) * 100 : 0;
+
+    // Desglose fiscal de la cotización (valores originales, no modificables)
+    const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
+    const totalConIVA = proyecto.totalCotizado;
+    const subtotalSinIVA = totalConIVA / (1 + ivaPct / 100);
+    const ivaMonto = totalConIVA - subtotalSinIVA;
+
+    // Utilidad: base sin IVA. Si el proyecto ya se facturó, se usa lo facturado.
+    const baseFacturadaSinIVA = proyecto.totalFacturado
+      ? proyecto.totalFacturado / (1 + ivaPct / 100)
+      : subtotalSinIVA;
+    const utilidadCotizada = subtotalSinIVA - costoTotalCotizado;
+    const utilidadReal = baseFacturadaSinIVA - costoTotalReal;
+    const porcentajeUtilidadCotizada = subtotalSinIVA > 0 ? (utilidadCotizada / subtotalSinIVA) * 100 : 0;
+    const porcentajeUtilidadReal = baseFacturadaSinIVA > 0 ? (utilidadReal / baseFacturadaSinIVA) * 100 : 0;
 
     return {
       costoMaterialesCotizado,
@@ -135,7 +141,12 @@ export function ControlDeCodigosView({
       costosAdicionalesReal,
       costoTotalCotizado,
       costoTotalReal,
-      totalFacturado,
+      subtotalSinIVA,
+      ivaMonto,
+      ivaPct,
+      totalConIVA,
+      baseFacturadaSinIVA,
+      totalFacturado: proyecto.totalFacturado || proyecto.totalCotizado,
       utilidadCotizada,
       utilidadReal,
       porcentajeUtilidadCotizada,
@@ -242,56 +253,77 @@ export function ControlDeCodigosView({
         </Button>
       </div>
 
-      {/* Resumen de Utilidad */}
+      {/* Desglose: cotización oficial vs costo directo vs utilidad */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Cotización oficial (valores originales, no modificables) */}
         <Card className="border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Total Cotizado</p>
-                <p className="text-xl font-bold text-slate-900">
-                  ${proyecto.totalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-blue-600" />
-              </div>
+          <CardContent className="p-4 space-y-1.5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cotización oficial</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Total sin IVA</span>
+              <span className="font-semibold">${totales.subtotalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">IVA ({totales.ivaPct}%)</span>
+              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-blue-100 pt-1.5">
+              <span className="text-slate-700 font-medium">Total cotizado</span>
+              <span className="font-bold text-blue-700">${totales.totalConIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Total Facturado</p>
-                <p className="text-xl font-bold text-purple-600">
-                  ${(proyecto.totalFacturado || proyecto.totalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-purple-600" />
-              </div>
+        {/* Costo directo: materiales + procesos + adicionales */}
+        <Card className={totales.costoTotalReal > totales.costoTotalCotizado ? 'border-red-200' : 'border-green-200'}>
+          <CardContent className="p-4 space-y-1.5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Costo directo</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Cotizado</span>
+              <span className="font-semibold">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Real</span>
+              <span className={`font-semibold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
+                ${totales.costoTotalReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
+              <span className="text-slate-700 font-medium">Diferencia</span>
+              <span className={`font-bold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
+                {totales.costoTotalReal > totales.costoTotalCotizado ? '+' : ''}
+                ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400">Materiales + procesos + costos adicionales</p>
           </CardContent>
         </Card>
 
-        <Card className={totales.utilidadReal >= 0 ? 'border-green-200' : 'border-red-200'}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Utilidad Real</p>
-                <p className={`text-xl font-bold ${totales.utilidadReal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  ${totales.utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {totales.porcentajeUtilidadReal.toFixed(1)}% del facturado
-                </p>
-              </div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${totales.utilidadReal >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                <TrendingUp className={`w-5 h-5 ${totales.utilidadReal >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-              </div>
+        {/* Utilidad: la margen de la cotización vs lo que quedó */}
+        <Card className={totales.utilidadReal >= totales.utilidadCotizada ? 'border-green-200' : 'border-amber-200'}>
+          <CardContent className="p-4 space-y-1.5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Utilidad</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Cotizada ({totales.porcentajeUtilidadCotizada.toFixed(1)}%)</span>
+              <span className="font-semibold">${totales.utilidadCotizada.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Real ({totales.porcentajeUtilidadReal.toFixed(1)}%)</span>
+              <span className={`font-semibold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-amber-600'}`}>
+                ${totales.utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
+              <span className="text-slate-700 font-medium">Efecto del costo real</span>
+              <span className={`font-bold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-red-600'}`}>
+                {totales.utilidadReal >= totales.utilidadCotizada ? '▲ sube' : '▼ baja'}
+                {' '}
+                {Math.abs(totales.porcentajeUtilidadReal - totales.porcentajeUtilidadCotizada).toFixed(1)} pts
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              Si gastas menos o fabricas más rápido, la utilidad sube; si gastas más, baja
+            </p>
           </CardContent>
         </Card>
       </div>

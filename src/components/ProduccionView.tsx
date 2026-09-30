@@ -16,10 +16,12 @@ import {
   ClipboardList,
   Wrench,
   Save,
+  Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProyectoVenta } from '@/types/ventas';
 import { procesosAplanados, materialesAplanados, minutosCotizados } from '@/utils/proyectoDatos';
+import { HojaViajeraDocumento } from '@/components/HojaViajeraDocumento';
 
 interface ProduccionViewProps {
   onVolver: () => void;
@@ -41,6 +43,23 @@ export function ProduccionView({
   // Captura por proceso: { [proyectoId]: { [procesoId]: { minutos, operador } } }
   const [captura, setCaptura] = useState<Record<string, Record<string, { minutos: string; operador: string }>>>({});
   const [guardando, setGuardando] = useState<string | null>(null);
+  // Pieza seleccionada para imprimir su hoja viajera (orden de producción)
+  const [impresion, setImpresion] = useState<{ proyecto: ProyectoVenta; pieza: any } | null>(null);
+
+  // Imprime la hoja viajera de una pieza directo desde producción
+  const handleImprimirPieza = (proyecto: ProyectoVenta, pieza: any) => {
+    setImpresion({ proyecto, pieza });
+    document.body.classList.add('imprimiendo-hoja-viajera');
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('imprimiendo-hoja-viajera');
+      setImpresion(null);
+    }, 100);
+  };
+
+  // Registro real de un proceso para el documento impreso
+  const realDeImpresion = (procesoId: string): any | null =>
+    (impresion?.proyecto.procesosReales || []).find((p: any) => p.id === procesoId) || null;
 
   // Proyectos activos en piso: en fabricación o fabricados pendientes de entrega
   const proyectosEnFabricacion = proyectos.filter(p =>
@@ -281,9 +300,21 @@ export function ProduccionView({
                                   <span className="text-xs text-slate-400 ml-2">{pieza.codigo}</span>
                                 )}
                               </div>
-                              <Badge variant="outline" className="text-slate-600">
-                                {pieza.cantidad} pzas
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-slate-600">
+                                  {pieza.cantidad} pzas
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-slate-300 no-print"
+                                  title="Imprimir hoja viajera de esta pieza"
+                                  onClick={() => handleImprimirPieza(proyecto, pieza)}
+                                >
+                                  <Printer className="w-3.5 h-3.5 mr-1" />
+                                  Hoja viajera
+                                </Button>
+                              </div>
                             </div>
 
                             {/* Material de la pieza */}
@@ -419,6 +450,15 @@ export function ProduccionView({
           })
         )}
       </div>
+
+      {/* Documento de impresión: hoja viajera de la pieza seleccionada */}
+      {impresion && (
+        <HojaViajeraDocumento
+          proyecto={impresion.proyecto}
+          pieza={impresion.pieza}
+          realDe={realDeImpresion}
+        />
+      )}
     </div>
   );
 }
