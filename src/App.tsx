@@ -873,7 +873,6 @@ function App() {
             <ProduccionView
               onVolver={irAHome}
               proyectos={proyectos}
-              onVerDetalle={canViewControlCodigos() ? handleVerControlCodigos : undefined}
               onVerHojaViajera={handleVerHojaViajera}
               onGuardarHorasReales={async (proyecto, procesosReales) => {
                 // 1. JSON en proyectos.procesos_reales (alimenta dashboard y control de códigos)
@@ -882,7 +881,7 @@ function App() {
                 const filas = procesosReales.map((p: any) => ({
                   proyecto_id: proyecto.id,
                   codigo_proyecto: proyecto.codigoProyecto,
-                  pieza_id: p.piezaId || null,
+                  pieza_id: p.piezaId || '',
                   pieza_nombre: p.piezaNombre || null,
                   proceso_id: p.id,
                   proceso_nombre: p.nombre,
@@ -895,9 +894,20 @@ function App() {
                 const { error } = await supabase
                   .from('registros_produccion')
                   .upsert(filas, { onConflict: 'proyecto_id,proceso_id' });
-                if (error) {
-                  console.error('[App] Error guardando registros_produccion:', error.message);
-                  toast.error('Las horas se guardaron, pero falló el registro de operador: ' + error.message);
+                // Sincronizar eliminaciones (extras quitados en la app)
+                const idsVigentes = procesosReales.map((p: any) => p.id);
+                let errorBorrado = null;
+                if (idsVigentes.length > 0) {
+                  const res = await supabase
+                    .from('registros_produccion')
+                    .delete()
+                    .eq('proyecto_id', proyecto.id)
+                    .not('proceso_id', 'in', `(${idsVigentes.map((i: string) => `"${i}"`).join(',')})`);
+                  errorBorrado = res.error;
+                }
+                if (error || errorBorrado) {
+                  console.error('[App] Error registros_produccion:', error?.message || errorBorrado?.message);
+                  toast.error('Las horas se guardaron, pero falló el registro detallado: ' + (error?.message || errorBorrado?.message));
                 } else {
                   toast.success(`Horas reales guardadas en ${proyecto.codigoProyecto}`);
                 }

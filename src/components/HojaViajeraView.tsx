@@ -15,6 +15,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import type { ProyectoVenta } from '@/types/ventas';
+import { buscarReal } from '@/utils/proyectoDatos';
 import { HojaViajeraDocumento } from '@/components/HojaViajeraDocumento';
 
 interface HojaViajeraViewProps {
@@ -47,9 +48,13 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
     window.print();
   };
 
-  // Registro real capturado en producción para un proceso (si existe)
-  const realDe = (procesoId: string): any | null =>
-    (proyecto.procesosReales || []).find((p: any) => p.id === procesoId) || null;
+  // Registro real capturado en producción para un proceso (llave pieza:proceso)
+  const realDe = (piezaId: string, procesoId: string): any | null =>
+    buscarReal(proyecto.procesosReales, {
+      captureId: `${piezaId}:${procesoId}`,
+      piezaId,
+      id: procesoId,
+    });
 
   return (
     <div className="space-y-6">
@@ -186,7 +191,7 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                       </h4>
                       <div className="space-y-2">
                         {pieza.procesos.map((proceso) => {
-                          const real = realDe(proceso.id);
+                          const real = realDe(pieza.id, proceso.id);
                           return (
                             <div
                               key={proceso.id}
@@ -244,7 +249,7 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
 
       {/* ─── ÁREA DE IMPRESIÓN: hoja viajera de UNA pieza ─── */}
       {piezaAImprimir && (
-        <HojaViajeraDocumento proyecto={proyecto} pieza={piezaAImprimir} realDe={realDe} />
+        <HojaViajeraDocumento proyecto={proyecto} pieza={piezaAImprimir} />
       )}
 
       {/* Estilos para impresión */}

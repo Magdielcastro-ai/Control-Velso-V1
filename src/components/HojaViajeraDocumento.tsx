@@ -3,6 +3,8 @@
 // Si un proceso ya tiene captura real se imprime el dato; si no, la
 // columna sale en blanco para llenarla a mano en piso.
 
+import { buscarReal } from '@/utils/proyectoDatos';
+
 interface HojaViajeraDocumentoProps {
   proyecto: {
     codigoProyecto: string;
@@ -10,16 +12,28 @@ interface HojaViajeraDocumentoProps {
     clienteNombre: string;
     ordenCompra?: string;
     numeroCotizacion?: string;
+    procesosReales?: any[];
   };
   pieza: any;
-  realDe?: (procesoId: string) => any | null;
 }
 
-export function HojaViajeraDocumento({ proyecto, pieza, realDe }: HojaViajeraDocumentoProps) {
+export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoProps) {
   const fechaHoy = new Date().toLocaleDateString('es-MX', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
-  const real = (id: string) => (realDe ? realDe(id) : null);
+  // Registro real del proceso (llave compuesta pieza:proceso, con
+  // tolerancia al formato viejo) — si existe se imprime, si no, en blanco
+  const real = (proc: any) =>
+    buscarReal(proyecto.procesosReales, {
+      captureId: `${pieza.id}:${proc.id}`,
+      piezaId: pieza.id,
+      id: proc.id,
+    });
+
+  // Herramientas/dispositivos extra capturados para esta pieza
+  const extras = (proyecto.procesosReales || []).filter(
+    (e: any) => e.tipo === 'herramienta_extra' && e.piezaId === pieza.id
+  );
 
   return (
     <div className="area-impresion hidden print:block text-slate-900">
@@ -78,35 +92,37 @@ export function HojaViajeraDocumento({ proyecto, pieza, realDe }: HojaViajeraDoc
         </tbody>
       </table>
 
-      {/* Procesos: cotizado fijo + reales si ya se capturaron, si no en blanco */}
+      {/* Procesos: cotizado fijo + fecha/hora por proceso + reales si ya se capturaron */}
       <table className="w-full text-xs border border-slate-300 mb-3">
         <thead>
           <tr className="bg-slate-800 text-white">
-            <th className="px-2 py-1.5 text-left w-8">#</th>
+            <th className="px-2 py-1.5 text-left w-6">#</th>
             <th className="px-2 py-1.5 text-left">PROCESO</th>
-            <th className="px-2 py-1.5 text-right w-20">MIN/PZA COT.</th>
-            <th className="px-2 py-1.5 text-right w-20">MIN TOTAL COT.</th>
-            <th className="px-2 py-1.5 text-center w-20">HORA INICIO</th>
-            <th className="px-2 py-1.5 text-center w-20">HORA FIN</th>
-            <th className="px-2 py-1.5 text-center w-20">MIN REALES</th>
-            <th className="px-2 py-1.5 text-center w-24">OPERADOR</th>
+            <th className="px-2 py-1.5 text-right w-16">MIN/PZA COT.</th>
+            <th className="px-2 py-1.5 text-right w-16">MIN TOTAL COT.</th>
+            <th className="px-2 py-1.5 text-center w-20">FECHA</th>
+            <th className="px-2 py-1.5 text-center w-16">HORA INICIO</th>
+            <th className="px-2 py-1.5 text-center w-16">HORA FIN</th>
+            <th className="px-2 py-1.5 text-center w-16">MIN REALES</th>
+            <th className="px-2 py-1.5 text-center w-20">OPERADOR</th>
           </tr>
         </thead>
         <tbody>
           {(pieza.procesos || []).map((proc: any, idx: number) => {
-            const r = real(proc.id);
+            const r = real(proc);
             return (
               <tr key={proc.id || idx} className="border-b border-slate-200">
-                <td className="px-2 py-3">{idx + 1}</td>
-                <td className="px-2 py-3 font-medium">{proc.nombre}</td>
-                <td className="px-2 py-3 text-right">{proc.tiempoMinutosPorPieza ?? '—'}</td>
-                <td className="px-2 py-3 text-right">{proc.tiempoMinutos ?? '—'}</td>
-                <td className="px-2 py-3" />
-                <td className="px-2 py-3" />
-                <td className="px-2 py-3 text-center font-semibold">
+                <td className="px-2 py-4">{idx + 1}</td>
+                <td className="px-2 py-4 font-medium">{proc.nombre}</td>
+                <td className="px-2 py-4 text-right">{proc.tiempoMinutosPorPieza ?? '—'}</td>
+                <td className="px-2 py-4 text-right">{proc.tiempoMinutos ?? '—'}</td>
+                <td className="px-2 py-4" />
+                <td className="px-2 py-4" />
+                <td className="px-2 py-4" />
+                <td className="px-2 py-4 text-center font-semibold">
                   {r ? r.tiempoMinutosReal : ''}
                 </td>
-                <td className="px-2 py-3 text-center">
+                <td className="px-2 py-4 text-center">
                   {r?.operadorNombre || ''}
                 </td>
               </tr>
@@ -121,24 +137,57 @@ export function HojaViajeraDocumento({ proyecto, pieza, realDe }: HojaViajeraDoc
             <td className="px-2 py-2 text-right">
               {(pieza.procesos || []).reduce((s: number, p: any) => s + (Number(p.tiempoMinutos) || 0), 0)}
             </td>
-            <td className="px-2 py-2" colSpan={4} />
+            <td className="px-2 py-2" colSpan={5} />
           </tr>
         </tbody>
       </table>
 
-      {/* Captura manual */}
+      {/* Herramientas / dispositivos extra con su tiempo y costo */}
+      <p className="text-xs font-bold text-slate-600 mb-1">
+        HERRAMIENTAS O DISPOSITIVOS ESPECIALES (suman al costo)
+      </p>
+      <table className="w-full text-xs border border-slate-300 mb-3">
+        <thead>
+          <tr className="bg-slate-600 text-white">
+            <th className="px-2 py-1.5 text-left">HERRAMIENTA / DISPOSITIVO</th>
+            <th className="px-2 py-1.5 text-center w-24">MIN UTILIZADOS</th>
+            <th className="px-2 py-1.5 text-center w-24">COSTO $</th>
+          </tr>
+        </thead>
+        <tbody>
+          {extras.map((e: any, idx: number) => (
+            <tr key={e.id || idx} className="border-b border-slate-200">
+              <td className="px-2 py-3 font-medium">{e.nombre}</td>
+              <td className="px-2 py-3 text-center">{e.tiempoMinutosReal ?? ''}</td>
+              <td className="px-2 py-3 text-center">
+                {e.costoTotalReal ? `$${Number(e.costoTotalReal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : ''}
+              </td>
+            </tr>
+          ))}
+          {/* Renglones en blanco para captura a mano */}
+          {Array.from({ length: Math.max(0, 3 - extras.length) }).map((_, i) => (
+            <tr key={`vacio-${i}`} className="border-b border-slate-200">
+              <td className="px-2 py-3" />
+              <td className="px-2 py-3" />
+              <td className="px-2 py-3" />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Captura: quién cargó la info al sistema y cuándo */}
       <table className="w-full text-xs border border-slate-300">
         <tbody>
           <tr className="border-b border-slate-300">
-            <td className="px-2 py-3 bg-slate-100 font-semibold w-28">Operador</td>
+            <td className="px-2 py-3 bg-slate-100 font-semibold w-28">Capturó</td>
             <td className="px-2 py-3 w-1/3" />
-            <td className="px-2 py-3 bg-slate-100 font-semibold w-28">Fecha</td>
+            <td className="px-2 py-3 bg-slate-100 font-semibold w-28">Fecha de captura</td>
             <td className="px-2 py-3" />
           </tr>
           <tr>
             <td className="px-2 py-3 bg-slate-100 font-semibold align-top">Notas</td>
             <td className="px-2 py-3" colSpan={3}>
-              <div className="h-16" />
+              <div className="h-12" />
             </td>
           </tr>
         </tbody>

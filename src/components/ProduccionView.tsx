@@ -8,7 +8,6 @@ import {
   Factory,
   Clock,
   Package,
-  TrendingUp,
   Search,
   ChevronRight,
   ChevronDown,
@@ -20,13 +19,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProyectoVenta } from '@/types/ventas';
-import { procesosAplanados, materialesAplanados, minutosCotizados } from '@/utils/proyectoDatos';
+import { procesosAplanados, materialesAplanados, minutosCotizados, buscarReal } from '@/utils/proyectoDatos';
 import { HojaViajeraDocumento } from '@/components/HojaViajeraDocumento';
 
 interface ProduccionViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
-  onVerDetalle?: (proyecto: ProyectoVenta) => void;
   onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   onGuardarHorasReales?: (proyecto: ProyectoVenta, procesosReales: any[]) => Promise<void> | void;
 }
@@ -34,7 +32,6 @@ interface ProduccionViewProps {
 export function ProduccionView({
   onVolver,
   proyectos,
-  onVerDetalle,
   onVerHojaViajera,
   onGuardarHorasReales,
 }: ProduccionViewProps) {
@@ -43,6 +40,17 @@ export function ProduccionView({
   // Captura por proceso: { [proyectoId]: { [procesoId]: { minutos, operador } } }
   const [captura, setCaptura] = useState<Record<string, Record<string, { minutos: string; operador: string }>>>({});
   const [guardando, setGuardando] = useState<string | null>(null);
+  // Herramientas/dispositivos extra por pieza (afectan el costo real)
+  interface ExtraCaptura {
+    id: string;
+    piezaId: string;
+    piezaNombre: string;
+    nombre: string;
+    minutos: string;
+    costo: string;
+  }
+  const [extras, setExtras] = useState<Record<string, ExtraCaptura[]>>({});
+  const [extrasEliminados, setExtrasEliminados] = useState<Record<string, string[]>>({});
   // Pieza seleccionada para imprimir su hoja viajera (orden de producción)
   const [impresion, setImpresion] = useState<{ proyecto: ProyectoVenta; pieza: any } | null>(null);
 
@@ -56,10 +64,6 @@ export function ProduccionView({
       setImpresion(null);
     }, 100);
   };
-
-  // Registro real de un proceso para el documento impreso
-  const realDeImpresion = (procesoId: string): any | null =>
-    (impresion?.proyecto.procesosReales || []).find((p: any) => p.id === procesoId) || null;
 
   // Proyectos activos en piso: en fabricación o fabricados pendientes de entrega
   const proyectosEnFabricacion = proyectos.filter(p =>
@@ -82,36 +86,103 @@ export function ProduccionView({
   // ─── Captura de horas reales + operador ───
   // Las horas cotizadas son de solo lectura; las reales se capturan,
   // pueden guardarse parcialmente y corregirse las ya guardadas.
-  const registroGuardado = (proyecto: ProyectoVenta, procesoId: string): any | null => {
-    return (proyecto.procesosReales || []).find((p: any) => p.id === procesoId) || null;
-  };
+  // La llave es captureId (pieza:proceso) — las plantillas repiten id.
+  const registroGuardado = (proyecto: ProyectoVenta, proc: any): any | null =>
+    buscarReal(proyecto.procesosReales, proc);
 
-  const getCaptura = (proyecto: ProyectoVenta, procesoId: string): { minutos: string; operador: string } => {
-    const editado = captura[proyecto.id]?.[procesoId];
+  const getCaptura = (proyecto: ProyectoVenta, proc: any): { minutos: string; operador: string } => {
+    const editado = captura[proyecto.id]?.[proc.captureId];
     if (editado !== undefined) return editado;
-    const guardado = registroGuardado(proyecto, procesoId);
+    const guardado = registroGuardado(proyecto, proc);
     return {
       minutos: guardado?.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
       operador: guardado?.operadorNombre || '',
     };
   };
 
-  const actualizarCaptura = (proyectoId: string, procesoId: string, campo: 'minutos' | 'operador', valor: string) => {
+  const actualizarCaptura = (proyecto: ProyectoVenta, proc: any, campo: 'minutos' | 'operador', valor: string) => {
     setCaptura(prev => {
-      const actual = prev[proyectoId]?.[procesoId] || { minutos: '', operador: '' };
-      // Rellenar el otro campo con lo ya guardado para no pisarlo
+      // Si no hay captura local, arrancar desde lo YA GUARDADO para
+      // no borrar el otro campo (bug: editar minutos borraba operador)
+      const guardado = registroGuardado(proyecto, proc);
+      const actual = prev[proyecto.id]?.[proc.captureId] || {
+        minutos: guardado?.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
+        operador: guardado?.operadorNombre || '',
+      };
       return {
         ...prev,
-        [proyectoId]: {
-          ...(prev[proyectoId] || {}),
-          [procesoId]: { ...actual, [campo]: valor },
+        [proyecto.id]: {
+          ...(prev[proyecto.id] || {}),
+          [proc.captureId]: { ...actual, [campo]: valor },
         },
       };
     });
   };
 
   // Hay capturas sin guardar (difieren de lo persistido)
-  const hayCambiosSinGuardar = Object.keys(captura).length > 0;
+  const hayCambiosSinGuardar =
+    Object.keys(captura).length > 0 ||
+    Object.keys(extras).length > 0 ||
+    Object.keys(extrasEliminados).length > 0;
+
+  const extrasDe = (proyectoId: string): ExtraCaptura[] => extras[proyectoId] || [];
+
+  const extrasDePieza = (proyecto: ProyectoVenta, pieza: any): ExtraCaptura[] => {
+    const enCaptura = extrasDe(proyecto.id).filter(e => e.piezaId === pieza.id);
+    const guardados = (proyecto.procesosReales || [])
+      .filter((g: any) => g.tipo === 'herramienta_extra' && g.piezaId === pieza.id)
+      .filter((g: any) => !enCaptura.some(c => c.id === g.id))
+      .map((g: any) => ({
+        id: g.id,
+        piezaId: g.piezaId,
+        piezaNombre: g.piezaNombre || pieza.nombre,
+        nombre: g.nombre || '',
+        minutos: g.tiempoMinutosReal != null ? String(g.tiempoMinutosReal) : '',
+        costo: g.costoTotalReal != null ? String(g.costoTotalReal) : '',
+      }));
+    return [...guardados, ...enCaptura];
+  };
+
+  const agregarExtra = (proyecto: ProyectoVenta, pieza: any) => {
+    setExtras(prev => ({
+      ...prev,
+      [proyecto.id]: [
+        ...extrasDe(proyecto.id),
+        { id: `extra:${pieza.id}:${Date.now()}`, piezaId: pieza.id, piezaNombre: pieza.nombre, nombre: '', minutos: '', costo: '' },
+      ],
+    }));
+  };
+
+  const actualizarExtra = (proyecto: ProyectoVenta, pieza: any, extraId: string, campo: 'nombre' | 'minutos' | 'costo', valor: string) => {
+    setExtras(prev => {
+      const lista = [...extrasDe(proyecto.id)];
+      const idx = lista.findIndex(e => e.id === extraId);
+      if (idx >= 0) {
+        lista[idx] = { ...lista[idx], [campo]: valor };
+      } else {
+        // El extra viene de lo guardado: sembrarlo en captura con el cambio
+        const guardado = extrasDePieza(proyecto, pieza).find(e => e.id === extraId);
+        if (guardado) lista.push({ ...guardado, [campo]: valor });
+      }
+      return { ...prev, [proyecto.id]: lista };
+    });
+  };
+
+  const quitarExtra = (proyecto: ProyectoVenta, extraId: string) => {
+    // Quitar de la captura local
+    setExtras(prev => ({
+      ...prev,
+      [proyecto.id]: extrasDe(proyecto.id).filter(e => e.id !== extraId),
+    }));
+    // Si venía de lo ya guardado, marcarlo para eliminación al guardar
+    const estabaGuardado = (proyecto.procesosReales || []).some((g: any) => g.id === extraId);
+    if (estabaGuardado) {
+      setExtrasEliminados(prev => ({
+        ...prev,
+        [proyecto.id]: [...(prev[proyecto.id] || []), extraId],
+      }));
+    }
+  };
 
   const handleVolverSeguro = () => {
     if (hayCambiosSinGuardar) {
@@ -123,13 +194,16 @@ export function ProduccionView({
 
   const handleGuardarHoras = async (proyecto: ProyectoVenta) => {
     if (!onGuardarHorasReales) return;
-    const procesosReales = procesosAplanados(proyecto)
+
+    // Nuevas entradas desde la captura (procesos cotizados con tiempo real)
+    const nuevas = procesosAplanados(proyecto)
       .map((p: any) => {
-        const cap = getCaptura(proyecto, p.id);
+        const cap = getCaptura(proyecto, p);
         if (cap.minutos === '') return null; // sin captura: no se envía
         const minutos = Number(cap.minutos) || 0;
         return {
-          id: p.id,
+          id: p.captureId,           // llave compuesta pieza:proceso
+          procesoId: p.id,
           nombre: p.nombre,
           tipo: p.tipo,
           piezaId: p.piezaId || null,
@@ -143,10 +217,38 @@ export function ProduccionView({
           costoTotalReal: (minutos / 60) * (Number(p.costoPorHora) || 0) + (Number(p.costoManoObra) || 0),
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as any[];
 
-    if (procesosReales.length === 0) {
-      toast.error('Captura al menos una hora real antes de guardar');
+    // Extras (herramientas/dispositivos) capturados por pieza
+    const extras = extrasDe(proyecto.id)
+      .filter(e => e.nombre.trim() !== '')
+      .map((e) => ({
+        id: e.id,
+        nombre: e.nombre.trim(),
+        tipo: 'herramienta_extra',
+        piezaId: e.piezaId,
+        piezaNombre: e.piezaNombre,
+        tiempoMinutosCotizado: 0,
+        tiempoMinutosReal: Number(e.minutos) || 0,
+        operadorNombre: '',
+        costoPorHora: 0,
+        costoManoObra: 0,
+        costoTotalCotizado: 0,
+        costoTotalReal: Number(e.costo) || 0,
+      }));
+
+    // Fusionar con lo ya guardado: no pisar procesos que no se tocaron
+    // ni extras que no se eliminaron
+    const eliminados = new Set(extrasEliminados[proyecto.id] || []);
+    const clavesNuevas = new Set([...nuevas, ...extras].map(e => e.id));
+    const claveDe = (e: any) => e.id?.includes(':') ? e.id : (e.piezaId ? `${e.piezaId}:${e.id}` : e.id);
+    const existentesIntactos = (proyecto.procesosReales || []).filter(
+      (e: any) => !clavesNuevas.has(claveDe(e)) && !eliminados.has(e.id)
+    );
+    const procesosReales = [...existentesIntactos, ...nuevas, ...extras];
+
+    if (nuevas.length === 0 && extras.length === 0 && eliminados.size === 0) {
+      toast.error('Captura al menos una hora real o herramienta antes de guardar');
       return;
     }
 
@@ -154,6 +256,16 @@ export function ProduccionView({
     await onGuardarHorasReales(proyecto, procesosReales);
     // Limpiar la captura local de este proyecto (ya quedó persistida)
     setCaptura(prev => {
+      const nuevo = { ...prev };
+      delete nuevo[proyecto.id];
+      return nuevo;
+    });
+    setExtras(prev => {
+      const nuevo = { ...prev };
+      delete nuevo[proyecto.id];
+      return nuevo;
+    });
+    setExtrasEliminados(prev => {
       const nuevo = { ...prev };
       delete nuevo[proyecto.id];
       return nuevo;
@@ -341,8 +453,10 @@ export function ProduccionView({
                             {/* Procesos de la pieza: cotizado (fijo) + captura real + operador */}
                             <div className="space-y-1.5">
                               {(pieza.procesos || []).map((proc: any) => {
-                                const regGuardado = registroGuardado(proyecto, proc.id);
-                                const cap = getCaptura(proyecto, proc.id);
+                                const procConLlave = { ...proc, captureId: `${pieza.id}:${proc.id}`, piezaId: pieza.id, piezaNombre: pieza.nombre };
+                                const regGuardado = registroGuardado(proyecto, procConLlave);
+                                const cap = getCaptura(proyecto, procConLlave);
+                                const totalCot = minutosCotizados(proc);
                                 return (
                                   <div
                                     key={proc.id}
@@ -358,8 +472,8 @@ export function ProduccionView({
                                         title="Horas cotizadas — no modificables"
                                       >
                                         {proc.tiempoMinutosPorPieza
-                                          ? `${proc.tiempoMinutosPorPieza} min/pza`
-                                          : `${minutosCotizados(proc)} min`} cotizado
+                                          ? `${proc.tiempoMinutosPorPieza} min/pza · ${totalCot} min totales`
+                                          : `${totalCot} min`} cotizado
                                       </span>
                                       {onGuardarHorasReales && (
                                         <>
@@ -368,14 +482,14 @@ export function ProduccionView({
                                             min="0"
                                             placeholder="min reales"
                                             value={cap.minutos}
-                                            onChange={(e) => actualizarCaptura(proyecto.id, proc.id, 'minutos', e.target.value)}
+                                            onChange={(e) => actualizarCaptura(proyecto, procConLlave, 'minutos', e.target.value)}
                                             className="h-7 w-24 text-sm text-right"
                                           />
                                           <Input
                                             type="text"
                                             placeholder="Operador"
                                             value={cap.operador}
-                                            onChange={(e) => actualizarCaptura(proyecto.id, proc.id, 'operador', e.target.value)}
+                                            onChange={(e) => actualizarCaptura(proyecto, procConLlave, 'operador', e.target.value)}
                                             className="h-7 w-28 text-sm"
                                           />
                                           {regGuardado && (
@@ -390,6 +504,57 @@ export function ProduccionView({
                                 );
                               })}
                             </div>
+
+                            {/* Herramientas / dispositivos extra de la pieza */}
+                            {onGuardarHorasReales && (
+                              <div className="border border-dashed border-slate-300 rounded-lg p-2 space-y-1.5">
+                                <p className="text-xs font-semibold text-slate-500">
+                                  Herramientas o dispositivos extra (suman al costo)
+                                </p>
+                                {extrasDePieza(proyecto, pieza).map((extra) => (
+                                  <div key={extra.id} className="flex items-center gap-2 flex-wrap">
+                                    <Input
+                                      placeholder="Herramienta / dispositivo"
+                                      value={extra.nombre}
+                                      onChange={(e) => actualizarExtra(proyecto, pieza, extra.id, 'nombre', e.target.value)}
+                                      className="h-7 flex-1 min-w-[140px] text-sm"
+                                    />
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="min"
+                                      value={extra.minutos}
+                                      onChange={(e) => actualizarExtra(proyecto, pieza, extra.id, 'minutos', e.target.value)}
+                                      className="h-7 w-20 text-sm text-right"
+                                    />
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      placeholder="$ costo"
+                                      value={extra.costo}
+                                      onChange={(e) => actualizarExtra(proyecto, pieza, extra.id, 'costo', e.target.value)}
+                                      className="h-7 w-24 text-sm text-right"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                                      onClick={() => quitarExtra(proyecto, extra.id)}
+                                    >
+                                      ✕
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-blue-600"
+                                  onClick={() => agregarExtra(proyecto, pieza)}
+                                >
+                                  + Agregar herramienta
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))
                       )}
@@ -406,7 +571,7 @@ export function ProduccionView({
                         </div>
                       )}
 
-                      {/* Acciones */}
+                      {/* Acciones — producción no navega a Proyectos */}
                       <div className="flex gap-2 flex-wrap">
                         {onGuardarHorasReales && (
                           <Button
@@ -427,18 +592,7 @@ export function ProduccionView({
                             onClick={() => onVerHojaViajera(proyecto)}
                           >
                             <ClipboardList className="w-3 h-3 mr-1" />
-                            Hoja viajera
-                          </Button>
-                        )}
-                        {onVerDetalle && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 border-slate-300"
-                            onClick={() => onVerDetalle(proyecto)}
-                          >
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            Cotización vs real
+                            Ver hoja viajera completa
                           </Button>
                         )}
                       </div>
@@ -456,7 +610,6 @@ export function ProduccionView({
         <HojaViajeraDocumento
           proyecto={impresion.proyecto}
           pieza={impresion.pieza}
-          realDe={realDeImpresion}
         />
       )}
     </div>

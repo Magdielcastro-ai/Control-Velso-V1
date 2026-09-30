@@ -14,7 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import type { ProyectoVenta, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
-import { procesosAplanados, materialesAplanados, minutosCotizados, costoCotizadoProc } from '@/utils/proyectoDatos';
+import { procesosAplanados, materialesAplanados, minutosCotizados, costoCotizadoProc, buscarReal } from '@/utils/proyectoDatos';
 import { toast } from 'sonner';
 
 interface ControlDeCodigosViewProps {
@@ -562,7 +562,7 @@ export function ControlDeCodigosView({
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {procesos.map((proceso) => {
-                          const real = (proyecto.procesosReales || []).find((r: any) => r.id === proceso.id);
+                          const real = buscarReal(proyecto.procesosReales, proceso);
                           const hayReal = real && real.tiempoMinutosReal != null;
                           const minReal = hayReal ? Number(real.tiempoMinutosReal) : proceso.tiempoMinutosCotizado;
                           const costoReal = hayReal

@@ -3,14 +3,19 @@
 // (cada pieza tiene su material y sus procesos), no en los arreglos
 // de nivel superior. Estas funciones aplanan ambas estructuras.
 
-/** Todos los procesos: nivel superior + los de cada pieza */
+/** Todos los procesos: nivel superior + los de cada pieza.
+ *  Cada proceso lleva captureId único (piezaId:procesoId) porque las
+ *  plantillas de proceso repiten el mismo id en varias piezas. */
 export function procesosAplanados(obj: any): any[] {
-  const top = Array.isArray(obj?.procesos) ? obj.procesos : [];
+  const top = Array.isArray(obj?.procesos)
+    ? obj.procesos.map((proc: any) => ({ ...proc, captureId: `top:${proc.id}` }))
+    : [];
   const dePiezas = Array.isArray(obj?.piezas)
     ? obj.piezas.flatMap((pz: any) =>
         Array.isArray(pz?.procesos)
           ? pz.procesos.map((proc: any) => ({
               ...proc,
+              captureId: `${pz.id}:${proc.id}`,
               piezaId: pz.id,
               piezaNombre: pz.nombre,
               piezaCodigo: pz.codigo,
@@ -19,6 +24,18 @@ export function procesosAplanados(obj: any): any[] {
       )
     : [];
   return [...top, ...dePiezas];
+}
+
+/** Busca el registro real de un proceso tolerando el formato viejo
+ *  (id plano + piezaId) y el nuevo (captureId compuesto) */
+export function buscarReal(procesosReales: any[] | undefined, proc: any): any | null {
+  if (!Array.isArray(procesosReales)) return null;
+  return (
+    procesosReales.find((r: any) => r.id === proc.captureId) ||
+    procesosReales.find((r: any) => r.piezaId && proc.piezaId && r.piezaId === proc.piezaId && r.id === proc.id) ||
+    procesosReales.find((r: any) => !r.piezaId && !proc.piezaId && r.id === proc.id) ||
+    null
+  );
 }
 
 /** Todos los materiales: nivel superior + el de cada pieza */
