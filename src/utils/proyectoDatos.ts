@@ -11,6 +11,7 @@ export function procesosAplanados(obj: any): any[] {
         Array.isArray(pz?.procesos)
           ? pz.procesos.map((proc: any) => ({
               ...proc,
+              piezaId: pz.id,
               piezaNombre: pz.nombre,
               piezaCodigo: pz.codigo,
             }))

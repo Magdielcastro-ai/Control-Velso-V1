@@ -16,8 +16,8 @@ import {
   CheckCircle
 } from 'lucide-react';
 import type { ProyectoVenta, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
-import { CATALOGO_PROCESOS_VELSO } from '@/types/cotizacion';
 import { procesosAplanados, materialesAplanados, minutosCotizados, costoCotizadoProc } from '@/utils/proyectoDatos';
+import { toast } from 'sonner';
 
 interface ControlDeCodigosViewProps {
   proyecto: ProyectoVenta;
@@ -52,10 +52,11 @@ export function ControlDeCodigosView({
       costoTotalCotizado: Number(m.costoTotal) || 0,
     })), [proyecto]);
 
-  const procesosCot = useMemo<ProcesoProyecto[]>(() =>
+  const procesosCot = useMemo<(ProcesoProyecto & { piezaNombre?: string })[]>(() =>
     procesosAplanados(proyecto).map((p: any) => ({
       id: p.id || crypto.randomUUID(),
-      nombre: p.piezaNombre ? `${p.nombre} (${p.piezaNombre})` : (p.nombre || ''),
+      nombre: p.nombre || '',
+      piezaNombre: p.piezaNombre || 'General',
       tipo: p.tipo || '',
       tiempoMinutosCotizado: minutosCotizados(p),
       costoPorHora: Number(p.costoPorHora) || 0,
@@ -84,8 +85,14 @@ export function ControlDeCodigosView({
     }))
   );
 
-  // Inicializar procesos reales
-  const [procesosReales, setProcesosReales] = useState<ProcesoProyecto[]>(
+  // Congelado por material: los guardados quedan bloqueados hasta "Editar"
+  const [materialesEditando, setMaterialesEditando] = useState<Set<string>>(new Set());
+  // Cambios sin guardar (para alertar al salir)
+  const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState(false);
+
+  // Procesos reales: solo lectura — la captura de tiempos reales
+  // se hace en la sección Producción (hoja viajera)
+  const [procesosReales] = useState<ProcesoProyecto[]>(
     proyecto.procesosReales || procesosCot.map(p => ({
       ...p,
       tiempoMinutosReal: p.tiempoMinutosCotizado,
@@ -136,8 +143,9 @@ export function ControlDeCodigosView({
     };
   }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, procesosReales, costosReales]);
 
-  // Actualizar material real
+  // Actualizar material real (solo si no está congelado)
   const actualizarMaterialReal = (id: string, campo: 'costoUnitarioReal' | 'cantidad', valor: number) => {
+    setHayCambiosSinGuardar(true);
     setMaterialesReales(prev => prev.map(m => {
       if (m.id !== id) return m;
       const nuevo = { ...m, [campo]: valor };
@@ -148,18 +156,49 @@ export function ControlDeCodigosView({
     }));
   };
 
-  // Actualizar proceso real
-  const actualizarProcesoReal = (id: string, tiempoReal: number) => {
-    setProcesosReales(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const tiempoHoras = tiempoReal / 60;
-      const costoTotalReal = (tiempoHoras * p.costoPorHora) + p.costoManoObra;
-      return { ...p, tiempoMinutosReal: tiempoReal, costoTotalReal };
-    }));
+  // Un material congelado = guardado y no en modo edición
+  const materialCongelado = (m: MaterialProyecto) =>
+    (m as any).guardado === true && !materialesEditando.has(m.id);
+
+  // Guardar material: lo congela y persiste de inmediato
+  const handleGuardarMaterial = (materialId: string) => {
+    const nuevos = materialesReales.map(m =>
+      m.id === materialId ? ({ ...m, guardado: true } as any) : m
+    );
+    setMaterialesReales(nuevos);
+    setMaterialesEditando(prev => {
+      const s = new Set(prev);
+      s.delete(materialId);
+      return s;
+    });
+
+    const costoMaterialesReal = nuevos.reduce((sum, m) => sum + (m.costoTotalReal || m.costoTotalCotizado), 0);
+    const costoProcesosReal = procesosReales.reduce((sum, p) => sum + (p.costoTotalReal || p.costoTotalCotizado), 0);
+    const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
+    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costosAdicionalesReal;
+    const totalFacturado = proyecto.totalFacturado || proyecto.totalCotizado;
+    const utilidadReal = totalFacturado - costoTotalReal;
+    const porcentajeUtilidadReal = totalFacturado > 0 ? (utilidadReal / totalFacturado) * 100 : 0;
+
+    onGuardarDatosReales(proyecto.id, {
+      materialesReales: nuevos,
+      procesosReales,
+      costosAdicionalesReales: costosReales,
+      costoTotalReal,
+      utilidadReal,
+      porcentajeUtilidadReal,
+    });
+    toast.success('Material guardado y congelado');
+  };
+
+  // Editar material congelado: habilita sus campos de nuevo
+  const handleEditarMaterial = (materialId: string) => {
+    setMaterialesEditando(prev => new Set(prev).add(materialId));
   };
 
   // Actualizar costo adicional real
   const actualizarCostoReal = (campo: keyof CostosAdicionalesProyecto, valor: number) => {
+    setHayCambiosSinGuardar(true);
     setCostosReales(prev => ({ ...prev, [campo]: valor }));
   };
 
@@ -173,19 +212,23 @@ export function ControlDeCodigosView({
       utilidadReal: totales.utilidadReal,
       porcentajeUtilidadReal: totales.porcentajeUtilidadReal,
     });
+    setHayCambiosSinGuardar(false);
   };
 
-  // Obtener nombre del proceso
-  const getNombreProceso = (tipo: string) => {
-    const proceso = CATALOGO_PROCESOS_VELSO.find(p => p.id === tipo);
-    return proceso?.nombre || tipo;
+  // Salir con cambios sin guardar → confirmar
+  const handleVolverSeguro = () => {
+    if (hayCambiosSinGuardar) {
+      const salir = confirm('Hay cambios sin guardar. ¿Salir sin guardar?\n\nAceptar = salir sin guardar · Cancelar = quedarse para guardar');
+      if (!salir) return;
+    }
+    onVolver();
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <Button variant="outline" onClick={onVolver} className="border-slate-300 w-fit">
+        <Button variant="outline" onClick={handleVolverSeguro} className="border-slate-300 w-fit">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver a Proyectos
         </Button>
@@ -367,92 +410,158 @@ export function ControlDeCodigosView({
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab Materiales */}
+        {/* Tab Materiales — con guardar/congelar por material */}
         <TabsContent value="materiales" className="space-y-4">
           <Card className="border-slate-200">
             <CardHeader>
               <CardTitle className="text-lg">Materiales Reales</CardTitle>
+              <p className="text-xs text-slate-500">
+                Guarda cada material para congelarlo. Para modificarlo después, usa Editar.
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {materialesReales.map((material) => (
-                  <div key={material.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">{material.nombre}</p>
-                      <p className="text-xs text-slate-500">{material.tipo} · {material.forma}</p>
+                {materialesReales.map((material) => {
+                  const congelado = materialCongelado(material);
+                  return (
+                    <div key={material.id} className={`grid grid-cols-1 md:grid-cols-5 gap-4 p-4 rounded-lg ${congelado ? 'bg-green-50/60 border border-green-200' : 'bg-slate-50'}`}>
+                      <div>
+                        <p className="text-sm font-medium">{material.nombre}</p>
+                        <p className="text-xs text-slate-500">{material.tipo} · {material.forma}</p>
+                        {congelado && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-green-700 font-semibold mt-1">
+                            <CheckCircle className="w-3 h-3" /> Guardado
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <Label className="text-xs">Cantidad Real</Label>
+                        <Input
+                          type="number"
+                          value={material.cantidad}
+                          disabled={congelado}
+                          onChange={(e) => actualizarMaterialReal(material.id, 'cantidad', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Costo Unitario Real ($)</Label>
+                        <Input
+                          type="number"
+                          value={material.costoUnitarioReal || material.costoUnitarioCotizado}
+                          disabled={congelado}
+                          onChange={(e) => actualizarMaterialReal(material.id, 'costoUnitarioReal', parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Costo Total Real</Label>
+                        <p className="font-semibold text-amber-600 mt-2">
+                          ${(material.costoTotalReal || material.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Cotizado: ${material.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="flex items-end">
+                        {congelado ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full border-slate-300"
+                            onClick={() => handleEditarMaterial(material.id)}
+                          >
+                            Editar
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="w-full bg-green-600 hover:bg-green-700"
+                            onClick={() => handleGuardarMaterial(material.id)}
+                          >
+                            <Save className="w-3.5 h-3.5 mr-1" />
+                            Guardar
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">Cantidad Real</Label>
-                      <Input
-                        type="number"
-                        value={material.cantidad}
-                        onChange={(e) => actualizarMaterialReal(material.id, 'cantidad', parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Costo Unitario Real ($)</Label>
-                      <Input
-                        type="number"
-                        value={material.costoUnitarioReal || material.costoUnitarioCotizado}
-                        onChange={(e) => actualizarMaterialReal(material.id, 'costoUnitarioReal', parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Costo Total Real</Label>
-                      <p className="font-semibold text-amber-600 mt-2">
-                        ${(material.costoTotalReal || material.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Cotizado: ${material.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Tab Procesos */}
+        {/* Tab Procesos — resumen por pieza, cotizado vs real (solo lectura) */}
         <TabsContent value="procesos" className="space-y-4">
           <Card className="border-slate-200">
             <CardHeader>
-              <CardTitle className="text-lg">Tiempos Reales de Procesos</CardTitle>
+              <CardTitle className="text-lg">Procesos por Pieza: Cotizado vs Real</CardTitle>
+              <p className="text-xs text-slate-500">
+                Las horas reales se capturan en la sección Producción. Si un proceso aún no
+                tiene captura, se muestran los valores cotizados.
+              </p>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {procesosReales.map((proceso) => (
-                  <div key={proceso.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">{getNombreProceso(proceso.tipo)}</p>
-                      <p className="text-xs text-slate-500">{proceso.nombre}</p>
+              <div className="space-y-5">
+                {Object.entries(
+                  procesosCot.reduce((grupos: Record<string, typeof procesosCot>, proc) => {
+                    const pieza = proc.piezaNombre || 'General';
+                    if (!grupos[pieza]) grupos[pieza] = [];
+                    grupos[pieza].push(proc);
+                    return grupos;
+                  }, {})
+                ).map(([piezaNombre, procesos]) => (
+                  <div key={piezaNombre} className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="bg-slate-100 px-3 py-2 flex items-center gap-2">
+                      <Package className="w-4 h-4 text-slate-500" />
+                      <span className="font-semibold text-sm text-slate-800">{piezaNombre}</span>
                     </div>
-                    <div>
-                      <Label className="text-xs">Tiempo Cotizado (min)</Label>
-                      <p className="font-medium mt-2">{proceso.tiempoMinutosCotizado}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Tiempo Real (min)</Label>
-                      <Input
-                        type="number"
-                        value={proceso.tiempoMinutosReal || proceso.tiempoMinutosCotizado}
-                        onChange={(e) => actualizarProcesoReal(proceso.id, parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Costo Total Real</Label>
-                      <p className="font-semibold text-amber-600 mt-2">
-                        ${(proceso.costoTotalReal || proceso.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Cotizado: ${proceso.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 text-slate-600 text-xs">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Proceso</th>
+                          <th className="px-3 py-2 text-right font-medium">Min. cotizados</th>
+                          <th className="px-3 py-2 text-right font-medium">Min. reales</th>
+                          <th className="px-3 py-2 text-right font-medium">Costo cotizado</th>
+                          <th className="px-3 py-2 text-right font-medium">Costo real</th>
+                          <th className="px-3 py-2 text-left font-medium">Operador</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {procesos.map((proceso) => {
+                          const real = (proyecto.procesosReales || []).find((r: any) => r.id === proceso.id);
+                          const hayReal = real && real.tiempoMinutosReal != null;
+                          const minReal = hayReal ? Number(real.tiempoMinutosReal) : proceso.tiempoMinutosCotizado;
+                          const costoReal = hayReal
+                            ? (Number(real.costoTotalReal) || (Number(real.tiempoMinutosReal) / 60) * proceso.costoPorHora + proceso.costoManoObra)
+                            : proceso.costoTotalCotizado;
+                          const sePaso = hayReal && minReal > proceso.tiempoMinutosCotizado;
+                          return (
+                            <tr key={proceso.id}>
+                              <td className="px-3 py-2 text-slate-800">{proceso.nombre}</td>
+                              <td className="px-3 py-2 text-right text-slate-600">{proceso.tiempoMinutosCotizado}</td>
+                              <td className={`px-3 py-2 text-right font-medium ${!hayReal ? 'text-slate-400' : sePaso ? 'text-red-600' : 'text-green-600'}`}>
+                                {minReal}
+                                {!hayReal && <span className="text-[10px] block">sin captura (cotizado)</span>}
+                              </td>
+                              <td className="px-3 py-2 text-right text-slate-600">
+                                ${proceso.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className={`px-3 py-2 text-right font-medium ${hayReal && costoReal > proceso.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
+                                ${costoReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-3 py-2 text-slate-600">{hayReal ? ((real as any).operadorNombre || '—') : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 ))}
+                {procesosCot.length === 0 && (
+                  <p className="text-center text-slate-400 py-6">Este proyecto no tiene procesos registrados.</p>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -50,6 +50,10 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
+  // Registro real capturado en producción para un proceso (si existe)
+  const realDe = (procesoId: string): any | null =>
+    (proyecto.procesosReales || []).find((p: any) => p.id === procesoId) || null;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -184,27 +188,36 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                         Procesos de Manufactura
                       </h4>
                       <div className="space-y-2">
-                        {pieza.procesos.map((proceso) => (
-                          <div 
-                            key={proceso.id} 
-                            className="bg-slate-50 rounded-lg p-3 flex items-center justify-between"
-                          >
-                            <div>
-                              <p className="font-medium text-sm">{proceso.nombre}</p>
-                              <p className="text-xs text-slate-500">
-                                {proceso.tiempoMinutosPorPieza} min/pieza
-                              </p>
+                        {pieza.procesos.map((proceso) => {
+                          const real = realDe(proceso.id);
+                          return (
+                            <div
+                              key={proceso.id}
+                              className="bg-slate-50 rounded-lg p-3 flex items-center justify-between"
+                            >
+                              <div>
+                                <p className="font-medium text-sm">{proceso.nombre}</p>
+                                <p className="text-xs text-slate-500">
+                                  {proceso.tiempoMinutosPorPieza} min/pieza cotizado
+                                </p>
+                                {real && (
+                                  <p className="text-xs text-green-700 mt-0.5">
+                                    Real: {real.tiempoMinutosReal} min
+                                    {real.operadorNombre ? ` · ${real.operadorNombre}` : ''}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold">
+                                  Total: {proceso.tiempoMinutos} min
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  ({(proceso.tiempoMinutos / 60).toFixed(1)} hrs)
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm font-semibold">
-                                Total: {proceso.tiempoMinutos} min
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                ({(proceso.tiempoMinutos / 60).toFixed(1)} hrs)
-                              </p>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -290,7 +303,7 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
             </tbody>
           </table>
 
-          {/* Procesos: cotizado fijo + columnas en blanco para captura física */}
+          {/* Procesos: cotizado fijo + reales si ya se capturaron, si no en blanco */}
           <table className="w-full text-xs border border-slate-300 mb-3">
             <thead>
               <tr className="bg-slate-800 text-white">
@@ -301,20 +314,30 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                 <th className="px-2 py-1.5 text-center w-20">HORA INICIO</th>
                 <th className="px-2 py-1.5 text-center w-20">HORA FIN</th>
                 <th className="px-2 py-1.5 text-center w-20">MIN REALES</th>
+                <th className="px-2 py-1.5 text-center w-24">OPERADOR</th>
               </tr>
             </thead>
             <tbody>
-              {(piezaAImprimir.procesos || []).map((proc: any, idx: number) => (
-                <tr key={proc.id || idx} className="border-b border-slate-200">
-                  <td className="px-2 py-3">{idx + 1}</td>
-                  <td className="px-2 py-3 font-medium">{proc.nombre}</td>
-                  <td className="px-2 py-3 text-right">{proc.tiempoMinutosPorPieza ?? '—'}</td>
-                  <td className="px-2 py-3 text-right">{proc.tiempoMinutos ?? '—'}</td>
-                  <td className="px-2 py-3" />
-                  <td className="px-2 py-3" />
-                  <td className="px-2 py-3" />
-                </tr>
-              ))}
+              {(piezaAImprimir.procesos || []).map((proc: any, idx: number) => {
+                const real = realDe(proc.id);
+                return (
+                  <tr key={proc.id || idx} className="border-b border-slate-200">
+                    <td className="px-2 py-3">{idx + 1}</td>
+                    <td className="px-2 py-3 font-medium">{proc.nombre}</td>
+                    <td className="px-2 py-3 text-right">{proc.tiempoMinutosPorPieza ?? '—'}</td>
+                    <td className="px-2 py-3 text-right">{proc.tiempoMinutos ?? '—'}</td>
+                    <td className="px-2 py-3" />
+                    <td className="px-2 py-3" />
+                    {/* Si ya se capturó en producción se imprime el dato real; si no, en blanco */}
+                    <td className="px-2 py-3 text-center font-semibold">
+                      {real ? real.tiempoMinutosReal : ''}
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      {real?.operadorNombre || ''}
+                    </td>
+                  </tr>
+                );
+              })}
               {/* Fila de totales */}
               <tr className="bg-slate-100 font-semibold">
                 <td className="px-2 py-2" colSpan={2}>TOTALES</td>
@@ -324,7 +347,7 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                 <td className="px-2 py-2 text-right">
                   {(piezaAImprimir.procesos || []).reduce((s: number, p: any) => s + (Number(p.tiempoMinutos) || 0), 0)}
                 </td>
-                <td className="px-2 py-2" colSpan={3} />
+                <td className="px-2 py-2" colSpan={4} />
               </tr>
             </tbody>
           </table>

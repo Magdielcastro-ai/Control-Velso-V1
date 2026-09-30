@@ -912,8 +912,31 @@ function App() {
               onVerDetalle={canViewControlCodigos() ? handleVerControlCodigos : undefined}
               onVerHojaViajera={handleVerHojaViajera}
               onGuardarHorasReales={async (proyecto, procesosReales) => {
+                // 1. JSON en proyectos.procesos_reales (alimenta dashboard y control de códigos)
                 await guardarDatosReales(proyecto.id, { procesosReales });
-                toast.success(`Horas reales guardadas en ${proyecto.codigoProyecto}`);
+                // 2. Tabla registros_produccion (una fila por proceso; corregir = upsert)
+                const filas = procesosReales.map((p: any) => ({
+                  proyecto_id: proyecto.id,
+                  codigo_proyecto: proyecto.codigoProyecto,
+                  pieza_id: p.piezaId || null,
+                  pieza_nombre: p.piezaNombre || null,
+                  proceso_id: p.id,
+                  proceso_nombre: p.nombre,
+                  minutos_cotizados: p.tiempoMinutosCotizado || 0,
+                  minutos_reales: p.tiempoMinutosReal,
+                  operador: p.operadorNombre || null,
+                  usuario_id: user.id,
+                  updated_at: new Date().toISOString(),
+                }));
+                const { error } = await supabase
+                  .from('registros_produccion')
+                  .upsert(filas, { onConflict: 'proyecto_id,proceso_id' });
+                if (error) {
+                  console.error('[App] Error guardando registros_produccion:', error.message);
+                  toast.error('Las horas se guardaron, pero falló el registro de operador: ' + error.message);
+                } else {
+                  toast.success(`Horas reales guardadas en ${proyecto.codigoProyecto}`);
+                }
               }}
             />
           </>

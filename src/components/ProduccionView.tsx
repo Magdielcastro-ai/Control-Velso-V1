@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,8 +38,8 @@ export function ProduccionView({
 }: ProduccionViewProps) {
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  // Captura de horas reales: { [proyectoId]: { [procesoId]: minutosComoTexto } }
-  const [horasRealesCaptura, setHorasRealesCaptura] = useState<Record<string, Record<string, string>>>({});
+  // Captura por proceso: { [proyectoId]: { [procesoId]: { minutos, operador } } }
+  const [captura, setCaptura] = useState<Record<string, Record<string, { minutos: string; operador: string }>>>({});
   const [guardando, setGuardando] = useState<string | null>(null);
 
   // Proyectos activos en piso: en fabricación o fabricados pendientes de entrega
@@ -60,43 +60,64 @@ export function ProduccionView({
   const totalHorasPiso = proyectosEnFabricacion.reduce((sum, p) => sum + horasEstimadas(p), 0);
   const totalPiezas = proyectosEnFabricacion.reduce((sum, p) => sum + (p.piezas?.length || 0), 0);
 
-  // ─── Captura de horas reales ───
+  // ─── Captura de horas reales + operador ───
   // Las horas cotizadas son de solo lectura; las reales se capturan,
   // pueden guardarse parcialmente y corregirse las ya guardadas.
-  const minutosRealesGuardados = (proyecto: ProyectoVenta, procesoId: string): number | null => {
-    const guardado = (proyecto.procesosReales || []).find((p: any) => p.id === procesoId);
-    const val = guardado?.tiempoMinutosReal;
-    return val !== undefined && val !== null ? Number(val) : null;
+  const registroGuardado = (proyecto: ProyectoVenta, procesoId: string): any | null => {
+    return (proyecto.procesosReales || []).find((p: any) => p.id === procesoId) || null;
   };
 
-  const getValorCaptura = (proyecto: ProyectoVenta, procesoId: string): string => {
-    const editado = horasRealesCaptura[proyecto.id]?.[procesoId];
+  const getCaptura = (proyecto: ProyectoVenta, procesoId: string): { minutos: string; operador: string } => {
+    const editado = captura[proyecto.id]?.[procesoId];
     if (editado !== undefined) return editado;
-    const guardado = minutosRealesGuardados(proyecto, procesoId);
-    return guardado !== null ? String(guardado) : '';
+    const guardado = registroGuardado(proyecto, procesoId);
+    return {
+      minutos: guardado?.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
+      operador: guardado?.operadorNombre || '',
+    };
   };
 
-  const setValorCaptura = (proyectoId: string, procesoId: string, valor: string) => {
-    setHorasRealesCaptura(prev => ({
-      ...prev,
-      [proyectoId]: { ...(prev[proyectoId] || {}), [procesoId]: valor },
-    }));
+  const actualizarCaptura = (proyectoId: string, procesoId: string, campo: 'minutos' | 'operador', valor: string) => {
+    setCaptura(prev => {
+      const actual = prev[proyectoId]?.[procesoId] || { minutos: '', operador: '' };
+      // Rellenar el otro campo con lo ya guardado para no pisarlo
+      return {
+        ...prev,
+        [proyectoId]: {
+          ...(prev[proyectoId] || {}),
+          [procesoId]: { ...actual, [campo]: valor },
+        },
+      };
+    });
+  };
+
+  // Hay capturas sin guardar (difieren de lo persistido)
+  const hayCambiosSinGuardar = Object.keys(captura).length > 0;
+
+  const handleVolverSeguro = () => {
+    if (hayCambiosSinGuardar) {
+      const salir = confirm('Hay capturas sin guardar. ¿Salir sin guardar?\n\nAceptar = salir sin guardar · Cancelar = quedarse para guardar');
+      if (!salir) return;
+    }
+    onVolver();
   };
 
   const handleGuardarHoras = async (proyecto: ProyectoVenta) => {
     if (!onGuardarHorasReales) return;
     const procesosReales = procesosAplanados(proyecto)
       .map((p: any) => {
-        const texto = getValorCaptura(proyecto, p.id);
-        if (texto === '') return null; // sin captura: no se envía
-        const minutos = Number(texto) || 0;
+        const cap = getCaptura(proyecto, p.id);
+        if (cap.minutos === '') return null; // sin captura: no se envía
+        const minutos = Number(cap.minutos) || 0;
         return {
           id: p.id,
           nombre: p.nombre,
           tipo: p.tipo,
+          piezaId: p.piezaId || null,
           piezaNombre: p.piezaNombre,
           tiempoMinutosCotizado: minutosCotizados(p),
           tiempoMinutosReal: minutos,
+          operadorNombre: cap.operador.trim(),
           costoPorHora: Number(p.costoPorHora) || 0,
           costoManoObra: Number(p.costoManoObra) || 0,
           costoTotalCotizado: Number(p.costoTotal ?? p.costoTotalCotizado) || 0,
@@ -112,15 +133,33 @@ export function ProduccionView({
 
     setGuardando(proyecto.id);
     await onGuardarHorasReales(proyecto, procesosReales);
+    // Limpiar la captura local de este proyecto (ya quedó persistida)
+    setCaptura(prev => {
+      const nuevo = { ...prev };
+      delete nuevo[proyecto.id];
+      return nuevo;
+    });
     setGuardando(null);
   };
+
+  // Alerta del navegador si hay capturas sin guardar y se cierra/recarga
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hayCambiosSinGuardar) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hayCambiosSinGuardar]);
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={onVolver} className="border-slate-300">
+          <Button variant="outline" size="sm" onClick={handleVolverSeguro} className="border-slate-300">
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
@@ -268,10 +307,11 @@ export function ProduccionView({
                               </div>
                             )}
 
-                            {/* Procesos de la pieza: cotizado (fijo) + captura real */}
+                            {/* Procesos de la pieza: cotizado (fijo) + captura real + operador */}
                             <div className="space-y-1.5">
                               {(pieza.procesos || []).map((proc: any) => {
-                                const realGuardado = minutosRealesGuardados(proyecto, proc.id);
+                                const regGuardado = registroGuardado(proyecto, proc.id);
+                                const cap = getCaptura(proyecto, proc.id);
                                 return (
                                   <div
                                     key={proc.id}
@@ -281,7 +321,7 @@ export function ProduccionView({
                                       <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                       <span className="text-sm text-slate-700 truncate">{proc.nombre}</span>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <span
                                         className="text-sm text-slate-500"
                                         title="Horas cotizadas — no modificables"
@@ -291,21 +331,28 @@ export function ProduccionView({
                                           : `${minutosCotizados(proc)} min`} cotizado
                                       </span>
                                       {onGuardarHorasReales && (
-                                        <div className="flex items-center gap-1">
+                                        <>
                                           <Input
                                             type="number"
                                             min="0"
                                             placeholder="min reales"
-                                            value={getValorCaptura(proyecto, proc.id)}
-                                            onChange={(e) => setValorCaptura(proyecto.id, proc.id, e.target.value)}
+                                            value={cap.minutos}
+                                            onChange={(e) => actualizarCaptura(proyecto.id, proc.id, 'minutos', e.target.value)}
                                             className="h-7 w-24 text-sm text-right"
                                           />
-                                          {realGuardado !== null && (
+                                          <Input
+                                            type="text"
+                                            placeholder="Operador"
+                                            value={cap.operador}
+                                            onChange={(e) => actualizarCaptura(proyecto.id, proc.id, 'operador', e.target.value)}
+                                            className="h-7 w-28 text-sm"
+                                          />
+                                          {regGuardado && (
                                             <span className="text-[10px] text-green-600" title="Ya capturado — puedes corregirlo y volver a guardar">
                                               ✓
                                             </span>
                                           )}
-                                        </div>
+                                        </>
                                       )}
                                     </div>
                                   </div>
