@@ -238,13 +238,14 @@ export function ProduccionView({
       }));
 
     // Fusionar con lo ya guardado: no pisar procesos que no se tocaron
-    // ni extras que no se eliminaron
+    // ni extras que no se eliminaron. Las entradas viejas (id plano) se
+    // normalizan a llave compuesta para que no colisionen en el upsert.
     const eliminados = new Set(extrasEliminados[proyecto.id] || []);
     const clavesNuevas = new Set([...nuevas, ...extras].map(e => e.id));
     const claveDe = (e: any) => e.id?.includes(':') ? e.id : (e.piezaId ? `${e.piezaId}:${e.id}` : e.id);
-    const existentesIntactos = (proyecto.procesosReales || []).filter(
-      (e: any) => !clavesNuevas.has(claveDe(e)) && !eliminados.has(e.id)
-    );
+    const existentesIntactos = (proyecto.procesosReales || [])
+      .filter((e: any) => !clavesNuevas.has(claveDe(e)) && !eliminados.has(e.id))
+      .map((e: any) => ({ ...e, id: claveDe(e) }));
     const procesosReales = [...existentesIntactos, ...nuevas, ...extras];
 
     if (nuevas.length === 0 && extras.length === 0 && eliminados.size === 0) {

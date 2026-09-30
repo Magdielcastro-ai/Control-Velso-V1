@@ -878,7 +878,15 @@ function App() {
                 // 1. JSON en proyectos.procesos_reales (alimenta dashboard y control de códigos)
                 await guardarDatosReales(proyecto.id, { procesosReales });
                 // 2. Tabla registros_produccion (una fila por proceso; corregir = upsert)
-                const filas = procesosReales.map((p: any) => ({
+                // Dedup de seguridad por proceso_id (nunca dos filas con la misma llave)
+                const vistos = new Set<string>();
+                const filas = procesosReales
+                  .filter((p: any) => {
+                    if (vistos.has(p.id)) return false;
+                    vistos.add(p.id);
+                    return true;
+                  })
+                  .map((p: any) => ({
                   proyecto_id: proyecto.id,
                   codigo_proyecto: proyecto.codigoProyecto,
                   pieza_id: p.piezaId || '',
