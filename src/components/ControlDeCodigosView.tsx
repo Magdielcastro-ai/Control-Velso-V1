@@ -22,7 +22,7 @@ interface ControlDeCodigosViewProps {
   onVolver: () => void;
   onGuardarDatosReales: (id: string, datos: {
     materialesReales: MaterialProyecto[];
-    procesosReales: ProcesoProyecto[];
+    procesosReales?: ProcesoProyecto[];
     costosAdicionalesReales: CostosAdicionalesProyecto;
     costoTotalReal: number;
     utilidadReal: number;
@@ -50,9 +50,11 @@ export function ControlDeCodigosView({
       costoTotalCotizado: Number(m.costoTotal) || 0,
     })), [proyecto]);
 
-  const procesosCot = useMemo<(ProcesoProyecto & { piezaNombre?: string })[]>(() =>
+  const procesosCot = useMemo<(ProcesoProyecto & { piezaNombre?: string; captureId?: string; piezaId?: string })[]>(() =>
     procesosAplanados(proyecto).map((p: any) => ({
       id: p.id || crypto.randomUUID(),
+      captureId: p.captureId,   // llave compuesta pieza:proceso (sin esto no se encuentra lo real)
+      piezaId: p.piezaId,
       nombre: p.nombre || '',
       piezaNombre: p.piezaNombre || 'General',
       tipo: p.tipo || '',
@@ -88,15 +90,8 @@ export function ControlDeCodigosView({
   // Cambios sin guardar (para alertar al salir)
   const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState(false);
 
-  // Procesos reales: solo lectura — la captura de tiempos reales
-  // se hace en la sección Producción (hoja viajera)
-  const [procesosReales] = useState<ProcesoProyecto[]>(
-    proyecto.procesosReales || procesosCot.map(p => ({
-      ...p,
-      tiempoMinutosReal: p.tiempoMinutosCotizado,
-      costoTotalReal: p.costoTotalCotizado
-    }))
-  );
+  // Los procesos reales son de SOLO LECTURA aquí: la captura de tiempos
+  // reales se hace en la sección Producción (hoja viajera)
 
   // Inicializar costos adicionales reales
   const [costosReales, setCostosReales] = useState<CostosAdicionalesProyecto>(
@@ -109,13 +104,22 @@ export function ControlDeCodigosView({
     const costoMaterialesReal = materialesReales.reduce((sum, m) => sum + (m.costoTotalReal || m.costoTotalCotizado), 0);
 
     const costoProcesosCotizado = procesosCot.reduce((sum, p) => sum + p.costoTotalCotizado, 0);
-    const costoProcesosReal = procesosReales.reduce((sum, p) => sum + (p.costoTotalReal || p.costoTotalCotizado), 0);
+    // Real por proceso: si hay captura se usa el real; si no, cuenta lo cotizado.
+    // (Antes solo sumaba lo capturado → diferencias fantasma "a favor")
+    const costoProcesosReal = procesosCot.reduce((sum, p) => {
+      const real = buscarReal(proyecto.procesosReales, p);
+      return sum + (real?.costoTotalReal != null ? Number(real.costoTotalReal) : p.costoTotalCotizado);
+    }, 0);
+    // Herramientas/dispositivos extra capturados en producción suman al costo real
+    const costoExtras = (proyecto.procesosReales || [])
+      .filter((e: any) => e.tipo === 'herramienta_extra')
+      .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
 
     const costosAdicionalesCotizado = Object.values(costosCot).reduce((sum, v) => sum + v, 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
     
     const costoTotalCotizado = costoMaterialesCotizado + costoProcesosCotizado + costosAdicionalesCotizado;
-    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costosAdicionalesReal;
+    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costosAdicionalesReal;
 
     // Desglose fiscal de la cotización (valores originales, no modificables)
     const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
@@ -152,7 +156,7 @@ export function ControlDeCodigosView({
       porcentajeUtilidadCotizada,
       porcentajeUtilidadReal,
     };
-  }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, procesosReales, costosReales]);
+  }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, costosReales]);
 
   // Actualizar material real (solo si no está congelado)
   const actualizarMaterialReal = (id: string, campo: 'costoUnitarioReal' | 'cantidad', valor: number) => {
@@ -184,16 +188,24 @@ export function ControlDeCodigosView({
     });
 
     const costoMaterialesReal = nuevos.reduce((sum, m) => sum + (m.costoTotalReal || m.costoTotalCotizado), 0);
-    const costoProcesosReal = procesosReales.reduce((sum, p) => sum + (p.costoTotalReal || p.costoTotalCotizado), 0);
+    // Los procesos reales se capturan en Producción — aquí solo se leen,
+    // NUNCA se reescriben (antes se pisaban con copias cotizadas)
+    const costoProcesosReal = procesosCot.reduce((sum, p) => {
+      const real = buscarReal(proyecto.procesosReales, p);
+      return sum + (real?.costoTotalReal != null ? Number(real.costoTotalReal) : p.costoTotalCotizado);
+    }, 0);
+    const costoExtras = (proyecto.procesosReales || [])
+      .filter((e: any) => e.tipo === 'herramienta_extra')
+      .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
-    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costosAdicionalesReal;
-    const totalFacturado = proyecto.totalFacturado || proyecto.totalCotizado;
-    const utilidadReal = totalFacturado - costoTotalReal;
-    const porcentajeUtilidadReal = totalFacturado > 0 ? (utilidadReal / totalFacturado) * 100 : 0;
+    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costosAdicionalesReal;
+    const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
+    const baseSinIVA = (proyecto.totalFacturado || proyecto.totalCotizado) / (1 + ivaPct / 100);
+    const utilidadReal = baseSinIVA - costoTotalReal;
+    const porcentajeUtilidadReal = baseSinIVA > 0 ? (utilidadReal / baseSinIVA) * 100 : 0;
 
     onGuardarDatosReales(proyecto.id, {
       materialesReales: nuevos,
-      procesosReales,
       costosAdicionalesReales: costosReales,
       costoTotalReal,
       utilidadReal,
@@ -213,11 +225,11 @@ export function ControlDeCodigosView({
     setCostosReales(prev => ({ ...prev, [campo]: valor }));
   };
 
-  // Guardar cambios
+  // Guardar cambios (materiales y costos adicionales; los procesos
+  // reales son de solo lectura aquí — se capturan en Producción)
   const handleGuardar = () => {
     onGuardarDatosReales(proyecto.id, {
       materialesReales,
-      procesosReales,
       costosAdicionalesReales: costosReales,
       costoTotalReal: totales.costoTotalReal,
       utilidadReal: totales.utilidadReal,
