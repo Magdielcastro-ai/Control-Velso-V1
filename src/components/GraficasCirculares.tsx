@@ -184,6 +184,7 @@ interface GraficaBarrasProps {
     vendidas: number;
     fabricadas: number;
     facturadas: number;
+    meta?: number;
   }[];
 }
 
@@ -195,59 +196,81 @@ export function GraficaBarrasComparacion({ titulo, datos }: GraficaBarrasProps) 
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {datos.map((item) => (
-            <div key={item.categoria} className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="font-medium">{item.categoria}</span>
+          {datos.map((item) => {
+            const meta = item.meta || 0;
+            const pctMeta = meta > 0 ? Math.min((item.vendidas / meta) * 100, 100) : 0;
+            return (
+              <div key={item.categoria} className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium">{item.categoria}</span>
+                  {meta > 0 && (
+                    <span className={`font-semibold ${item.vendidas >= meta ? 'text-green-600' : 'text-slate-500'}`}>
+                      Meta: {meta.toFixed(1)}h · vendidas {pctMeta.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {/* Meta mensual (horas que hay que vender) */}
+                  {meta > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs w-16 text-slate-500">Meta</span>
+                      <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-slate-400 h-full rounded-full"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <span className="text-xs w-12 text-right">{meta.toFixed(1)}h</span>
+                    </div>
+                  )}
+                  {/* Cotizadas */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16 text-slate-500">Cotizadas</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-blue-400 h-full rounded-full"
+                        style={{ width: `${Math.min((item.cotizadas / Math.max(meta, item.cotizadas, 1)) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-12 text-right">{item.cotizadas.toFixed(1)}h</span>
+                  </div>
+                  {/* Vendidas — la barra clave contra la meta */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16 text-slate-500">Vendidas</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${item.vendidas >= meta && meta > 0 ? 'bg-green-600' : 'bg-green-500'}`}
+                        style={{ width: `${Math.min((item.vendidas / Math.max(meta, 1)) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-12 text-right">{item.vendidas.toFixed(1)}h</span>
+                  </div>
+                  {/* Fabricadas */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16 text-slate-500">Fabricadas</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-amber-500 h-full rounded-full"
+                        style={{ width: `${Math.min((item.fabricadas / Math.max(meta, item.cotizadas, 1)) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-12 text-right">{item.fabricadas.toFixed(1)}h</span>
+                  </div>
+                  {/* Facturadas */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-16 text-slate-500">Facturadas</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-purple-500 h-full rounded-full"
+                        style={{ width: `${Math.min((item.facturadas / Math.max(meta, item.cotizadas, 1)) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs w-12 text-right">{item.facturadas.toFixed(1)}h</span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                {/* Cotizadas */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs w-16 text-slate-500">Cotizadas</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-blue-400 h-full rounded-full"
-                      style={{ width: `${Math.min((item.cotizadas / Math.max(item.cotizadas, 1)) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs w-12 text-right">{item.cotizadas.toFixed(1)}h</span>
-                </div>
-                {/* Vendidas */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs w-16 text-slate-500">Vendidas</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-green-500 h-full rounded-full"
-                      style={{ width: `${Math.min((item.vendidas / Math.max(item.cotizadas, 1)) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs w-12 text-right">{item.vendidas.toFixed(1)}h</span>
-                </div>
-                {/* Fabricadas */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs w-16 text-slate-500">Fabricadas</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-amber-500 h-full rounded-full"
-                      style={{ width: `${Math.min((item.fabricadas / Math.max(item.cotizadas, 1)) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs w-12 text-right">{item.fabricadas.toFixed(1)}h</span>
-                </div>
-                {/* Facturadas */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs w-16 text-slate-500">Facturadas</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-purple-500 h-full rounded-full"
-                      style={{ width: `${Math.min((item.facturadas / Math.max(item.cotizadas, 1)) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs w-12 text-right">{item.facturadas.toFixed(1)}h</span>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

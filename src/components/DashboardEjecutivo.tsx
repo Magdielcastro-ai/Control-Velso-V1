@@ -327,6 +327,7 @@ export function DashboardEjecutivo({
       vendidas: datosVentasMes.horasVendidas[p.id] || 0,
       fabricadas: datosVentasMes.horasFabricadas[p.id] || 0,
       facturadas: datosVentasMes.horasFacturadas[p.id] || 0,
+      meta: horasDisponibles[p.id] || 0,
     }));
 
   const datosCotizadas = datosPorProceso.map(p => ({ nombre: p.categoria, valor: p.cotizadas }));

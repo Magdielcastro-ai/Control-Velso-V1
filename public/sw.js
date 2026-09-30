@@ -1,5 +1,5 @@
 // Service Worker para Velso CNC - Modo Offline
-const CACHE_NAME = 'velso-cnc-v3';
+const CACHE_NAME = 'velso-cnc-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
