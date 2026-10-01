@@ -51,7 +51,6 @@ export interface OrdenesCompraViewProps {
   onCambiarEstado?: (id: string, estado: OrdenCompra['estado']) => void;
   onEliminar?: (id: string) => void;
   onCrearOrden?: (datos: any) => Promise<boolean>;
-  onCrearProveedor?: (datos: any) => Promise<Proveedor | null>;
 }
 
 const estadoConfig: Record<
@@ -111,7 +110,6 @@ export function OrdenesCompraView({
   onCambiarEstado,
   onEliminar,
   onCrearOrden,
-  onCrearProveedor,
 }: OrdenesCompraViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
@@ -140,7 +138,11 @@ export function OrdenesCompraView({
   const ordenesConNombreProyecto = useMemo(() => {
     return ordenes.map((oc) => ({
       ...oc,
-      proyectoNombreDisplay: proyectoNombreMap[oc.proyectoId || ''] || 'Sin proyecto',
+      proyectoNombreDisplay: proyectoNombreMap[oc.proyectoId || '']
+        ? `${oc.codigoProyecto ? oc.codigoProyecto + ' · ' : ''}${proyectoNombreMap[oc.proyectoId || '']}`
+        : oc.codigoProyecto
+          ? `${oc.codigoProyecto} · Gastos internos`
+          : 'Sin proyecto',
     }));
   }, [ordenes, proyectoNombreMap]);
 
@@ -427,7 +429,11 @@ export function OrdenesCompraView({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-500">Proyecto</span>
                   <span className="text-slate-900">
-                    {proyectoNombreMap[ordenSeleccionada.proyectoId || ''] || 'Sin proyecto'}
+                    {proyectoNombreMap[ordenSeleccionada.proyectoId || '']
+                      ? `${ordenSeleccionada.codigoProyecto ? ordenSeleccionada.codigoProyecto + ' · ' : ''}${proyectoNombreMap[ordenSeleccionada.proyectoId || '']}`
+                      : ordenSeleccionada.codigoProyecto
+                        ? `${ordenSeleccionada.codigoProyecto} · Gastos internos`
+                        : 'Sin proyecto'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -527,14 +533,13 @@ export function OrdenesCompraView({
       </Dialog>
 
       {/* Diálogo: Nueva OC */}
-      {onCrearOrden && onCrearProveedor && (
+      {onCrearOrden && (
         <NuevaOrdenCompraDialog
           open={dialogoNueva}
           onOpenChange={setDialogoNueva}
           proveedores={proveedores}
           proyectos={proyectos}
           solicitanteDefault={solicitanteDefault}
-          onCrearProveedor={onCrearProveedor}
           onCrearOrden={onCrearOrden}
         />
       )}

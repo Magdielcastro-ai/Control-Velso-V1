@@ -15,6 +15,7 @@ export const useOrdenesCompraStore = () => {
     id: row.id,
     numeroOc: row.numero_oc || '',
     proyectoId: row.proyecto_id || undefined,
+    codigoProyecto: row.codigo_proyecto || undefined,
     cotizacionId: row.cotizacion_id || undefined,
     usuarioId: row.usuario_id || undefined,
     proveedor: row.proveedor || undefined,
@@ -123,6 +124,7 @@ export const useOrdenesCompraStore = () => {
 
   const crearOrdenCompra = useCallback(async (datos: {
     proyectoId?: string;
+    codigoProyecto?: string;
     cotizacionId?: string;
     proveedor?: string;
     proveedorId?: string;
@@ -188,6 +190,9 @@ export const useOrdenesCompraStore = () => {
 
       if (datos.proyectoId && datos.proyectoId.trim() !== '') {
         insertData.proyecto_id = datos.proyectoId;
+      }
+      if (datos.codigoProyecto && datos.codigoProyecto.trim() !== '') {
+        insertData.codigo_proyecto = datos.codigoProyecto;
       }
       if (datos.cotizacionId && datos.cotizacionId.trim() !== '') {
         insertData.cotizacion_id = datos.cotizacionId;

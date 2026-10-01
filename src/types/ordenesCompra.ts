@@ -2,6 +2,7 @@ export interface OrdenCompra {
   id: string;
   numeroOc: string;
   proyectoId?: string;
+  codigoProyecto?: string;
   cotizacionId?: string;
   usuarioId?: string;
   proveedor?: string;
@@ -42,5 +43,6 @@ export interface Proveedor {
   telefono?: string;
   email?: string;
   contacto?: string;
+  diasCredito?: number;
   createdAt?: string;
 }

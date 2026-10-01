@@ -73,6 +73,7 @@ import { DashboardEjecutivo } from '@/components/DashboardEjecutivo';
 // VISTA CATÁLOGO DE PIEZAS
 import { CatalogoPiezasView } from '@/components/CatalogoPiezasView';
 import { OrdenesCompraView } from '@/components/OrdenesCompraView';
+import { ProveedoresView } from '@/components/ProveedoresView';
 
 import type { PasoCotizacion } from '@/types/cotizacion';
 import type { CotizacionGuardada } from '@/types/cotizacion';
@@ -91,7 +92,8 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 type VistaPrincipal = 'home' | 'dashboard' | 'clientes' | 'proyectos' | 'materiales' |
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra';
+                      'pendientes' | 'cobranza' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra' |
+                      'proveedores';
 
 const HORAS_DEFAULT: Record<string, number> = {
   codigo_07: 742.69,
@@ -240,6 +242,8 @@ function App() {
   const {
     proveedores,
     crearProveedor,
+    actualizarProveedor,
+    eliminarProveedor,
   } = useProveedoresStore();
 
   // Verificar sesión periódicamente para evitar cierres inesperados
@@ -454,6 +458,7 @@ function App() {
   const irACobranza = () => setVistaActual('cobranza');
   const irAProduccion = () => setVistaActual('produccion');
   const irAOrdenesCompra = () => setVistaActual('ordenes-compra');
+  const irAProveedores = () => setVistaActual('proveedores');
 
   const irANuevaCotizacion = () => {
     if (!canCreateCotizacion()) {
@@ -785,6 +790,7 @@ function App() {
               onProduccion={irAProduccion}
               onPiezasCatalogo={irAPiezasCatalogo}
               onOrdenesCompra={irAOrdenesCompra}
+              onProveedores={irAProveedores}
               onAdminUsuarios={irAAdminUsuarios}
               esAdmin={canManageUsers() || canViewDashboard()}
               alertasCount={alertasCount}
@@ -1135,7 +1141,25 @@ function App() {
               onCambiarEstado={actualizarEstadoOC}
               onEliminar={eliminarOrdenCompra}
               onCrearOrden={crearOrdenCompra}
-              onCrearProveedor={crearProveedor}
+            />
+          </>
+        );
+
+      case 'proveedores':
+        return (
+          <>
+            <UserHeader
+              user={user}
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <ProveedoresView
+              onVolver={irAHome}
+              proveedores={proveedores}
+              onCrear={crearProveedor}
+              onActualizar={actualizarProveedor}
+              onEliminar={eliminarProveedor}
             />
           </>
         );

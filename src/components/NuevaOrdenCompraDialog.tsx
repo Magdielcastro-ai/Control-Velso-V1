@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Building2, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Building2 } from 'lucide-react';
 import type { OrdenCompraItem, Proveedor } from '@/types/ordenesCompra';
 import type { ProyectoVenta } from '@/types/ventas';
 
@@ -34,16 +34,9 @@ interface NuevaOrdenCompraDialogProps {
   proveedores: Proveedor[];
   proyectos: ProyectoVenta[];
   solicitanteDefault?: string;
-  onCrearProveedor: (datos: {
-    nombre: string;
-    tipo?: string;
-    domicilio?: string;
-    telefono?: string;
-    email?: string;
-    contacto?: string;
-  }) => Promise<Proveedor | null>;
   onCrearOrden: (datos: {
     proyectoId?: string;
+    codigoProyecto?: string;
     proveedor?: string;
     proveedorId?: string;
     concepto?: string;
@@ -64,13 +57,17 @@ interface NuevaOrdenCompraDialogProps {
 
 const itemVacio: ItemForm = { nombre: '', cantidad: '1', unidad: 'pieza', precioUnitario: '' };
 
+// Código de taller para gastos internos — siempre activo.
+// El 0007 de cada año está reservado para esto.
+const CODIGO_TALLER_007 = `MAQ-${String(new Date().getFullYear() % 100).padStart(2, '0')}-0007`;
+const VALOR_GASTOS_INTERNOS = '_gastos_internos';
+
 export function NuevaOrdenCompraDialog({
   open,
   onOpenChange,
   proveedores,
   proyectos,
   solicitanteDefault,
-  onCrearProveedor,
   onCrearOrden,
 }: NuevaOrdenCompraDialogProps) {
   const [proveedorId, setProveedorId] = useState('');
@@ -86,12 +83,6 @@ export function NuevaOrdenCompraDialog({
   const [fechaEntrega, setFechaEntrega] = useState('');
   const [notas, setNotas] = useState('');
   const [guardando, setGuardando] = useState(false);
-
-  // Formulario rápido de nuevo proveedor
-  const [mostrarNuevoProveedor, setMostrarNuevoProveedor] = useState(false);
-  const [nuevoProv, setNuevoProv] = useState({
-    nombre: '', tipo: '', domicilio: '', telefono: '', email: '', contacto: '',
-  });
 
   const totales = useMemo(() => {
     const subtotal = items.reduce((sum, it) => {
@@ -111,16 +102,6 @@ export function NuevaOrdenCompraDialog({
   const agregarItem = () => setItems(prev => [...prev, { ...itemVacio }]);
   const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
-  const handleCrearProveedor = async () => {
-    if (!nuevoProv.nombre.trim()) return;
-    const creado = await onCrearProveedor(nuevoProv);
-    if (creado) {
-      setProveedorId(creado.id);
-      setMostrarNuevoProveedor(false);
-      setNuevoProv({ nombre: '', tipo: '', domicilio: '', telefono: '', email: '', contacto: '' });
-    }
-  };
-
   const limpiar = () => {
     setProveedorId('');
     setProyectoId('');
@@ -138,12 +119,17 @@ export function NuevaOrdenCompraDialog({
   const handleGuardar = async () => {
     const itemsValidos = items.filter(it => it.nombre.trim() !== '');
     if (itemsValidos.length === 0) return;
+    if (!proveedorId || !proyectoId) return;
 
     const proveedor = proveedores.find(p => p.id === proveedorId);
+    const esGastosInternos = proyectoId === VALOR_GASTOS_INTERNOS;
+    const proyecto = esGastosInternos ? null : proyectos.find(p => p.id === proyectoId);
+    const codigoProyecto = esGastosInternos ? CODIGO_TALLER_007 : (proyecto?.codigoProyecto || '');
 
     setGuardando(true);
     const exito = await onCrearOrden({
-      proyectoId: proyectoId && proyectoId !== '_ninguno' ? proyectoId : undefined,
+      proyectoId: esGastosInternos ? undefined : proyectoId,
+      codigoProyecto,
       proveedor: proveedor?.nombre || '',
       proveedorId: proveedorId || undefined,
       concepto: concepto || undefined,
@@ -193,97 +179,41 @@ export function NuevaOrdenCompraDialog({
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
-          {/* Proveedor */}
+          {/* Proveedor — solo del catálogo (la alta es en la sección Proveedores) */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Proveedor</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setMostrarNuevoProveedor(!mostrarNuevoProveedor)}
-                className="text-blue-600 h-7"
-              >
-                <UserPlus className="w-3.5 h-3.5 mr-1" />
-                {mostrarNuevoProveedor ? 'Cancelar' : 'Nuevo proveedor'}
-              </Button>
-            </div>
-
-            {mostrarNuevoProveedor ? (
-              <div className="border border-blue-200 bg-blue-50/50 rounded-lg p-3 space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <Input
-                    placeholder="Nombre del proveedor *"
-                    value={nuevoProv.nombre}
-                    onChange={e => setNuevoProv(p => ({ ...p, nombre: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Tipo (ej. materiales, servicios)"
-                    value={nuevoProv.tipo}
-                    onChange={e => setNuevoProv(p => ({ ...p, tipo: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Domicilio"
-                    value={nuevoProv.domicilio}
-                    onChange={e => setNuevoProv(p => ({ ...p, domicilio: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Teléfono"
-                    value={nuevoProv.telefono}
-                    onChange={e => setNuevoProv(p => ({ ...p, telefono: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Email"
-                    value={nuevoProv.email}
-                    onChange={e => setNuevoProv(p => ({ ...p, email: e.target.value }))}
-                  />
-                  <Input
-                    placeholder="Contacto"
-                    value={nuevoProv.contacto}
-                    onChange={e => setNuevoProv(p => ({ ...p, contacto: e.target.value }))}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleCrearProveedor}
-                  disabled={!nuevoProv.nombre.trim()}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Guardar proveedor
-                </Button>
-              </div>
-            ) : (
-              <Select value={proveedorId} onValueChange={setProveedorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un proveedor..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {proveedores.length === 0 && (
-                    <SelectItem value="_vacio" disabled>
-                      No hay proveedores — crea uno nuevo
-                    </SelectItem>
-                  )}
-                  {proveedores.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.numero} · {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Label>Proveedor *</Label>
+            <Select value={proveedorId} onValueChange={setProveedorId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un proveedor del catálogo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {proveedores.length === 0 && (
+                  <SelectItem value="_vacio" disabled>
+                    No hay proveedores — agrégalos en la sección Proveedores
+                  </SelectItem>
+                )}
+                {proveedores.map(p => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.numero} · {p.nombre}
+                    {p.diasCredito ? ` · ${p.diasCredito} días crédito` : ' · Contado'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Proyecto + Concepto */}
+          {/* Proyecto + Concepto — el código es OBLIGATORIO (007 siempre activo) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Proyecto (opcional)</Label>
+              <Label>Código de proyecto *</Label>
               <Select value={proyectoId} onValueChange={setProyectoId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sin proyecto" />
+                  <SelectValue placeholder="Selecciona el código..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_ninguno">Sin proyecto</SelectItem>
+                  <SelectItem value={VALOR_GASTOS_INTERNOS}>
+                    {CODIGO_TALLER_007} · Gastos internos (taller)
+                  </SelectItem>
                   {proyectos.filter(p => p.estado !== 'facturado').map(p => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigoProyecto} · {p.proyectoNombre || p.clienteNombre}
@@ -291,7 +221,9 @@ export function NuevaOrdenCompraDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-500">Solo proyectos activos sin facturar</p>
+              <p className="text-xs text-slate-500">
+                Obligatorio: proyecto activo sin facturar, o {CODIGO_TALLER_007} para gastos internos
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Concepto</Label>
@@ -496,7 +428,7 @@ export function NuevaOrdenCompraDialog({
             </Button>
             <Button
               onClick={handleGuardar}
-              disabled={guardando || items.every(it => !it.nombre.trim())}
+              disabled={guardando || !proveedorId || !proyectoId || items.every(it => !it.nombre.trim())}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {guardando ? 'Guardando...' : 'Crear orden de compra'}

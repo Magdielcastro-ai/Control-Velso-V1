@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   Shield,
+  Building2,
 } from 'lucide-react';
 
 interface HomeVelsoProps {
@@ -32,6 +33,7 @@ interface HomeVelsoProps {
   onProduccion: () => void;
   onPiezasCatalogo: () => void;
   onOrdenesCompra: () => void;
+  onProveedores: () => void;
   onAdminUsuarios?: () => void;
   esAdmin?: boolean;
   alertasCount: number;
@@ -104,6 +106,7 @@ export function HomeVelso({
   onProduccion,
   onPiezasCatalogo,
   onOrdenesCompra,
+  onProveedores,
   onAdminUsuarios,
   esAdmin = false,
   alertasCount,
@@ -236,6 +239,13 @@ export function HomeVelso({
           icono: Settings,
           onClick: onProcesos,
           colorIcono: 'bg-teal-600',
+        }} />
+        <TarjetaModulo modulo={{
+          titulo: 'Proveedores',
+          descripcion: 'Catálogo y días de crédito',
+          icono: Building2,
+          onClick: onProveedores,
+          colorIcono: 'bg-cyan-700',
         }} />
       </SeccionCategoria>
 

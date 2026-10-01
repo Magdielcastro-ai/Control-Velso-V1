@@ -18,6 +18,7 @@ export const useProveedoresStore = () => {
     telefono: row.telefono || undefined,
     email: row.email || undefined,
     contacto: row.contacto || undefined,
+    diasCredito: Number(row.dias_credito) || 0,
     createdAt: row.created_at || undefined,
   });
 
@@ -71,6 +72,7 @@ export const useProveedoresStore = () => {
     telefono?: string;
     email?: string;
     contacto?: string;
+    diasCredito?: number;
   }): Promise<Proveedor | null> => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -92,6 +94,7 @@ export const useProveedoresStore = () => {
         telefono: datos.telefono?.trim() || null,
         email: datos.email?.trim() || null,
         contacto: datos.contacto?.trim() || null,
+        dias_credito: Number(datos.diasCredito) || 0,
       };
 
       const { data, error } = await supabase
@@ -117,6 +120,47 @@ export const useProveedoresStore = () => {
     }
   }, [proveedores.length]);
 
+  const actualizarProveedor = useCallback(async (id: string, datos: Partial<{
+    nombre: string;
+    tipo: string;
+    domicilio: string;
+    telefono: string;
+    email: string;
+    contacto: string;
+    diasCredito: number;
+  }>): Promise<boolean> => {
+    try {
+      const updateData: any = { updated_at: new Date().toISOString() };
+      if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
+      if (datos.tipo !== undefined) updateData.tipo = datos.tipo;
+      if (datos.domicilio !== undefined) updateData.domicilio = datos.domicilio;
+      if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
+      if (datos.email !== undefined) updateData.email = datos.email;
+      if (datos.contacto !== undefined) updateData.contacto = datos.contacto;
+      if (datos.diasCredito !== undefined) updateData.dias_credito = datos.diasCredito;
+
+      const { error } = await supabase
+        .from('proveedores')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        toast.error('Error actualizando proveedor: ' + error.message);
+        return false;
+      }
+
+      setProveedores(prev =>
+        prev.map(p => p.id === id ? { ...p, ...datos } : p)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      );
+      toast.success('Proveedor actualizado');
+      return true;
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + e.message);
+      return false;
+    }
+  }, []);
+
   const eliminarProveedor = useCallback(async (id: string) => {
     try {
       const { error } = await supabase.from('proveedores').delete().eq('id', id);
@@ -138,6 +182,7 @@ export const useProveedoresStore = () => {
     cargando,
     error,
     crearProveedor,
+    actualizarProveedor,
     eliminarProveedor,
     cargarProveedores,
   };
