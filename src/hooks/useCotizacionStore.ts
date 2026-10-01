@@ -805,6 +805,30 @@ export const useCotizacionStore = () => {
           piezas = [piezaVacia()];
         }
 
+        // Términos de pago del cliente: cotizaciones viejas guardaron la forma
+        // de pago por defecto antes de que el cliente tuviera términos asignados.
+        // Si nunca se personalizó, aplicar los términos actuales del cliente.
+        let condiciones = data.condiciones || cotizacionVacia().condiciones;
+        if (data.cliente_id) {
+          const { data: clienteRow } = await supabase
+            .from('clientes')
+            .select('terminos_pago')
+            .eq('id', data.cliente_id)
+            .single();
+
+          const terminosCliente = clienteRow?.terminos_pago;
+          const esDefault = !condiciones?.formaPago ||
+            condiciones.formaPago === '50% anticipo, 50% contra entrega';
+
+          if (terminosCliente && esDefault) {
+            condiciones = {
+              ...condiciones,
+              formaPago: terminosCliente,
+              anticipoPorcentaje: terminosCliente.includes('Net ') ? 0 : 50,
+            };
+          }
+        }
+
         const cotizacionCargada: Cotizacion = {
           id: data.id,
           numero: data.numero,
@@ -821,7 +845,7 @@ export const useCotizacionStore = () => {
           materiales: data.materiales || [],
           procesos: data.procesos || [],
           costosAdicionales: migrarCostosAdicionales(data.costos_adicionales) || cotizacionVacia().costosAdicionales,
-          condiciones: data.condiciones || cotizacionVacia().condiciones,
+          condiciones,
           moneda: data.moneda || 'MXN',
           tipoCambio: Number(data.tipo_cambio) || 1,
           subtotal: Number(data.subtotal) || 0,

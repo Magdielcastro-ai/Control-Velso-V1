@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ChevronDown,
   User,
-  ClipboardList,
   Wrench,
   Save,
   Printer,
@@ -25,20 +24,18 @@ import { HojaViajeraDocumento } from '@/components/HojaViajeraDocumento';
 interface ProduccionViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
-  onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   onGuardarHorasReales?: (proyecto: ProyectoVenta, procesosReales: any[]) => Promise<void> | void;
 }
 
 export function ProduccionView({
   onVolver,
   proyectos,
-  onVerHojaViajera,
   onGuardarHorasReales,
 }: ProduccionViewProps) {
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  // Línea de captura: minutos + operador (cada proceso puede tener varias)
-  type LineaCaptura = { minutos: string; operador: string };
+  // Línea de captura: minutos + operador + piezas hechas por esa persona
+  type LineaCaptura = { minutos: string; operador: string; piezas: string };
   // Captura por proceso: { [proyectoId]: { [captureId]: { lineas } } }
   const [captura, setCaptura] = useState<Record<string, Record<string, { lineas: LineaCaptura[] }>>>({});
   const [guardando, setGuardando] = useState<string | null>(null);
@@ -96,16 +93,18 @@ export function ProduccionView({
     const editado = captura[proyecto.id]?.[proc.captureId];
     if (editado !== undefined) return editado.lineas;
     const guardado = registroGuardado(proyecto, proc);
-    if (!guardado) return [{ minutos: '', operador: '' }];
+    if (!guardado) return [{ minutos: '', operador: '', piezas: '' }];
     if (Array.isArray(guardado.lineas) && guardado.lineas.length > 0) {
       return guardado.lineas.map((l: any) => ({
         minutos: l.minutos != null ? String(l.minutos) : '',
         operador: l.operador || '',
+        piezas: l.piezas != null ? String(l.piezas) : '',
       }));
     }
     return [{
       minutos: guardado.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
       operador: guardado.operadorNombre || '',
+      piezas: '',
     }];
   };
 
@@ -120,18 +119,18 @@ export function ProduccionView({
     }));
   };
 
-  const actualizarLinea = (proyecto: ProyectoVenta, proc: any, idx: number, campo: 'minutos' | 'operador', valor: string) => {
+  const actualizarLinea = (proyecto: ProyectoVenta, proc: any, idx: number, campo: 'minutos' | 'operador' | 'piezas', valor: string) => {
     const lineas = getLineas(proyecto, proc).map((l, i) => i === idx ? { ...l, [campo]: valor } : l);
     setLineas(proyecto, proc, lineas);
   };
 
   const agregarLinea = (proyecto: ProyectoVenta, proc: any) => {
-    setLineas(proyecto, proc, [...getLineas(proyecto, proc), { minutos: '', operador: '' }]);
+    setLineas(proyecto, proc, [...getLineas(proyecto, proc), { minutos: '', operador: '', piezas: '' }]);
   };
 
   const quitarLinea = (proyecto: ProyectoVenta, proc: any, idx: number) => {
     const lineas = getLineas(proyecto, proc).filter((_, i) => i !== idx);
-    setLineas(proyecto, proc, lineas.length > 0 ? lineas : [{ minutos: '', operador: '' }]);
+    setLineas(proyecto, proc, lineas.length > 0 ? lineas : [{ minutos: '', operador: '', piezas: '' }]);
   };
 
   const minutosCapturados = (proyecto: ProyectoVenta, proc: any): number =>
@@ -142,6 +141,12 @@ export function ProduccionView({
     Object.keys(captura).length > 0 ||
     Object.keys(extras).length > 0 ||
     Object.keys(extrasEliminados).length > 0;
+
+  // Cambios pendientes por proyecto (para habilitar su botón Guardar)
+  const hayCambiosEn = (proyectoId: string) =>
+    !!captura[proyectoId] ||
+    !!extras[proyectoId] ||
+    (extrasEliminados[proyectoId]?.length ?? 0) > 0;
 
   const extrasDe = (proyectoId: string): ExtraCaptura[] => extras[proyectoId] || [];
 
@@ -235,7 +240,12 @@ export function ProduccionView({
           tiempoMinutosCotizado: minCot,
           tiempoMinutosReal: minutos,
           operadorNombre: operadores.join(' / '),
-          lineas: lineas.map(l => ({ minutos: Number(l.minutos) || 0, operador: l.operador.trim() })),
+          lineas: lineas.map(l => ({
+            minutos: Number(l.minutos) || 0,
+            operador: l.operador.trim(),
+            piezas: Number(l.piezas) || 0,
+          })),
+          piezasReal: lineas.reduce((s, l) => s + (Number(l.piezas) || 0), 0),
           costoPorHora: Number(p.costoPorHora) || 0,
           costoManoObra: Number(p.costoManoObra) || 0,
           costoTotalCotizado: costoCot,
@@ -528,6 +538,15 @@ export function ProduccionView({
                                               onChange={(e) => actualizarLinea(proyecto, procConLlave, idx, 'operador', e.target.value)}
                                               className="h-7 w-28 text-sm"
                                             />
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              placeholder="pzas"
+                                              title="Piezas que hizo esta persona en este proceso"
+                                              value={linea.piezas}
+                                              onChange={(e) => actualizarLinea(proyecto, procConLlave, idx, 'piezas', e.target.value)}
+                                              className="h-7 w-16 text-sm text-right"
+                                            />
                                             {lineas.length > 1 && (
                                               <button
                                                 onClick={() => quitarLinea(proyecto, procConLlave, idx)}
@@ -621,28 +640,19 @@ export function ProduccionView({
                         </div>
                       )}
 
-                      {/* Acciones — producción no navega a Proyectos */}
+                      {/* Acciones — producción no navega a Proyectos;
+                          Guardar solo se habilita cuando hay cambios */}
                       <div className="flex gap-2 flex-wrap">
                         {onGuardarHorasReales && (
                           <Button
                             size="sm"
                             className="flex-1 bg-green-600 hover:bg-green-700"
-                            disabled={guardando === proyecto.id}
+                            disabled={guardando === proyecto.id || !hayCambiosEn(proyecto.id)}
+                            title={hayCambiosEn(proyecto.id) ? 'Guardar capturas' : 'No hay cambios por guardar'}
                             onClick={() => handleGuardarHoras(proyecto)}
                           >
                             <Save className="w-3 h-3 mr-1" />
                             {guardando === proyecto.id ? 'Guardando...' : 'Guardar horas reales'}
-                          </Button>
-                        )}
-                        {onVerHojaViajera && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1 border-slate-300"
-                            onClick={() => onVerHojaViajera(proyecto)}
-                          >
-                            <ClipboardList className="w-3 h-3 mr-1" />
-                            Ver hoja viajera completa
                           </Button>
                         )}
                       </div>

@@ -87,6 +87,8 @@ export function ControlDeCodigosView({
 
   // Congelado por material: los guardados quedan bloqueados hasta "Editar"
   const [materialesEditando, setMaterialesEditando] = useState<Set<string>>(new Set());
+  // Materiales con cambios sin guardar (su botón Guardar solo se habilita así)
+  const [materialesSucios, setMaterialesSucios] = useState<Set<string>>(new Set());
   // Cambios sin guardar (para alertar al salir)
   const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState(false);
 
@@ -161,6 +163,7 @@ export function ControlDeCodigosView({
   // Actualizar material real (solo si no está congelado)
   const actualizarMaterialReal = (id: string, campo: 'costoUnitarioReal' | 'cantidad', valor: number) => {
     setHayCambiosSinGuardar(true);
+    setMaterialesSucios(prev => new Set(prev).add(id));
     setMaterialesReales(prev => prev.map(m => {
       if (m.id !== id) return m;
       const nuevo = { ...m, [campo]: valor };
@@ -182,6 +185,11 @@ export function ControlDeCodigosView({
     );
     setMaterialesReales(nuevos);
     setMaterialesEditando(prev => {
+      const s = new Set(prev);
+      s.delete(materialId);
+      return s;
+    });
+    setMaterialesSucios(prev => {
       const s = new Set(prev);
       s.delete(materialId);
       return s;
@@ -259,7 +267,12 @@ export function ControlDeCodigosView({
           <h2 className="text-2xl font-bold text-slate-900">Control de Códigos</h2>
           <p className="text-slate-500">{proyecto.proyectoNombre} · {proyecto.clienteNombre}</p>
         </div>
-        <Button onClick={handleGuardar} className="bg-green-600 hover:bg-green-700">
+        <Button
+          onClick={handleGuardar}
+          disabled={!hayCambiosSinGuardar}
+          title={hayCambiosSinGuardar ? 'Guardar cambios' : 'No hay cambios por guardar'}
+          className="bg-green-600 hover:bg-green-700"
+        >
           <Save className="w-4 h-4 mr-2" />
           Guardar Cambios
         </Button>
@@ -521,6 +534,8 @@ export function ControlDeCodigosView({
                           <Button
                             size="sm"
                             className="w-full bg-green-600 hover:bg-green-700"
+                            disabled={!materialesSucios.has(material.id)}
+                            title={materialesSucios.has(material.id) ? 'Guardar y congelar' : 'No hay cambios por guardar'}
                             onClick={() => handleGuardarMaterial(material.id)}
                           >
                             <Save className="w-3.5 h-3.5 mr-1" />

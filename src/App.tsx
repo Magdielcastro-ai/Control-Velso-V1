@@ -879,7 +879,6 @@ function App() {
             <ProduccionView
               onVolver={irAHome}
               proyectos={proyectos}
-              onVerHojaViajera={handleVerHojaViajera}
               onGuardarHorasReales={async (proyecto, procesosReales) => {
                 // 1. JSON en proyectos.procesos_reales (alimenta dashboard y control de códigos)
                 await guardarDatosReales(proyecto.id, { procesosReales });
@@ -902,6 +901,8 @@ function App() {
                   minutos_cotizados: p.tiempoMinutosCotizado || 0,
                   minutos_reales: p.tiempoMinutosReal,
                   operador: p.operadorNombre || null,
+                  lineas: p.lineas || null,
+                  piezas_real: p.piezasReal || 0,
                   usuario_id: user.id,
                   updated_at: new Date().toISOString(),
                 }));
