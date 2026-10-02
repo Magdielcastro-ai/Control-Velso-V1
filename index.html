@@ -22,17 +22,41 @@
     
     <title>Velso CNC - Sistema de Control de Ventas</title>
     
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration con auto-actualización -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
               console.log('SW registrado:', registration.scope);
+
+              // Cuando hay una versión nueva del SW, tomar el control y recargar
+              registration.addEventListener('updatefound', () => {
+                const nuevoWorker = registration.installing;
+                if (!nuevoWorker) return;
+                nuevoWorker.addEventListener('statechange', () => {
+                  if (nuevoWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                    console.log('Nueva versión detectada — recargando...');
+                    window.location.reload();
+                  }
+                });
+              });
+
+              // Buscar actualizaciones al cargar y cada minuto
+              registration.update();
+              setInterval(() => registration.update(), 60 * 1000);
             })
             .catch((error) => {
               console.log('SW error:', error);
             });
+
+          // Si el SW cambió mientras la pestaña estaba abierta, recargar
+          let recargando = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (recargando) return;
+            recargando = true;
+            window.location.reload();
+          });
         });
       }
     </script>
