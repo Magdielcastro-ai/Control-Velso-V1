@@ -47,6 +47,13 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
   const ivaTotal = subtotalConUtilidad * (ivaPorcentaje / 100);
   const totalGeneral = subtotalConUtilidad + ivaTotal;
 
+  // % de utilidad promedio ponderado de la cotización (cada pieza puede
+  // tener su propio margen). Es el % que se usa en Control de Códigos.
+  const basePiezasConUtilidad = subtotalConUtilidad - costosGenerales;
+  const margenPromedio = basePiezasConUtilidad > 0
+    ? (utilidadTotal / basePiezasConUtilidad) * 100
+    : margenUtilidad;
+
   // Símbolo de moneda
   const simbolo = cotizacion.moneda === 'USD' ? 'US$' : '$';
 
@@ -149,7 +156,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                     <span className="font-medium">{simbolo}{costoDirectoPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-green-600">
-                    <span>Utilidad ({margenUtilidad}%)</span>
+                    <span>Utilidad ({pieza.margenPieza ?? margenUtilidad}%)</span>
                     <span>{simbolo}{utilidadPieza.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-blue-700 pt-1 border-t border-slate-100">
@@ -201,7 +208,7 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
               <span>{simbolo}{subtotalPiezasSinUtilidad.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm text-green-600">
-              <span>Utilidad ({margenUtilidad}%)</span>
+              <span>Utilidad ({margenPromedio.toFixed(1)}% promedio)</span>
               <span>{simbolo}{utilidadTotal.toFixed(2)}</span>
             </div>
             {costosGenerales > 0 && (

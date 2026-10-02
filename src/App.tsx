@@ -492,6 +492,15 @@ function App() {
     // Buscar la cotización completa para obtener las piezas
     const cotizacionCompleta = cotizacionesGuardadas.find(c => c.id === cotizacion.id);
 
+    // Margen efectivo: promedio ponderado del % de utilidad de las piezas
+    // (cada pieza puede tener su propio margen 15–50%)
+    const piezasConv = cotizacionCompleta?.piezas || [];
+    const totalConUtilidad = piezasConv.reduce((s, p) => s + p.totalPieza * p.cantidad, 0);
+    const utilidadTotalConv = piezasConv.reduce((s, p) => s + p.utilidadPieza * p.cantidad, 0);
+    const margenEfectivo = totalConUtilidad > 0
+      ? Math.round((utilidadTotalConv / totalConUtilidad) * 100)
+      : (cotizacion.margenUtilidad || 30);
+
     const exito = await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
       ordenCompra,
@@ -500,7 +509,7 @@ function App() {
       clienteNombre: cotizacion.clienteNombre,
       proyectoNombre: cotizacion.proyectoNombre,
       totalCotizado: cotizacion.total,
-      margenUtilidad: cotizacion.margenUtilidad || 30,
+      margenUtilidad: margenEfectivo,
       ivaPorcentaje: cotizacion.ivaPorcentaje || 16,
       piezas: cotizacionCompleta?.piezas || [],
       materiales: cotizacionCompleta?.materiales || [],

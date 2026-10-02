@@ -220,6 +220,12 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                               Código: {pieza.codigo}
                             </div>
                           )}
+                          {/* Descripción breve de la pieza (se captura en la pestaña Piezas) */}
+                          {pieza.descripcion && (
+                            <div className="text-slate-600 text-xs mt-1 italic">
+                              {pieza.descripcion}
+                            </div>
+                          )}
                           {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 && (
                             <div className="text-xs text-slate-500 mt-1">
                               {pieza.procesos

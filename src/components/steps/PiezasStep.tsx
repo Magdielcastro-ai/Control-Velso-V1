@@ -575,6 +575,31 @@ function PiezaCard({
                       )}
                     </div>
                   </div>
+
+                  {/* Utilidad por pieza (15%–50%, pasos de 5) + descripción */}
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-500">Utilidad:</span>
+                      <select
+                        value={pieza.margenPieza ?? 30}
+                        onChange={(e) => onActualizar(pieza.id, { margenPieza: parseInt(e.target.value) })}
+                        className="h-7 text-xs rounded border border-slate-200 bg-white px-1.5"
+                        title="Porcentaje de utilidad de ESTA pieza"
+                      >
+                        {[15, 20, 25, 30, 35, 40, 45, 50].map(m => (
+                          <option key={m} value={m}>{m}%</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <textarea
+                      value={pieza.descripcion || ''}
+                      onChange={(e) => onActualizar(pieza.id, { descripcion: e.target.value })}
+                      placeholder="Descripción breve o procesos generales de esta pieza (se muestra en la cotización imprimible)..."
+                      className="w-full text-xs rounded-lg border border-slate-200 p-2 min-h-[52px] bg-white"
+                    />
+                  </div>
                 </>
               ) : (
                 /* Resumen tipo catálogo - solo cuando está plegada */
