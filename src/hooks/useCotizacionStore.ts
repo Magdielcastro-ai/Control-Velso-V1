@@ -616,6 +616,15 @@ export const useCotizacionStore = () => {
       estado: estadoFinal,
       usuarioId: user?.id,
       cantidadPiezas: nuevaCotizacion.piezas.length,
+      // Conservar el detalle completo en memoria: sin esto, convertir a
+      // proyecto después de editar mandaba piezas vacías (bug MAQ003)
+      piezas: nuevaCotizacion.piezas,
+      materiales: nuevaCotizacion.materiales,
+      procesos: nuevaCotizacion.procesos,
+      costosAdicionales: nuevaCotizacion.costosAdicionales,
+      clienteId: nuevaCotizacion.datosCliente.clienteId || undefined,
+      margenUtilidad: nuevaCotizacion.margenUtilidad,
+      ivaPorcentaje: nuevaCotizacion.ivaPorcentaje,
     };
 
     setCotizacionesGuardadas(prev => {
