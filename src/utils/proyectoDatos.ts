@@ -38,7 +38,9 @@ export function buscarReal(procesosReales: any[] | undefined, proc: any): any | 
   );
 }
 
-/** Todos los materiales: nivel superior + el de cada pieza */
+/** Todos los materiales: nivel superior + el de cada pieza.
+ *  piezaCantidad = piezas a producir (la cotización cobra el material
+ *  por pieza), distinto de la cantidad de compra del material. */
 export function materialesAplanados(obj: any): any[] {
   const top = Array.isArray(obj?.materiales) ? obj.materiales : [];
   const dePiezas = Array.isArray(obj?.piezas)
@@ -46,8 +48,10 @@ export function materialesAplanados(obj: any): any[] {
         .filter((pz: any) => pz?.material)
         .map((pz: any) => ({
           ...pz.material,
+          piezaId: pz.id,
           piezaNombre: pz.nombre,
           piezaCodigo: pz.codigo,
+          piezaCantidad: Number(pz.cantidad) || 1,
         }))
     : [];
   return [...top, ...dePiezas];

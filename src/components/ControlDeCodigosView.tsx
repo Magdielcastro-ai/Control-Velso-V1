@@ -39,21 +39,22 @@ export function ControlDeCodigosView({
   // pieza — aquí los aplanamos y los llevamos al esquema del proyecto.
   const materialesCot = useMemo<MaterialProyecto[]>(() =>
     materialesAplanados(proyecto).map((m: any) => {
-      // El material cotizado se muestra CON su markup, igual que en la
-      // cotización ("Material por pieza (con 30% margen)") — así, si el
-      // precio real es igual al cotizado, la diferencia es exactamente $0
+      // El material cotizado se muestra CON su markup y ESCALADO POR
+      // PIEZAS A PRODUCIR (no por unidades compradas), igual que la
+      // cotización — así, sin cambios reales, la diferencia es $0
       const margenMat = Number(m.margenPorcentaje) || 0;
       const unitConMargen = (Number(m.costoUnitario) || 0) * (1 + margenMat / 100);
+      const piezasAProducir = Number(m.piezaCantidad) || 1;
       return {
         id: m.id || crypto.randomUUID(),
         nombre: m.piezaNombre ? `${m.nombre} (${m.piezaNombre})` : (m.nombre || ''),
         tipo: m.tipo || '',
         forma: m.forma || '',
-        cantidad: Number(m.cantidad) || 0,
+        cantidad: piezasAProducir,
         unidad: m.unidad || 'pieza',
         costoUnitarioCotizado: unitConMargen,
         margenPorcentaje: margenMat,
-        costoTotalCotizado: unitConMargen * (Number(m.cantidad) || 0),
+        costoTotalCotizado: unitConMargen * piezasAProducir,
       };
     }), [proyecto]);
 
@@ -123,6 +124,13 @@ export function ControlDeCodigosView({
     const costoExtras = (proyecto.procesosReales || [])
       .filter((e: any) => e.tipo === 'herramienta_extra')
       .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
+    // Costos adicionales POR PIEZA (ya vienen dentro del subtotalPieza
+    // cotizado; en lo real cuentan igual mientras no se capturen)
+    const costoAdicionalesPiezas = (proyecto.piezas || []).reduce((s, pz: any) => {
+      const ca = pz.costosAdicionales || {};
+      return s + Object.values(ca).reduce((s2: number, item: any) =>
+        s2 + (item && !item.incluidoGratis ? Number(item.costo) || 0 : 0), 0);
+    }, 0);
 
     const costosAdicionalesCotizado = Object.values(costosCot).reduce((sum, v) => sum + v, 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
@@ -134,7 +142,7 @@ export function ControlDeCodigosView({
       (s, pz: any) => s + (Number(pz.subtotalPieza) || 0) * (Number(pz.cantidad) || 1), 0
     );
     const costoTotalCotizado = costoDirectoPiezas + costosAdicionalesCotizado;
-    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costosAdicionalesReal;
+    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costoAdicionalesPiezas + costosAdicionalesReal;
 
     // Desglose fiscal de la cotización (valores originales, no modificables)
     const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
