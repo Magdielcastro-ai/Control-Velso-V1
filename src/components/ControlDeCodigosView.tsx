@@ -38,17 +38,24 @@ export function ControlDeCodigosView({
   // Los proyectos convertidos guardan material y procesos DENTRO de cada
   // pieza — aquí los aplanamos y los llevamos al esquema del proyecto.
   const materialesCot = useMemo<MaterialProyecto[]>(() =>
-    materialesAplanados(proyecto).map((m: any) => ({
-      id: m.id || crypto.randomUUID(),
-      nombre: m.piezaNombre ? `${m.nombre} (${m.piezaNombre})` : (m.nombre || ''),
-      tipo: m.tipo || '',
-      forma: m.forma || '',
-      cantidad: Number(m.cantidad) || 0,
-      unidad: m.unidad || 'pieza',
-      costoUnitarioCotizado: Number(m.costoUnitario) || 0,
-      margenPorcentaje: Number(m.margenPorcentaje) || 0,
-      costoTotalCotizado: Number(m.costoTotal) || 0,
-    })), [proyecto]);
+    materialesAplanados(proyecto).map((m: any) => {
+      // El material cotizado se muestra CON su markup, igual que en la
+      // cotización ("Material por pieza (con 30% margen)") — así, si el
+      // precio real es igual al cotizado, la diferencia es exactamente $0
+      const margenMat = Number(m.margenPorcentaje) || 0;
+      const unitConMargen = (Number(m.costoUnitario) || 0) * (1 + margenMat / 100);
+      return {
+        id: m.id || crypto.randomUUID(),
+        nombre: m.piezaNombre ? `${m.nombre} (${m.piezaNombre})` : (m.nombre || ''),
+        tipo: m.tipo || '',
+        forma: m.forma || '',
+        cantidad: Number(m.cantidad) || 0,
+        unidad: m.unidad || 'pieza',
+        costoUnitarioCotizado: unitConMargen,
+        margenPorcentaje: margenMat,
+        costoTotalCotizado: unitConMargen * (Number(m.cantidad) || 0),
+      };
+    }), [proyecto]);
 
   const procesosCot = useMemo<(ProcesoProyecto & { piezaNombre?: string; captureId?: string; piezaId?: string })[]>(() =>
     procesosAplanados(proyecto).map((p: any) => ({
@@ -119,8 +126,14 @@ export function ControlDeCodigosView({
 
     const costosAdicionalesCotizado = Object.values(costosCot).reduce((sum, v) => sum + v, 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
-    
-    const costoTotalCotizado = costoMaterialesCotizado + costoProcesosCotizado + costosAdicionalesCotizado;
+
+    // COSTO DIRECTO COTIZADO OFICIAL: el que calculó la cotización
+    // (Σ subtotalPieza × cantidad + costos generales) — nunca se recomputa
+    // desde componentes, para coincidir exactamente con el Resumen.
+    const costoDirectoPiezas = (proyecto.piezas || []).reduce(
+      (s, pz: any) => s + (Number(pz.subtotalPieza) || 0) * (Number(pz.cantidad) || 1), 0
+    );
+    const costoTotalCotizado = costoDirectoPiezas + costosAdicionalesCotizado;
     const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costosAdicionalesReal;
 
     // Desglose fiscal de la cotización (valores originales, no modificables)
@@ -129,13 +142,19 @@ export function ControlDeCodigosView({
     const subtotalSinIVA = totalConIVA / (1 + ivaPct / 100);
     const ivaMonto = totalConIVA - subtotalSinIVA;
 
-    // Utilidad: base sin IVA. Si el proyecto ya se facturó, se usa lo facturado.
+    // Utilidad cotizada OFICIAL: la que calculó la cotización por pieza.
+    // Nunca cambia; la real es la que se mueve con los gastos.
+    const utilidadCotizada = (proyecto.piezas || []).reduce(
+      (s, pz: any) => s + (Number(pz.utilidadPieza) || 0) * (Number(pz.cantidad) || 1), 0
+    );
+    // El % cotizado es el margen que quedó guardado en el proyecto (32.1%)
+    const porcentajeUtilidadCotizada = Number(proyecto.margenUtilidad) ||
+      (subtotalSinIVA > 0 ? (utilidadCotizada / subtotalSinIVA) * 100 : 0);
+    // Utilidad real: base sin IVA (o facturado sin IVA) menos el gasto real
     const baseFacturadaSinIVA = proyecto.totalFacturado
       ? proyecto.totalFacturado / (1 + ivaPct / 100)
       : subtotalSinIVA;
-    const utilidadCotizada = subtotalSinIVA - costoTotalCotizado;
     const utilidadReal = baseFacturadaSinIVA - costoTotalReal;
-    const porcentajeUtilidadCotizada = subtotalSinIVA > 0 ? (utilidadCotizada / subtotalSinIVA) * 100 : 0;
     const porcentajeUtilidadReal = baseFacturadaSinIVA > 0 ? (utilidadReal / baseFacturadaSinIVA) * 100 : 0;
 
     return {
