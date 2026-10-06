@@ -45,7 +45,8 @@ interface ProyectosViewProps {
     cotizacion: CotizacionGuardada,
     ordenCompra: string,
     tipoProyecto: 'suministro' | 'maquinado',
-    codigoManual?: string
+    codigoManual?: string,
+    piezasCompradas?: { piezaId: string; cantidad: number }[]
   ) => void;
   onEliminarProyecto?: (id: string) => void;
   onMarcarFabricado?: (id: string) => void;
@@ -131,6 +132,8 @@ export function ProyectosView({
   const [ordenCompra, setOrdenCompra] = useState('');
   const [tipoProyecto, setTipoProyecto] = useState<'suministro' | 'maquinado'>('maquinado');
   const [codigoManual, setCodigoManual] = useState('');
+  // Piezas compradas: por defecto todo lo cotizado; se puede bajar a 0 o desmarcar
+  const [piezasCompra, setPiezasCompra] = useState<Record<string, { incluir: boolean; cantidad: number }>>({});
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
   
@@ -216,11 +219,23 @@ export function ProyectosView({
   const handleConvertir = () => {
     if (!cotizacionSeleccionada || !ordenCompra || !onConvertirAVenta) return;
 
-    onConvertirAVenta(cotizacionSeleccionada, ordenCompra, tipoProyecto, codigoManual || undefined);
+    // Piezas compradas: solo las incluidas con cantidad > 0.
+    // Si la cotización no tiene piezas (formato viejo), se convierte completa.
+    const piezasCot = cotizacionSeleccionada.piezas || [];
+    let piezasCompradas: { piezaId: string; cantidad: number }[] | undefined;
+    if (piezasCot.length > 0) {
+      piezasCompradas = piezasCot
+        .filter(pz => piezasCompra[pz.id]?.incluir && (piezasCompra[pz.id]?.cantidad ?? 0) > 0)
+        .map(pz => ({ piezaId: pz.id, cantidad: piezasCompra[pz.id].cantidad }));
+      if (piezasCompradas.length === 0) return; // el botón se deshabilita, doble seguro
+    }
+
+    onConvertirAVenta(cotizacionSeleccionada, ordenCompra, tipoProyecto, codigoManual || undefined, piezasCompradas);
 
     setOrdenCompra('');
     setTipoProyecto('maquinado');
     setCodigoManual('');
+    setPiezasCompra({});
     setCotizacionSeleccionada(null);
     setDialogoConvertir(false);
   };
@@ -309,7 +324,7 @@ export function ProyectosView({
                 Convertir Cotización
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Convertir Cotización a Venta</DialogTitle>
               </DialogHeader>
@@ -324,7 +339,13 @@ export function ProyectosView({
                         {cotizacionesPendientes.map((cot) => (
                           <button
                             key={cot.id}
-                            onClick={() => setCotizacionSeleccionada(cot)}
+                            onClick={() => {
+                              setCotizacionSeleccionada(cot);
+                              // Inicializar: todo lo cotizado queda incluido por defecto
+                              setPiezasCompra(Object.fromEntries(
+                                (cot.piezas || []).map(pz => [pz.id, { incluir: true, cantidad: pz.cantidad }])
+                              ));
+                            }}
                             className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${
                               cotizacionSeleccionada?.id === cot.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                             }`}
@@ -345,6 +366,70 @@ export function ProyectosView({
                     )}
                   </div>
                 </div>
+
+                {/* Piezas compradas: ajustar cantidades o excluir items */}
+                {cotizacionSeleccionada && (cotizacionSeleccionada.piezas?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <Label>Piezas compradas *</Label>
+                    <p className="text-xs text-slate-400">
+                      Lo cotizado queda guardado en la cotización. Aquí ajusta lo que SÍ te
+                      compraron: baja la cantidad o desmarca el item (0 = no entra al proyecto).
+                    </p>
+                    <div className="border rounded-lg divide-y max-h-[180px] overflow-y-auto">
+                      {cotizacionSeleccionada.piezas!.map((pz) => {
+                        const sel = piezasCompra[pz.id] || { incluir: true, cantidad: pz.cantidad };
+                        return (
+                          <div key={pz.id} className={`flex items-center gap-2 p-2 ${sel.incluir ? '' : 'opacity-40'}`}>
+                            <input
+                              type="checkbox"
+                              checked={sel.incluir}
+                              onChange={(e) => setPiezasCompra(prev => ({
+                                ...prev,
+                                [pz.id]: { ...sel, incluir: e.target.checked },
+                              }))}
+                              className="rounded border-slate-300 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800 truncate">{pz.nombre}</p>
+                              <p className="text-xs text-slate-400">Cotizadas: {pz.cantidadCotizada ?? pz.cantidad}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-xs text-slate-500">Compradas:</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={pz.cantidadCotizada ?? pz.cantidad}
+                                value={sel.cantidad}
+                                disabled={!sel.incluir}
+                                onChange={(e) => setPiezasCompra(prev => ({
+                                  ...prev,
+                                  [pz.id]: { ...sel, cantidad: Math.max(0, parseInt(e.target.value) || 0) },
+                                }))}
+                                className="h-7 w-16 text-sm text-right"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Vista previa del total comprado */}
+                    {(() => {
+                      const ivaPct = (cotizacionSeleccionada.ivaPorcentaje ?? 16) / 100;
+                      const totalCompra = (cotizacionSeleccionada.piezas || []).reduce((s, pz) => {
+                        const sel = piezasCompra[pz.id];
+                        if (!sel?.incluir || sel.cantidad <= 0) return s;
+                        return s + (pz.totalPieza || 0) * sel.cantidad;
+                      }, 0);
+                      return (
+                        <p className="text-sm text-right text-slate-600">
+                          Total de la compra: <span className="font-bold text-green-700">
+                            ${(totalCompra * (1 + ivaPct)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </span> <span className="text-xs text-slate-400">(con IVA)</span>
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>Tipo de Proyecto *</Label>
@@ -380,9 +465,15 @@ export function ProyectosView({
                   </p>
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleConvertir}
-                  disabled={!cotizacionSeleccionada || !ordenCompra}
+                  disabled={
+                    !cotizacionSeleccionada ||
+                    !ordenCompra ||
+                    // Si la cotización tiene piezas, al menos una debe quedar incluida con cantidad > 0
+                    ((cotizacionSeleccionada.piezas?.length ?? 0) > 0 &&
+                      !Object.values(piezasCompra).some(s => s.incluir && s.cantidad > 0))
+                  }
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
                   Convertir a Venta

@@ -294,6 +294,7 @@ export interface PiezaCotizacion {
   // Campos para costos por pieza en la pestaña Costos
   margenPieza?: number;        // Margen de utilidad específico por pieza (sobrescribe el global)
   descripcion?: string;        // Descripción/comentario — se muestra en la cotización imprimible
+  cantidadCotizada?: number;   // En proyectos: cuántas se cotizaron originalmente (la OC puede ser menor)
 }
 
 export interface PiezaCatalogo {

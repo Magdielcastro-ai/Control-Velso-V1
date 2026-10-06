@@ -482,7 +482,8 @@ function App() {
     cotizacion: CotizacionGuardada,
     ordenCompra: string,
     tipoProyecto: 'suministro' | 'maquinado' = 'maquinado',
-    codigoManual?: string
+    codigoManual?: string,
+    piezasCompradas?: { piezaId: string; cantidad: number }[]
   ) => {
     if (!canConvertirAVenta()) {
       toast.error('No tienes permiso para convertir cotizaciones');
@@ -492,14 +493,51 @@ function App() {
     // Buscar la cotización completa para obtener las piezas
     const cotizacionCompleta = cotizacionesGuardadas.find(c => c.id === cotizacion.id);
 
+    // Piezas COMPRADAS: escalar cada pieza a la cantidad comprada.
+    // La cotización original no se toca (queda lo ofertado); el proyecto
+    // nace solo con lo comprado. Si no hay selección, se toma todo.
+    const piezasOriginales = cotizacionCompleta?.piezas || [];
+    const piezasConv = piezasOriginales
+      .filter(pz => !piezasCompradas || piezasCompradas.some(s => s.piezaId === pz.id))
+      .map(pz => {
+        const compradas = piezasCompradas
+          ? (piezasCompradas.find(s => s.piezaId === pz.id)?.cantidad ?? pz.cantidad)
+          : pz.cantidad;
+        const factor = pz.cantidad > 0 ? compradas / pz.cantidad : 0;
+        return {
+          ...pz,
+          cantidadCotizada: pz.cantidad,   // trazabilidad: cotizado vs comprado
+          cantidad: compradas,
+          // Procesos escalan por pieza: min/pza × compradas, costo proporcional
+          procesos: (pz.procesos || []).map((pr: any) => ({
+            ...pr,
+            tiempoMinutos: (Number(pr.tiempoMinutosPorPieza ?? pr.tiempoMinutos) || 0) * compradas,
+            costoTotal: (Number(pr.costoTotal) || 0) * factor,
+          })),
+          // Material: precio por pieza × compradas
+          material: pz.material ? {
+            ...pz.material,
+            cantidad: compradas,
+            costoTotal: (Number(pz.material.costoUnitario) || 0) * compradas,
+          } : null,
+        };
+      });
+
     // Margen efectivo: promedio ponderado del % de utilidad de las piezas
-    // (cada pieza puede tener su propio margen 15–50%)
-    const piezasConv = cotizacionCompleta?.piezas || [];
+    // COMPRADAS (cada pieza puede tener su propio margen 15–50%)
     const totalConUtilidad = piezasConv.reduce((s, p) => s + p.totalPieza * p.cantidad, 0);
     const utilidadTotalConv = piezasConv.reduce((s, p) => s + p.utilidadPieza * p.cantidad, 0);
     const margenEfectivo = totalConUtilidad > 0
       ? Math.round((utilidadTotalConv / totalConUtilidad) * 100)
       : (cotizacion.margenUtilidad || 30);
+
+    // Total del proyecto = solo lo comprado (subtotal + IVA)
+    const costosGenerales = Object.values(cotizacionCompleta?.costosAdicionales || {})
+      .filter((item: any) => !item?.incluidoGratis)
+      .reduce((s: number, item: any) => s + (Number(item?.costo) || 0), 0);
+    const ivaPct = (cotizacion.ivaPorcentaje || 16) / 100;
+    const subtotalCompra = totalConUtilidad + costosGenerales;
+    const totalCompra = subtotalCompra * (1 + ivaPct);
 
     const exito = await convertirAVenta({
       numeroCotizacion: cotizacion.numero,
@@ -508,10 +546,10 @@ function App() {
       clienteId: cotizacion.clienteId || '',
       clienteNombre: cotizacion.clienteNombre,
       proyectoNombre: cotizacion.proyectoNombre,
-      totalCotizado: cotizacion.total,
+      totalCotizado: piezasCompradas ? totalCompra : cotizacion.total,
       margenUtilidad: margenEfectivo,
       ivaPorcentaje: cotizacion.ivaPorcentaje || 16,
-      piezas: cotizacionCompleta?.piezas || [],
+      piezas: piezasConv,
       materiales: cotizacionCompleta?.materiales || [],
       procesos: cotizacionCompleta?.procesos || [],
       costosAdicionales: cotizacionCompleta?.costosAdicionales || {
