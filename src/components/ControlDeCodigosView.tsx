@@ -121,17 +121,6 @@ export function ControlDeCodigosView({
       return sum + (real?.costoTotalReal != null ? Number(real.costoTotalReal) : p.costoTotalCotizado);
     }, 0);
     // Herramientas/dispositivos extra capturados en producción suman al costo real
-    const costoExtras = (proyecto.procesosReales || [])
-      .filter((e: any) => e.tipo === 'herramienta_extra')
-      .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
-    // Costos adicionales POR PIEZA (ya vienen dentro del subtotalPieza
-    // cotizado; en lo real cuentan igual mientras no se capturen)
-    const costoAdicionalesPiezas = (proyecto.piezas || []).reduce((s, pz: any) => {
-      const ca = pz.costosAdicionales || {};
-      return s + Object.values(ca).reduce((s2: number, item: any) =>
-        s2 + (item && !item.incluidoGratis ? Number(item.costo) || 0 : 0), 0);
-    }, 0);
-
     const costosAdicionalesCotizado = Object.values(costosCot).reduce((sum, v) => sum + v, 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
 
@@ -142,7 +131,25 @@ export function ControlDeCodigosView({
       (s, pz: any) => s + (Number(pz.subtotalPieza) || 0) * (Number(pz.cantidad) || 1), 0
     );
     const costoTotalCotizado = costoDirectoPiezas + costosAdicionalesCotizado;
-    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costoAdicionalesPiezas + costosAdicionalesReal;
+
+    // COSTO REAL POR DELTAS: cotizado oficial + (real − cotizado) de cada
+    // concepto capturado. Sin capturas → real = cotizado AL CENTAVO,
+    // siempre, sin importar cómo se armó la cotización por dentro.
+    const deltaMateriales = materialesReales.reduce((sum, m, i) => {
+      const cot = materialesCot[i]?.costoTotalCotizado ?? m.costoTotalCotizado;
+      const real = m.costoTotalReal ?? cot;
+      return sum + (real - cot);
+    }, 0);
+    const deltaProcesos = procesosCot.reduce((sum, p) => {
+      const real = buscarReal(proyecto.procesosReales, p);
+      return sum + (real?.costoTotalReal != null ? Number(real.costoTotalReal) - p.costoTotalCotizado : 0);
+    }, 0);
+    const costoExtras = (proyecto.procesosReales || [])
+      .filter((e: any) => e.tipo === 'herramienta_extra')
+      .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
+    const deltaAdicionales = costosAdicionalesReal - costosAdicionalesCotizado;
+
+    const costoTotalReal = costoTotalCotizado + deltaMateriales + deltaProcesos + costoExtras + deltaAdicionales;
 
     // Desglose fiscal de la cotización (valores originales, no modificables)
     const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
