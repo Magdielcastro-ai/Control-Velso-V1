@@ -467,14 +467,20 @@ export function CotizacionesView({
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="borrador">Borrador</SelectItem>
-                                      <SelectItem value="cotizacion">Cotización</SelectItem>
-                                      {/* Orden solo se asigna al convertir con número de OC
-                                          desde Proyectos; aquí solo se muestra */}
+                                      {/* El estado actual siempre visible */}
+                                      <SelectItem value={cot.estado}>
+                                        {estadosConfig[cot.estado]?.label || cot.estado}
+                                      </SelectItem>
+                                      {/* Cotización/Orden pueden REGRESAR a borrador para pulir
+                                          (desde orden dispara la limpieza en cascada) */}
+                                      {cot.estado !== 'borrador' && (
+                                        <SelectItem value="borrador">Borrador</SelectItem>
+                                      )}
+                                      {/* Orden puede regresar a cotización (también con cascada).
+                                          Borrador NO puede pasar a Cotización manualmente:
+                                          eso solo lo hace "Generar Cotización" en el Resumen */}
                                       {cot.estado === 'orden' && (
-                                        <SelectItem value="orden" disabled>
-                                          Orden (solo desde Proyectos)
-                                        </SelectItem>
+                                        <SelectItem value="cotizacion">Cotización</SelectItem>
                                       )}
                                     </SelectContent>
                                   </Select>
