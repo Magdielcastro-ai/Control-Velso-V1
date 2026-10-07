@@ -614,7 +614,7 @@ function App() {
     const totalConUtilidad = piezasConv.reduce((s, p) => s + p.totalPieza * p.cantidad, 0);
     const utilidadTotalConv = piezasConv.reduce((s, p) => s + p.utilidadPieza * p.cantidad, 0);
     const margenEfectivo = totalConUtilidad > 0
-      ? Math.round((utilidadTotalConv / totalConUtilidad) * 100)
+      ? Math.round((utilidadTotalConv / totalConUtilidad) * 1000) / 10
       : (cotizacion.margenUtilidad || 30);
 
     // Total del proyecto = solo lo comprado (subtotal + IVA)

@@ -137,22 +137,24 @@ export function NuevaOrdenCompraDialog({
     if (idx >= 0) {
       quitarItemSeguro(idx);
     } else {
-      setItems(prev => [
-        ...prev,
-        {
-          nombre: [
-            m.nombreMaterial,
-            m.forma && `forma ${m.forma}`,
-            m.dimensionesTexto,
-            `para ${m.piezaNombre}`,
-          ].filter(Boolean).join(' · '),
-          cantidad: '1',
-          unidad: m.unidad || 'pieza',
-          precioUnitario: m.costoTotalCotizado.toFixed(2),
-          referencia: '',
-          materialId: m.id,
-        },
-      ]);
+      const nuevaPartida = {
+        nombre: [
+          m.nombreMaterial,
+          m.forma && `forma ${m.forma}`,
+          m.dimensionesTexto,
+          `para ${m.piezaNombre}`,
+        ].filter(Boolean).join(' · '),
+        cantidad: '1',
+        unidad: m.unidad || 'pieza',
+        precioUnitario: m.costoTotalCotizado.toFixed(2),
+        referencia: '',
+        materialId: m.id,
+      };
+      setItems(prev => {
+        // Si solo hay la línea vacía inicial, el primer material la SUSTITUYE
+        const soloVacia = prev.length === 1 && prev[0].nombre.trim() === '';
+        return soloVacia ? [nuevaPartida] : [...prev, nuevaPartida];
+      });
     }
   };
 
@@ -226,7 +228,7 @@ export function NuevaOrdenCompraDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900">
             <Building2 className="w-5 h-5 text-blue-600" />
@@ -234,7 +236,7 @@ export function NuevaOrdenCompraDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 pt-2">
+        <div className="space-y-4 pt-1">
           {/* 1. Proyecto — OBLIGATORIO (007 siempre activo) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
