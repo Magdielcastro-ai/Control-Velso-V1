@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, Trash2, Building2 } from 'lucide-react';
 import type { OrdenCompraItem, Proveedor } from '@/types/ordenesCompra';
+import { materialesCotizadosDeProyecto } from '@/utils/proyectoDatos';
 import type { ProyectoVenta } from '@/types/ventas';
 
 interface ItemForm {
@@ -26,6 +27,7 @@ interface ItemForm {
   cantidad: string;
   unidad: string;
   precioUnitario: string;
+  materialId?: string;
 }
 
 interface NuevaOrdenCompraDialogProps {
@@ -52,7 +54,7 @@ interface NuevaOrdenCompraDialogProps {
     solicitanteNombre?: string;
     solicitanteCodigo?: string;
     notas?: string;
-  }) => Promise<boolean>;
+  }) => Promise<any>;
 }
 
 const itemVacio: ItemForm = { nombre: '', cantidad: '1', unidad: 'pieza', precioUnitario: '' };
@@ -102,6 +104,51 @@ export function NuevaOrdenCompraDialog({
   const agregarItem = () => setItems(prev => [...prev, { ...itemVacio }]);
   const quitarItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
+  // Materiales cotizados del proyecto seleccionado (para precargar partidas)
+  const proyectoSel = proyectoId && proyectoId !== VALOR_GASTOS_INTERNOS
+    ? proyectos.find(p => p.id === proyectoId) || null
+    : null;
+  const materialesCotizados = useMemo(
+    () => (proyectoSel ? materialesCotizadosDeProyecto(proyectoSel) : []),
+    [proyectoSel]
+  );
+
+  // Al cambiar de proyecto: quitar partidas precargadas del proyecto anterior
+  const handleCambiarProyecto = (valor: string) => {
+    setProyectoId(valor);
+    setItems(prev => prev.filter(it => !it.materialId).length > 0
+      ? prev.filter(it => !it.materialId)
+      : [{ ...itemVacio }]);
+  };
+
+  // Incluir/quitar un material cotizado como partida de la OC
+  const itemDeMaterial = (materialId: string) => items.findIndex(it => it.materialId === materialId);
+
+  const quitarItemSeguro = (idx: number) => {
+    setItems(prev => {
+      const nuevos = prev.filter((_, i) => i !== idx);
+      return nuevos.length > 0 ? nuevos : [{ ...itemVacio }];
+    });
+  };
+
+  const toggleMaterialCotizado = (m: any) => {
+    const idx = itemDeMaterial(m.id);
+    if (idx >= 0) {
+      quitarItemSeguro(idx);
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          nombre: `${m.nombreMaterial}${m.forma ? ` · ${m.forma}` : ''} — ${m.piezaNombre}`,
+          cantidad: '1',
+          unidad: m.unidad || 'pieza',
+          precioUnitario: m.costoTotalCotizado.toFixed(2),
+          materialId: m.id,
+        },
+      ]);
+    }
+  };
+
   const limpiar = () => {
     setProveedorId('');
     setProyectoId('');
@@ -143,6 +190,7 @@ export function NuevaOrdenCompraDialog({
           unidad: it.unidad || 'pieza',
           precioUnitario,
           total: cantidad * precioUnitario,
+          materialId: it.materialId,
         };
       }),
       subtotal: totales.subtotal,
@@ -206,7 +254,7 @@ export function NuevaOrdenCompraDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Código de proyecto *</Label>
-              <Select value={proyectoId} onValueChange={setProyectoId}>
+              <Select value={proyectoId} onValueChange={handleCambiarProyecto}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona el código..." />
                 </SelectTrigger>
@@ -234,6 +282,42 @@ export function NuevaOrdenCompraDialog({
               />
             </div>
           </div>
+
+          {/* Materiales cotizados del proyecto: marcar para esta OC */}
+          {proyectoSel && materialesCotizados.length > 0 && (
+            <div className="space-y-2">
+              <Label>Materiales cotizados en {proyectoSel.codigoProyecto}</Label>
+              <p className="text-xs text-slate-400">
+                Marca los materiales que van en esta OC (los que comparte el mismo proveedor van
+                juntos). Descripción y costo quedan editables — ajusta si compras un solo tramo
+                para varias piezas o piezas por separado.
+              </p>
+              <div className="border border-slate-200 rounded-lg divide-y max-h-[160px] overflow-y-auto">
+                {materialesCotizados.map((m) => {
+                  const incluido = itemDeMaterial(m.id) >= 0;
+                  return (
+                    <label key={m.id} className={`flex items-center gap-2 p-2 cursor-pointer ${incluido ? 'bg-blue-50/50' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={incluido}
+                        onChange={() => toggleMaterialCotizado(m)}
+                        className="rounded border-slate-300"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-800 truncate">
+                          {m.nombreMaterial}
+                          <span className="text-xs text-slate-400 ml-1.5">para {m.piezaNombre}</span>
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-500 shrink-0">
+                        Est. ${m.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Items */}
           <div className="space-y-2">

@@ -524,6 +524,11 @@ export function ControlDeCodigosView({
                             <CheckCircle className="w-3 h-3" /> Guardado
                           </span>
                         )}
+                        {(material as any).comprasOC?.length > 0 && (
+                          <span className="block text-[10px] text-blue-600 mt-0.5">
+                            Comprado en: {(material as any).comprasOC.map((c: any) => c.numero).join(', ')}
+                          </span>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">Cantidad Real</Label>

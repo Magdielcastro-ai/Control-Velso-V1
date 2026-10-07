@@ -50,7 +50,7 @@ export interface OrdenesCompraViewProps {
   solicitanteDefault?: string;
   onCambiarEstado?: (id: string, estado: OrdenCompra['estado']) => void;
   onEliminar?: (id: string) => void;
-  onCrearOrden?: (datos: any) => Promise<boolean>;
+  onCrearOrden?: (datos: any) => Promise<any>;
 }
 
 const estadoConfig: Record<

@@ -28,6 +28,7 @@ export const useOrdenesCompraStore = () => {
       unidad: it.unidad || '',
       precioUnitario: Number(it.precio_unitario) || 0,
       total: Number(it.total) || 0,
+      materialId: it.material_id || undefined,
     })),
     subtotal: Number(row.subtotal) || 0,
     ivaPorcentaje: Number(row.iva_porcentaje) || 16,
@@ -179,6 +180,7 @@ export const useOrdenesCompraStore = () => {
           unidad: it.unidad,
           precio_unitario: it.precioUnitario,
           total: it.total,
+          material_id: it.materialId || null,
         })),
         subtotal: Number(datos.subtotal) || 0,
         iva_porcentaje: Number(datos.ivaPorcentaje) || 16,
@@ -235,13 +237,16 @@ export const useOrdenesCompraStore = () => {
         const nuevaOrden = mapearOrden(data);
         setOrdenes(prev => [nuevaOrden, ...prev]);
         toast.success(`Orden de compra ${nuevaOrden.numeroOc} creada exitosamente`);
+        // Devolver la orden creada: App la usa para registrar el costo real
+        // de los materiales en el proyecto
+        return nuevaOrden;
       }
 
-      return true;
+      return null;
     } catch (e: any) {
       console.error('[useOrdenesCompraStore] ERROR EN CREAR ORDEN:', e);
       toast.error('Error inesperado: ' + e.message);
-      return false;
+      return null;
     }
   }, []);
 

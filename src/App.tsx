@@ -37,6 +37,7 @@ import { usePiezasCatalogoStore } from '@/hooks/usePiezasCatalogoStore';
 import { useMonedaStore } from '@/hooks/useMonedaStore';
 import { useOrdenesCompraStore } from '@/hooks/useOrdenesCompraStore';
 import { useProveedoresStore } from '@/hooks/useProveedoresStore';
+import { materialesCotizadosDeProyecto } from '@/utils/proyectoDatos';
 
 // Componentes de pasos
 import { TallerStep } from '@/components/steps/TallerStep';
@@ -245,6 +246,91 @@ function App() {
     actualizarProveedor,
     eliminarProveedor,
   } = useProveedoresStore();
+
+  // ─── OC → costo real de materiales del proyecto ───
+  // Al crear una OC ligada a un proyecto: los items ligados a un material
+  // cotizado acumulan su compra (permite re-compras por errores de
+  // maquinado), y los items libres entran como "compra extra".
+  const registrarComprasEnProyecto = async (proyectoId: string, ocId: string, ocNumero: string, items: any[]) => {
+    const proyecto = proyectos.find(p => p.id === proyectoId);
+    if (!proyecto) return;
+
+    const actuales = (proyecto.materialesReales && proyecto.materialesReales.length > 0)
+      ? proyecto.materialesReales.map((m: any) => ({ ...m }))
+      : materialesCotizadosDeProyecto(proyecto).map((m: any) => ({
+          ...m,
+          costoUnitarioReal: m.costoUnitarioCotizado,
+          costoTotalReal: m.costoTotalCotizado,
+        }));
+
+    const compraExtra = (item: any) => ({
+      id: `oc-${ocId}-${item.id}`,
+      nombre: `${item.nombre} (compra extra)`,
+      tipo: 'compra_extra',
+      forma: '',
+      cantidad: item.cantidad,
+      unidad: item.unidad || 'pieza',
+      costoUnitarioCotizado: 0,
+      margenPorcentaje: 0,
+      costoTotalCotizado: 0,
+      costoUnitarioReal: item.precioUnitario,
+      costoTotalReal: item.total,
+      comprasOC: [{ ocId, numero: ocNumero, descripcion: item.nombre, total: item.total }],
+    });
+
+    for (const item of items) {
+      const mat = item.materialId ? actuales.find((m: any) => m.id === item.materialId) : null;
+      if (mat) {
+        mat.comprasOC = [...(mat.comprasOC || []), { ocId, numero: ocNumero, descripcion: item.nombre, total: item.total }];
+        mat.costoTotalReal = mat.comprasOC.reduce((s: number, c: any) => s + (Number(c.total) || 0), 0);
+      } else {
+        actuales.push(compraExtra(item));
+      }
+    }
+
+    await guardarDatosReales(proyectoId, { materialesReales: actuales });
+  };
+
+  // Al eliminar una OC: quitar sus compras del costo real del proyecto
+  const limpiarComprasDeProyecto = async (proyectoId: string, ocId: string) => {
+    const proyecto = proyectos.find(p => p.id === proyectoId);
+    if (!proyecto || !proyecto.materialesReales) return;
+
+    const nuevos = proyecto.materialesReales
+      .filter((m: any) => !String(m.id).startsWith(`oc-${ocId}-`))
+      .map((m: any) => {
+        if (!m.comprasOC) return m;
+        const compras = m.comprasOC.filter((c: any) => c.ocId !== ocId);
+        return {
+          ...m,
+          comprasOC: compras,
+          // Sin compras registradas: vuelve a contar como cotizado
+          costoTotalReal: compras.length > 0
+            ? compras.reduce((s: number, c: any) => s + (Number(c.total) || 0), 0)
+            : undefined,
+        };
+      });
+
+    await guardarDatosReales(proyectoId, { materialesReales: nuevos });
+  };
+
+  const handleCrearOrdenCompra = async (datos: any): Promise<boolean> => {
+    const ocCreada = await crearOrdenCompra(datos);
+    if (!ocCreada) return false;
+    if (ocCreada.proyectoId) {
+      await registrarComprasEnProyecto(ocCreada.proyectoId, ocCreada.id, ocCreada.numeroOc, ocCreada.items || []);
+    }
+    return true;
+  };
+
+  const handleEliminarOrdenCompra = async (id: string): Promise<boolean> => {
+    const oc = ordenesCompra.find(o => o.id === id);
+    const ok = await eliminarOrdenCompra(id);
+    if (ok && oc?.proyectoId) {
+      await limpiarComprasDeProyecto(oc.proyectoId, id);
+    }
+    return ok;
+  };
 
   // Verificar sesión periódicamente para evitar cierres inesperados
   useEffect(() => {
@@ -1030,7 +1116,7 @@ function App() {
               userId={user.id}
               ordenesCompra={ordenesCompra}
               onCambiarEstadoOC={actualizarEstadoOC}
-              onEliminarOC={eliminarOrdenCompra}
+              onEliminarOC={handleEliminarOrdenCompra}
             />
           </>
         );
@@ -1186,8 +1272,8 @@ function App() {
               }
               solicitanteDefault={user?.nombre || user?.email || ''}
               onCambiarEstado={actualizarEstadoOC}
-              onEliminar={eliminarOrdenCompra}
-              onCrearOrden={crearOrdenCompra}
+              onEliminar={handleEliminarOrdenCompra}
+              onCrearOrden={handleCrearOrdenCompra}
             />
           </>
         );

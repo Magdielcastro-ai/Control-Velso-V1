@@ -71,3 +71,26 @@ export function minutosReales(proc: any): number {
 export function costoCotizadoProc(proc: any): number {
   return Number(proc?.costoTotal ?? proc?.costoTotalCotizado ?? 0) || 0;
 }
+
+/** Materiales cotizados de un proyecto con markup y escala por piezas
+ *  a producir — la misma base que usa Control de Códigos para lo real */
+export function materialesCotizadosDeProyecto(proyecto: any): any[] {
+  return materialesAplanados(proyecto).map((m: any) => {
+    const margenMat = Number(m.margenPorcentaje) || 0;
+    const unitConMargen = (Number(m.costoUnitario) || 0) * (1 + margenMat / 100);
+    const piezasAProducir = Number(m.piezaCantidad) || 1;
+    return {
+      id: m.id || crypto.randomUUID(),
+      nombre: m.piezaNombre ? `${m.nombre} (${m.piezaNombre})` : (m.nombre || ''),
+      nombreMaterial: m.nombre || '',
+      piezaNombre: m.piezaNombre || '',
+      tipo: m.tipo || '',
+      forma: m.forma || '',
+      cantidad: piezasAProducir,
+      unidad: m.unidad || 'pieza',
+      costoUnitarioCotizado: unitConMargen,
+      margenPorcentaje: margenMat,
+      costoTotalCotizado: unitConMargen * piezasAProducir,
+    };
+  });
+}
