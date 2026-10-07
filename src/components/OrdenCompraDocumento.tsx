@@ -152,7 +152,14 @@ export function OrdenCompraDocumento({
               {orden.items.map((item, idx) => (
                 <tr key={idx}>
                   <td className="px-3 py-2">{item.cantidad} {item.unidad}</td>
-                  <td className="px-3 py-2">{item.nombre}</td>
+                  <td className="px-3 py-2">
+                    {item.nombre}
+                    {item.referencia && (
+                      <span className="block text-[10px] text-slate-500">
+                        Ref. cot. proveedor: {item.referencia}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right">{formatearMoneda(item.precioUnitario, moneda)}</td>
                   <td className="px-3 py-2 text-right font-medium">{formatearMoneda(item.total, moneda)}</td>
                 </tr>

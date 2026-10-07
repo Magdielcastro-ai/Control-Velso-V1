@@ -32,6 +32,7 @@ export interface OrdenCompraItem {
   unidad: string;
   precioUnitario: number;
   total: number;
+  referencia?: string; // referencia de la cotización del proveedor
   materialId?: string; // material cotizado del proyecto al que corresponde (si aplica)
 }
 

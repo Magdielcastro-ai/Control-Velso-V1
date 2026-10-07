@@ -79,6 +79,15 @@ export function materialesCotizadosDeProyecto(proyecto: any): any[] {
     const margenMat = Number(m.margenPorcentaje) || 0;
     const unitConMargen = (Number(m.costoUnitario) || 0) * (1 + margenMat / 100);
     const piezasAProducir = Number(m.piezaCantidad) || 1;
+    const dimensionesTexto = [
+      m.diametro && `⌀${m.diametro}`,
+      m.lado && `□${m.lado}`,
+      m.longitud && `× ${m.longitud}`,
+      m.largo && `largo ${m.largo}`,
+      m.ancho && `ancho ${m.ancho}`,
+      m.espesor && `esp. ${m.espesor}`,
+      m.unidadMedida,
+    ].filter(Boolean).join(' ');
     return {
       id: m.id || crypto.randomUUID(),
       nombre: m.piezaNombre ? `${m.nombre} (${m.piezaNombre})` : (m.nombre || ''),
@@ -86,6 +95,7 @@ export function materialesCotizadosDeProyecto(proyecto: any): any[] {
       piezaNombre: m.piezaNombre || '',
       tipo: m.tipo || '',
       forma: m.forma || '',
+      dimensionesTexto,
       cantidad: piezasAProducir,
       unidad: m.unidad || 'pieza',
       costoUnitarioCotizado: unitConMargen,

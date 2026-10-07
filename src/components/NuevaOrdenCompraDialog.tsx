@@ -27,6 +27,7 @@ interface ItemForm {
   cantidad: string;
   unidad: string;
   precioUnitario: string;
+  referencia: string;
   materialId?: string;
 }
 
@@ -57,7 +58,7 @@ interface NuevaOrdenCompraDialogProps {
   }) => Promise<any>;
 }
 
-const itemVacio: ItemForm = { nombre: '', cantidad: '1', unidad: 'pieza', precioUnitario: '' };
+const itemVacio: ItemForm = { nombre: '', cantidad: '1', unidad: 'pieza', precioUnitario: '', referencia: '' };
 
 // Código de taller para gastos internos — siempre activo.
 // El 0007 de cada año está reservado para esto.
@@ -139,10 +140,16 @@ export function NuevaOrdenCompraDialog({
       setItems(prev => [
         ...prev,
         {
-          nombre: `${m.nombreMaterial}${m.forma ? ` · ${m.forma}` : ''} — ${m.piezaNombre}`,
+          nombre: [
+            m.nombreMaterial,
+            m.forma && `forma ${m.forma}`,
+            m.dimensionesTexto,
+            `para ${m.piezaNombre}`,
+          ].filter(Boolean).join(' · '),
           cantidad: '1',
           unidad: m.unidad || 'pieza',
           precioUnitario: m.costoTotalCotizado.toFixed(2),
+          referencia: '',
           materialId: m.id,
         },
       ]);
@@ -190,6 +197,7 @@ export function NuevaOrdenCompraDialog({
           unidad: it.unidad || 'pieza',
           precioUnitario,
           total: cantidad * precioUnitario,
+          referencia: it.referencia?.trim() || undefined,
           materialId: it.materialId,
         };
       }),
@@ -218,7 +226,7 @@ export function NuevaOrdenCompraDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900">
             <Building2 className="w-5 h-5 text-blue-600" />
@@ -227,30 +235,7 @@ export function NuevaOrdenCompraDialog({
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
-          {/* Proveedor — solo del catálogo (la alta es en la sección Proveedores) */}
-          <div className="space-y-2">
-            <Label>Proveedor *</Label>
-            <Select value={proveedorId} onValueChange={setProveedorId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un proveedor del catálogo..." />
-              </SelectTrigger>
-              <SelectContent>
-                {proveedores.length === 0 && (
-                  <SelectItem value="_vacio" disabled>
-                    No hay proveedores — agrégalos en la sección Proveedores
-                  </SelectItem>
-                )}
-                {proveedores.map(p => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.numero} · {p.nombre}
-                    {p.diasCredito ? ` · ${p.diasCredito} días crédito` : ' · Contado'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Proyecto + Concepto — el código es OBLIGATORIO (007 siempre activo) */}
+          {/* 1. Proyecto — OBLIGATORIO (007 siempre activo) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Código de proyecto *</Label>
@@ -281,6 +266,29 @@ export function NuevaOrdenCompraDialog({
                 onChange={e => setConcepto(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* 2. Proveedor — solo del catálogo (la alta es en la sección Proveedores) */}
+          <div className="space-y-2">
+            <Label>Proveedor *</Label>
+            <Select value={proveedorId} onValueChange={setProveedorId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un proveedor del catálogo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {proveedores.length === 0 && (
+                  <SelectItem value="_vacio" disabled>
+                    No hay proveedores — agrégalos en la sección Proveedores
+                  </SelectItem>
+                )}
+                {proveedores.map(p => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.numero} · {p.nombre}
+                    {p.diasCredito ? ` · ${p.diasCredito} días crédito` : ' · Contado'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Materiales cotizados del proyecto: marcar para esta OC */}
@@ -322,79 +330,87 @@ export function NuevaOrdenCompraDialog({
           {/* Items */}
           <div className="space-y-2">
             <Label>Partidas</Label>
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-2 py-2 text-left font-medium">Descripción</th>
-                    <th className="px-2 py-2 text-right font-medium w-20">Cant.</th>
-                    <th className="px-2 py-2 text-right font-medium w-24">Unidad</th>
-                    <th className="px-2 py-2 text-right font-medium w-28">Costo unit.</th>
-                    <th className="px-2 py-2 text-right font-medium w-28">Total</th>
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((it, idx) => {
-                    const totalFila = (parseFloat(it.cantidad) || 0) * (parseFloat(it.precioUnitario) || 0);
-                    return (
-                      <tr key={idx}>
-                        <td className="px-2 py-1.5">
-                          <Input
-                            placeholder="Descripción del item"
-                            value={it.nombre}
-                            onChange={e => actualizarItem(idx, 'nombre', e.target.value)}
-                            className="h-8"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={it.cantidad}
-                            onChange={e => actualizarItem(idx, 'cantidad', e.target.value)}
-                            className="h-8 text-right"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input
-                            value={it.unidad}
-                            onChange={e => actualizarItem(idx, 'unidad', e.target.value)}
-                            className="h-8 text-right"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={it.precioUnitario}
-                            onChange={e => actualizarItem(idx, 'precioUnitario', e.target.value)}
-                            className="h-8 text-right"
-                          />
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-medium text-slate-900">
+            <p className="text-xs text-slate-400">
+              Descripción libre y larga (como viene en la cotización del proveedor) + referencia
+              de su cotización.
+            </p>
+            <div className="space-y-3">
+              {items.map((it, idx) => {
+                const totalFila = (parseFloat(it.cantidad) || 0) * (parseFloat(it.precioUnitario) || 0);
+                return (
+                  <div key={idx} className="border border-slate-200 rounded-lg p-3 space-y-2">
+                    {/* Descripción larga */}
+                    <textarea
+                      placeholder="Descripción completa del item (material, medidas, acabado, como viene en la cotización del proveedor...)"
+                      value={it.nombre}
+                      onChange={e => actualizarItem(idx, 'nombre', e.target.value)}
+                      className="w-full text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] bg-white"
+                    />
+                    {/* Números */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Cantidad</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={it.cantidad}
+                          onChange={e => actualizarItem(idx, 'cantidad', e.target.value)}
+                          className="h-8 text-right"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Unidad</Label>
+                        <Input
+                          value={it.unidad}
+                          onChange={e => actualizarItem(idx, 'unidad', e.target.value)}
+                          className="h-8 text-right"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Costo unitario</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={it.precioUnitario}
+                          onChange={e => actualizarItem(idx, 'precioUnitario', e.target.value)}
+                          className="h-8 text-right"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Total</Label>
+                        <p className="h-8 flex items-center justify-end font-semibold text-slate-900">
                           {formatearMoneda(totalFila)}
-                        </td>
-                        <td className="px-1 py-1.5 text-center">
-                          {items.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => quitarItem(idx)}
-                              className="h-7 w-7 p-0 text-red-500"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </p>
+                      </div>
+                      <div className="flex justify-end">
+                        {items.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => quitarItem(idx)}
+                            className="h-8 w-8 p-0 text-red-500"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {/* Referencia de la cotización del proveedor */}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-slate-500 shrink-0">Ref. cotización proveedor:</Label>
+                      <Input
+                        placeholder="Ej. COT-4821 / folio del proveedor"
+                        value={it.referencia}
+                        onChange={e => actualizarItem(idx, 'referencia', e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <Button type="button" variant="outline" size="sm" onClick={agregarItem} className="border-slate-300">
               <Plus className="w-3.5 h-3.5 mr-1" />

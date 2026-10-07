@@ -476,7 +476,14 @@ export function OrdenesCompraView({
                     <tbody className="divide-y divide-slate-100">
                       {ordenSeleccionada.items.map((item, idx) => (
                         <tr key={idx}>
-                          <td className="px-3 py-2 text-slate-900">{item.nombre}</td>
+                          <td className="px-3 py-2 text-slate-900">
+                            {item.nombre}
+                            {item.referencia && (
+                              <span className="block text-xs text-blue-600">
+                                Ref. cot. proveedor: {item.referencia}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-right text-slate-700">
                             {item.cantidad}
                           </td>
