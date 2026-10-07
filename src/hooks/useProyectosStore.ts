@@ -476,10 +476,38 @@ export const useProyectosStore = () => {
 
   const eliminarProyecto = useCallback(async (id: string) => {
     try {
+      const proyecto = proyectos.find(p => p.id === id);
+
       await supabase.from('proyectos').delete().eq('id', id);
       setProyectos(prev => prev.filter(p => p.id !== id));
+
+      // Al eliminar el proyecto, su cotización vuelve a 'Cotización'
+      // (queda lista para convertirse de nuevo si se requiere)
+      if (proyecto) {
+        let query = supabase
+          .from('cotizaciones')
+          .update({ estado: 'cotizacion', updated_at: new Date().toISOString() });
+
+        if (proyecto.cotizacionId) {
+          query = query.eq('id', proyecto.cotizacionId);
+        } else if (proyecto.numeroCotizacion) {
+          query = query.eq('numero', proyecto.numeroCotizacion);
+        } else {
+          query = null as any;
+        }
+
+        if (query) {
+          const { error } = await query;
+          if (error) {
+            console.error('[useProyectosStore] Error regresando cotización a "cotizacion":', error.message);
+            toast.error('Proyecto eliminado, pero no se pudo actualizar la cotización: ' + error.message);
+          } else {
+            toast.success(`Cotización ${proyecto.numeroCotizacion} regresó a "Cotización"`);
+          }
+        }
+      }
     } catch (e) { console.error(e); }
-  }, []);
+  }, [proyectos]);
 
   const refrescarDesdeSupabase = useCallback(async () => {
     await cargarProyectos();

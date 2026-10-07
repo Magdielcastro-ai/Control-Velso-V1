@@ -322,7 +322,8 @@ export function useAuth() {
   }, [user]);
 
   const canDeleteProyectos = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    // Eliminar proyectos es solo para superadmin
+    return user?.rol === 'superadmin';
   }, [user]);
 
   const canViewPiezasCatalogo = useCallback(() => {
