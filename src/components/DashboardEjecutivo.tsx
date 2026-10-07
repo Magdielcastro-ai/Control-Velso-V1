@@ -25,7 +25,6 @@ import {
   Settings,
   Loader2,
   Calendar,
-  ChevronDown,
   Target,
   ShoppingCart,
   Wrench
@@ -92,14 +91,15 @@ export function DashboardEjecutivo({
   procesosCount = 0,
 }: DashboardEjecutivoProps) {
   const [vistaActiva, setVistaActiva] = useState<'resumen' | 'pipeline' | 'ventas' | 'produccion' | 'alertas' | 'catalogos'>('resumen');
-  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null); // null = todos los meses
-  const [anioSeleccionado] = useState(2026);
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null); // null = todo el año
+  const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
 
-  // Período independiente para la pestaña de Ventas (meta mensual)
+  // Período independiente para la pestaña de Ventas (meta mensual o anual)
   const hoy = new Date();
-  const [mesVentas, setMesVentas] = useState(hoy.getMonth());
+  const [mesVentas, setMesVentas] = useState<number | null>(hoy.getMonth());
   const [anioVentas, setAnioVentas] = useState(hoy.getFullYear());
+  // La meta es mensual: en "todo el año" se multiplica por 12
+  const mesesPeriodoVentas = mesVentas === null ? 12 : 1;
 
 
   // ============================================
@@ -187,20 +187,17 @@ export function DashboardEjecutivo({
   // (integrado desde DashboardView)
   // ============================================
   const datosVentasMes = useMemo(() => {
-    const cotizacionesMes = cotizaciones.filter(c => {
-      const fecha = new Date(c.fecha);
-      return fecha.getMonth() === mesVentas && fecha.getFullYear() === anioVentas;
-    });
+    // mesVentas null = todo el año (solo filtra por año)
+    const enPeriodo = (fecha: Date) =>
+      (mesVentas === null || fecha.getMonth() === mesVentas) && fecha.getFullYear() === anioVentas;
 
-    const proyectosMes = proyectos.filter(p => {
-      const fecha = new Date(p.fechaVenta);
-      return fecha.getMonth() === mesVentas && fecha.getFullYear() === anioVentas;
-    });
+    const cotizacionesMes = cotizaciones.filter(c => enPeriodo(new Date(c.fecha)));
+
+    const proyectosMes = proyectos.filter(p => enPeriodo(new Date(p.fechaVenta)));
 
     const proyectosFacturadosMes = proyectos.filter(p => {
       if (!p.fechaFacturado) return false;
-      const fecha = new Date(p.fechaFacturado);
-      return fecha.getMonth() === mesVentas && fecha.getFullYear() === anioVentas;
+      return enPeriodo(new Date(p.fechaFacturado));
     });
 
     const totalCotizado = cotizacionesMes.reduce((sum, c) => sum + c.total, 0);
@@ -327,7 +324,7 @@ export function DashboardEjecutivo({
       vendidas: datosVentasMes.horasVendidas[p.id] || 0,
       fabricadas: datosVentasMes.horasFabricadas[p.id] || 0,
       facturadas: datosVentasMes.horasFacturadas[p.id] || 0,
-      meta: horasDisponibles[p.id] || 0,
+      meta: (horasDisponibles[p.id] || 0) * mesesPeriodoVentas,
     }));
 
   const datosCotizadas = datosPorProceso.map(p => ({ nombre: p.categoria, valor: p.cotizadas }));
@@ -455,45 +452,55 @@ export function DashboardEjecutivo({
         </Card>
       )}
 
-      {/* Filtro de período */}
+      {/* Filtro de período — siempre visible: año + mes o todo el año */}
       {hayDatos && (
         <Card className="border-slate-200">
-          <CardContent className="p-3">
-            <button 
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 w-full"
-            >
-              <Calendar className="w-4 h-4" />
-              {mesSeleccionado !== null 
-                ? `Filtrando: ${MESES[mesSeleccionado]} ${anioSeleccionado}` 
-                : 'Mostrando datos históricos (todos los períodos)'
-              }
-              <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${mostrarFiltros ? 'rotate-180' : ''}`} />
-            </button>
-
-            {mostrarFiltros && (
-              <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 flex-wrap">
-                <Button 
-                  size="sm" 
-                  variant={mesSeleccionado === null ? 'default' : 'outline'}
-                  onClick={() => setMesSeleccionado(null)}
-                  className={mesSeleccionado === null ? 'bg-blue-600' : ''}
+          <CardContent className="p-3 space-y-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-1.5 text-sm text-slate-600">
+                <Calendar className="w-4 h-4" />
+                Período:
+              </span>
+              <Select
+                value={anioSeleccionado.toString()}
+                onValueChange={(v) => setAnioSeleccionado(parseInt(v))}
+              >
+                <SelectTrigger className="h-8 w-24 border-slate-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2024, 2025, 2026, 2027].map((anio) => (
+                    <SelectItem key={anio} value={anio.toString()}>{anio}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-slate-400">
+                {mesSeleccionado !== null
+                  ? `Mostrando ${MESES[mesSeleccionado]} ${anioSeleccionado}`
+                  : `Todo ${anioSeleccionado} (suma del año)`}
+              </span>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={mesSeleccionado === null ? 'default' : 'outline'}
+                onClick={() => setMesSeleccionado(null)}
+                className={mesSeleccionado === null ? 'bg-blue-600' : ''}
+              >
+                Todo el año
+              </Button>
+              {MESES.map((mes, index) => (
+                <Button
+                  key={index}
+                  size="sm"
+                  variant={mesSeleccionado === index ? 'default' : 'outline'}
+                  onClick={() => setMesSeleccionado(index)}
+                  className={mesSeleccionado === index ? 'bg-blue-600' : ''}
                 >
-                  Todos
+                  {mes}
                 </Button>
-                {MESES.map((mes, index) => (
-                  <Button 
-                    key={index}
-                    size="sm" 
-                    variant={mesSeleccionado === index ? 'default' : 'outline'}
-                    onClick={() => setMesSeleccionado(index)}
-                    className={mesSeleccionado === index ? 'bg-blue-600' : ''}
-                  >
-                    {mes}
-                  </Button>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -776,22 +783,36 @@ export function DashboardEjecutivo({
       {/* === VISTA VENTAS (horas cotizadas vs meta mensual) === */}
       {vistaActiva === 'ventas' && (
         <div className="space-y-6">
-          {/* Selector de período */}
+          {/* Selector de período: mes + año, o todo el año */}
           <Card className="border-slate-200">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row gap-4 items-end">
                 <div className="flex-1 w-full">
                   <label className="text-sm font-medium text-slate-700 mb-2 block">Mes</label>
-                  <Select value={mesVentas.toString()} onValueChange={(v) => setMesVentas(parseInt(v))}>
-                    <SelectTrigger className="border-slate-300">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MESES.map((mes, index) => (
-                        <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select
+                      value={mesVentas === null ? '' : mesVentas.toString()}
+                      onValueChange={(v) => setMesVentas(parseInt(v))}
+                      disabled={mesVentas === null}
+                    >
+                      <SelectTrigger className="border-slate-300">
+                        <SelectValue placeholder="Todo el año" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MESES.map((mes, index) => (
+                          <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant={mesVentas === null ? 'default' : 'outline'}
+                      onClick={() => setMesVentas(mesVentas === null ? hoy.getMonth() : null)}
+                      className={mesVentas === null ? 'bg-blue-600' : 'border-slate-300'}
+                    >
+                      Todo el año
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex-1 w-full">
                   <label className="text-sm font-medium text-slate-700 mb-2 block">Año</label>
@@ -800,7 +821,7 @@ export function DashboardEjecutivo({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[2024, 2025, 2026].map((anio) => (
+                      {[2024, 2025, 2026, 2027].map((anio) => (
                         <SelectItem key={anio} value={anio.toString()}>{anio}</SelectItem>
                       ))}
                     </SelectContent>
@@ -905,17 +926,17 @@ export function DashboardEjecutivo({
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Progreso: Facturadas vs Meta</span>
+                  <span>Progreso: Facturadas vs Meta{mesVentas === null ? ' anual' : ''}</span>
                   <span className="font-semibold">
-                    {Math.min(((datosVentasMes.horasFacturadas['codigo_07'] || 0) / (horasDisponibles['codigo_07'] || 1)) * 100, 100).toFixed(1)}%
+                    {Math.min(((datosVentasMes.horasFacturadas['codigo_07'] || 0) / ((horasDisponibles['codigo_07'] || 1) * mesesPeriodoVentas)) * 100, 100).toFixed(1)}%
                   </span>
                 </div>
                 <Progress
-                  value={Math.min(((datosVentasMes.horasFacturadas['codigo_07'] || 0) / (horasDisponibles['codigo_07'] || 1)) * 100, 100)}
+                  value={Math.min(((datosVentasMes.horasFacturadas['codigo_07'] || 0) / ((horasDisponibles['codigo_07'] || 1) * mesesPeriodoVentas)) * 100, 100)}
                   className="h-3"
                 />
                 <p className="text-xs text-slate-500 text-right">
-                  Meta: {horasDisponibles['codigo_07']?.toFixed(2) || '0.00'}h
+                  Meta{mesVentas === null ? ' anual' : ''}: {((horasDisponibles['codigo_07'] || 0) * mesesPeriodoVentas).toFixed(2)}h
                 </p>
               </div>
             </CardContent>
