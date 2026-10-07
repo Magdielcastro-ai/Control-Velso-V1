@@ -162,15 +162,21 @@ export function ControlDeCodigosView({
     const utilidadCotizada = (proyecto.piezas || []).reduce(
       (s, pz: any) => s + (Number(pz.utilidadPieza) || 0) * (Number(pz.cantidad) || 1), 0
     );
-    // El % cotizado es el margen que quedó guardado en el proyecto (32.1%)
+    // El % cotizado es el margen que quedó guardado en el proyecto
     const porcentajeUtilidadCotizada = Number(proyecto.margenUtilidad) ||
       (subtotalSinIVA > 0 ? (utilidadCotizada / subtotalSinIVA) * 100 : 0);
-    // Utilidad real: base sin IVA (o facturado sin IVA) menos el gasto real
+    // Utilidad real = cotizada − lo que se movió el costo (deltas).
+    // Si ya se facturó por otro monto, también se ajusta.
+    // Sin capturas → idéntica a la cotizada en pesos Y en %.
+    const deltaCosto = costoTotalReal - costoTotalCotizado;
     const baseFacturadaSinIVA = proyecto.totalFacturado
       ? proyecto.totalFacturado / (1 + ivaPct / 100)
       : subtotalSinIVA;
-    const utilidadReal = baseFacturadaSinIVA - costoTotalReal;
-    const porcentajeUtilidadReal = baseFacturadaSinIVA > 0 ? (utilidadReal / baseFacturadaSinIVA) * 100 : 0;
+    const ajusteFacturado = proyecto.totalFacturado ? (baseFacturadaSinIVA - subtotalSinIVA) : 0;
+    const utilidadReal = utilidadCotizada + ajusteFacturado - deltaCosto;
+    // Misma base que la cotización oficial (costo + utilidad = subtotal sin IVA)
+    const baseParaPorcentaje = costoTotalCotizado + utilidadCotizada;
+    const porcentajeUtilidadReal = baseParaPorcentaje > 0 ? (utilidadReal / baseParaPorcentaje) * 100 : 0;
 
     return {
       costoMaterialesCotizado,
