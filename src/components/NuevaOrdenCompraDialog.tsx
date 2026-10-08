@@ -228,7 +228,7 @@ export function NuevaOrdenCompraDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[1100px] max-h-[94vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900">
             <Building2 className="w-5 h-5 text-blue-600" />
@@ -420,69 +420,70 @@ export function NuevaOrdenCompraDialog({
             </Button>
           </div>
 
-          {/* Totales + IVA */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>IVA %</Label>
-              <Input
-                type="number"
-                min="0"
-                value={ivaPorcentaje}
-                onChange={e => setIvaPorcentaje(e.target.value)}
-              />
+          {/* Banda tipo hoja: términos / entrega+IVA / totales en 3 columnas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Términos de pago</Label>
+                <Select value={terminosPago} onValueChange={v => setTerminosPago(v as 'contado' | 'credito')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contado">Contado</SelectItem>
+                    <SelectItem value="credito">Crédito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Moneda</Label>
+                <Select value={moneda} onValueChange={v => setMoneda(v as 'MXN' | 'USD')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MXN">MXN</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Solicitante</Label>
+                <Input
+                  placeholder="Nombre de quien solicita"
+                  value={solicitanteNombre}
+                  onChange={e => setSolicitanteNombre(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Subtotal</span>
-                <span className="font-medium">{formatearMoneda(totales.subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">IVA</span>
-                <span className="font-medium">{formatearMoneda(totales.iva)}</span>
-              </div>
-              <div className="flex justify-between border-t border-slate-200 pt-1">
-                <span className="font-semibold">Total</span>
-                <span className="font-bold text-blue-600">{formatearMoneda(totales.total)}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Términos */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <Label>Términos de pago</Label>
-              <Select value={terminosPago} onValueChange={v => setTerminosPago(v as 'contado' | 'credito')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contado">Contado</SelectItem>
-                  <SelectItem value="credito">Crédito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Moneda</Label>
-              <Select value={moneda} onValueChange={v => setMoneda(v as 'MXN' | 'USD')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MXN">MXN</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Entrega estimada</Label>
-              <Input
-                type="date"
-                value={fechaEntrega}
-                onChange={e => setFechaEntrega(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Entrega estimada</Label>
+                <Input
+                  type="date"
+                  value={fechaEntrega}
+                  onChange={e => setFechaEntrega(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>IVA %</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={ivaPorcentaje}
+                  onChange={e => setIvaPorcentaje(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Código solicitante</Label>
+                <Input
+                  placeholder="Ej. VLS-01"
+                  value={solicitanteCodigo}
+                  onChange={e => setSolicitanteCodigo(e.target.value)}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
                 <Checkbox
                   checked={certificadoCalidad}
                   onCheckedChange={v => setCertificadoCalidad(v === true)}
@@ -490,37 +491,32 @@ export function NuevaOrdenCompraDialog({
                 Certificado de calidad
               </label>
             </div>
-          </div>
 
-          {/* Solicitante */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Solicitante</Label>
-              <Input
-                placeholder="Nombre de quien solicita"
-                value={solicitanteNombre}
-                onChange={e => setSolicitanteNombre(e.target.value)}
-              />
+            <div className="space-y-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Subtotal</span>
+                  <span className="font-medium">{formatearMoneda(totales.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">IVA</span>
+                  <span className="font-medium">{formatearMoneda(totales.iva)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200 pt-1">
+                  <span className="font-semibold">Total</span>
+                  <span className="font-bold text-blue-600">{formatearMoneda(totales.total)}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notas (opcional)</Label>
+                <Textarea
+                  placeholder="Observaciones para el proveedor..."
+                  value={notas}
+                  onChange={e => setNotas(e.target.value)}
+                  rows={3}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Código solicitante</Label>
-              <Input
-                placeholder="Ej. VLS-01"
-                value={solicitanteCodigo}
-                onChange={e => setSolicitanteCodigo(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Notas */}
-          <div className="space-y-1.5">
-            <Label>Notas (opcional)</Label>
-            <Textarea
-              placeholder="Observaciones para el proveedor..."
-              value={notas}
-              onChange={e => setNotas(e.target.value)}
-              rows={2}
-            />
           </div>
 
           {/* Acciones */}
