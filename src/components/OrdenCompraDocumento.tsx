@@ -61,7 +61,8 @@ export function OrdenCompraDocumento({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+      {/* sm:max-w-4xl con variante para ganarle al sm:max-w-lg por defecto */}
+      <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader className="no-print">
           <DialogTitle className="flex items-center justify-between pr-8">
             <span className="flex items-center gap-2 text-slate-900">

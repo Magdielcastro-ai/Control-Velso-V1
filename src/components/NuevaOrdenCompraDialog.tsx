@@ -228,7 +228,9 @@ export function NuevaOrdenCompraDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[1100px] max-h-[94vh] overflow-y-auto">
+      {/* sm:max-w-[1100px] con la variante sm: para ganarle al sm:max-w-lg
+          que trae por defecto el DialogContent de shadcn */}
+      <DialogContent className="w-[95vw] sm:max-w-[1100px] max-h-[94vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900">
             <Building2 className="w-5 h-5 text-blue-600" />
