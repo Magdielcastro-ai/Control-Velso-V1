@@ -205,6 +205,8 @@ function App() {
     canManageProcesos,
     canViewProcesos,
     canDeleteProyectos,
+    canCrearOrdenesCompra,
+    canAutorizarOrdenesCompra,
     canViewPiezasCatalogo,
     canManagePiezasCatalogo,
   } = useAuth();
@@ -1115,8 +1117,19 @@ function App() {
               userRol={user.rol}
               userId={user.id}
               ordenesCompra={ordenesCompra}
-              onCambiarEstadoOC={actualizarEstadoOC}
               onEliminarOC={handleEliminarOrdenCompra}
+              proveedores={proveedores}
+              datosTallerOC={
+                talleres[0]
+                  ? {
+                      nombre: talleres[0].nombre,
+                      direccion: talleres[0].direccion,
+                      telefono: talleres[0].telefono,
+                      email: talleres[0].email,
+                      rfc: talleres[0].rfc,
+                    }
+                  : { nombre: 'Soluciones Integrales Velso' }
+              }
             />
           </>
         );
@@ -1151,6 +1164,7 @@ function App() {
             {proyectoFresco ? (
               <ControlDeCodigosView
                 proyecto={proyectoFresco}
+                ordenesCompra={ordenesCompra}
                 onVolver={handleVolverDeControlCodigos}
                 onGuardarDatosReales={guardarDatosReales}
               />
@@ -1271,6 +1285,9 @@ function App() {
                     : { nombre: 'Soluciones Integrales Velso' }
               }
               solicitanteDefault={user?.nombre || user?.email || ''}
+              puedeCrear={canCrearOrdenesCompra()}
+              puedeAutorizar={canAutorizarOrdenesCompra()}
+              usuarioNombre={user?.nombre || user?.email || ''}
               onCambiarEstado={actualizarEstadoOC}
               onEliminar={handleEliminarOrdenCompra}
               onCrearOrden={handleCrearOrdenCompra}
