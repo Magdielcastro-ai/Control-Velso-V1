@@ -36,6 +36,8 @@ export const useOrdenesCompraStore = () => {
     iva: Number(row.iva) || 0,
     total: Number(row.total) || 0,
     estado: row.estado || 'pendiente',
+    autorizadaPor: row.autorizada_por || undefined,
+    autorizadaFecha: row.autorizada_fecha || undefined,
     fechaOc: row.fecha_oc || new Date().toISOString(),
     fechaEntrega: row.fecha_entrega || undefined,
     terminosPago: row.terminos_pago || 'contado',
@@ -254,14 +256,22 @@ export const useOrdenesCompraStore = () => {
 
   const actualizarEstado = useCallback(async (
     id: string,
-    estado: OrdenCompra['estado']
+    estado: OrdenCompra['estado'],
+    autorizadoPor?: string
   ) => {
     console.log(`[useOrdenesCompraStore] Actualizando estado de ${id} a ${estado}`);
 
     try {
+      const updateData: any = { estado };
+      // Al autorizar queda la firma de finanzas
+      if (estado === 'autorizada' && autorizadoPor) {
+        updateData.autorizada_por = autorizadoPor;
+        updateData.autorizada_fecha = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from('ordenes_compra')
-        .update({ estado })
+        .update(updateData)
         .eq('id', id);
 
       if (error) {
@@ -271,7 +281,12 @@ export const useOrdenesCompraStore = () => {
       }
 
       setOrdenes(prev =>
-        prev.map(o => (o.id === id ? { ...o, estado } : o))
+        prev.map(o => (o.id === id ? {
+          ...o,
+          estado,
+          autorizadaPor: estado === 'autorizada' ? autorizadoPor : o.autorizadaPor,
+          autorizadaFecha: estado === 'autorizada' ? new Date().toISOString() : o.autorizadaFecha,
+        } : o))
       );
 
       toast.success(`Orden actualizada a "${estado}"`);

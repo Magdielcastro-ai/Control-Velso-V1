@@ -114,6 +114,18 @@ export function NuevaOrdenCompraDialog({
     [proyectoSel]
   );
 
+  // Material ya comprado si el proyecto tiene compras registradas de él
+  const comprasDeMaterial = (materialId: string): any[] => {
+    const mat = (proyectoSel?.materialesReales || []).find((m: any) => m.id === materialId);
+    return (mat as any)?.comprasOC || [];
+  };
+
+  // Por defecto se ocultan los materiales ya comprados; el toggle los muestra
+  const [mostrarComprados, setMostrarComprados] = useState(false);
+  const materialesVisibles = materialesCotizados.filter(
+    m => mostrarComprados || comprasDeMaterial(m.id).length === 0
+  );
+
   // Al cambiar de proyecto: quitar partidas precargadas del proyecto anterior
   const handleCambiarProyecto = (valor: string) => {
     setProyectoId(valor);
@@ -136,26 +148,37 @@ export function NuevaOrdenCompraDialog({
     const idx = itemDeMaterial(m.id);
     if (idx >= 0) {
       quitarItemSeguro(idx);
-    } else {
-      const nuevaPartida = {
-        nombre: [
-          m.nombreMaterial,
-          m.forma && `forma ${m.forma}`,
-          m.dimensionesTexto,
-          `para ${m.piezaNombre}`,
-        ].filter(Boolean).join(' · '),
-        cantidad: '1',
-        unidad: m.unidad || 'pieza',
-        precioUnitario: m.costoTotalCotizado.toFixed(2),
-        referencia: '',
-        materialId: m.id,
-      };
-      setItems(prev => {
-        // Si solo hay la línea vacía inicial, el primer material la SUSTITUYE
-        const soloVacia = prev.length === 1 && prev[0].nombre.trim() === '';
-        return soloVacia ? [nuevaPartida] : [...prev, nuevaPartida];
-      });
+      return;
     }
+    // Aviso de compra duplicada: el costo real se SUMA con la compra anterior
+    const comprasPrevias = comprasDeMaterial(m.id);
+    if (comprasPrevias.length > 0) {
+      const ocs = comprasPrevias.map((c: any) => c.numero).join(', ');
+      const ok = confirm(
+        `⚠️ Este material ya se compró en ${ocs}.\n\n` +
+        `Estás DUPLICANDO la compra: el costo real del material será la SUMA de ambas órdenes.\n\n` +
+        `¿Continuar con la compra duplicada?`
+      );
+      if (!ok) return;
+    }
+    const nuevaPartida = {
+      nombre: [
+        m.nombreMaterial,
+        m.forma && `forma ${m.forma}`,
+        m.dimensionesTexto,
+        `para ${m.piezaNombre}`,
+      ].filter(Boolean).join(' · '),
+      cantidad: '1',
+      unidad: m.unidad || 'pieza',
+      precioUnitario: m.costoTotalCotizado.toFixed(2),
+      referencia: '',
+      materialId: m.id,
+    };
+    setItems(prev => {
+      // Si solo hay la línea vacía inicial, el primer material la SUSTITUYE
+      const soloVacia = prev.length === 1 && prev[0].nombre.trim() === '';
+      return soloVacia ? [nuevaPartida] : [...prev, nuevaPartida];
+    });
   };
 
   const limpiar = () => {
@@ -298,15 +321,28 @@ export function NuevaOrdenCompraDialog({
           {/* Materiales cotizados del proyecto: marcar para esta OC */}
           {proyectoSel && materialesCotizados.length > 0 && (
             <div className="space-y-2">
-              <Label>Materiales cotizados en {proyectoSel.codigoProyecto}</Label>
+              <div className="flex items-center justify-between">
+                <Label>Materiales cotizados en {proyectoSel.codigoProyecto}</Label>
+                {materialesCotizados.some(m => comprasDeMaterial(m.id).length > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarComprados(!mostrarComprados)}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    {mostrarComprados ? 'Ocultar ya comprados' : 'Mostrar ya comprados (re-compra)'}
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-slate-400">
                 Marca los materiales que van en esta OC (los que comparte el mismo proveedor van
-                juntos). Descripción y costo quedan editables — ajusta si compras un solo tramo
-                para varias piezas o piezas por separado.
+                juntos). El "Considerado" es el monto total del proyecto para ese material —
+                compara contra el precio del tramo o las piezas sueltas.
               </p>
               <div className="border border-slate-200 rounded-lg divide-y max-h-[160px] overflow-y-auto">
-                {materialesCotizados.map((m) => {
+                {materialesVisibles.map((m) => {
                   const incluido = itemDeMaterial(m.id) >= 0;
+                  const compras = comprasDeMaterial(m.id);
+                  const yaComprado = compras.length > 0;
                   return (
                     <label key={m.id} className={`flex items-center gap-2 p-2 cursor-pointer ${incluido ? 'bg-blue-50/50' : ''}`}>
                       <input
@@ -320,9 +356,14 @@ export function NuevaOrdenCompraDialog({
                           {m.nombreMaterial}
                           <span className="text-xs text-slate-400 ml-1.5">para {m.piezaNombre}</span>
                         </p>
+                        {yaComprado && (
+                          <p className="text-[10px] text-amber-600">
+                            ⚠️ Ya comprado en {compras.map((c: any) => c.numero).join(', ')} — se sumará al costo real
+                          </p>
+                        )}
                       </div>
                       <span className="text-xs text-slate-500 shrink-0">
-                        Est. ${m.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        Considerado: ${m.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </span>
                     </label>
                   );
@@ -332,8 +373,14 @@ export function NuevaOrdenCompraDialog({
           )}
 
           {/* Items */}
+          {/* Partidas */}
           <div className="space-y-2">
-            <Label>Partidas</Label>
+            <div className="flex items-center justify-between">
+              <Label>Partidas</Label>
+              <span className="text-xs text-slate-500">
+                {items.filter(it => it.nombre.trim() !== '').length} partida{items.filter(it => it.nombre.trim() !== '').length !== 1 ? 's' : ''}
+              </span>
+            </div>
             <p className="text-xs text-slate-400">
               Descripción libre y larga (como viene en la cotización del proveedor) + referencia
               de su cotización.

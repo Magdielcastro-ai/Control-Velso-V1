@@ -28,9 +28,6 @@ import {
   DollarSign,
   Clock,
   CheckCircle2,
-  Truck,
-  XCircle,
-  CreditCard,
   Boxes,
   FileText,
   Plus,
@@ -48,13 +45,18 @@ export interface OrdenesCompraViewProps {
   proveedores?: Proveedor[];
   datosTaller?: DatosTallerOC;
   solicitanteDefault?: string;
-  onCambiarEstado?: (id: string, estado: OrdenCompra['estado']) => void;
+  puedeCrear?: boolean;      // solo admin/superadmin
+  puedeAutorizar?: boolean;  // solo finanzas/superadmin
+  usuarioNombre?: string;    // firma de la autorización
+  onCambiarEstado?: (id: string, estado: OrdenCompra['estado'], autorizadoPor?: string) => void;
   onEliminar?: (id: string) => void;
   onCrearOrden?: (datos: any) => Promise<any>;
 }
 
+// Ciclo de vida de la OC: solo pendiente y autorizada.
+// Los estados viejos quedan mapeados por compatibilidad visual.
 const estadoConfig: Record<
-  OrdenCompra['estado'],
+  string,
   { label: string; colorClasses: string; icon: typeof Clock }
 > = {
   pendiente: {
@@ -68,19 +70,19 @@ const estadoConfig: Record<
     icon: CheckCircle2,
   },
   pagada: {
-    label: 'Pagada',
-    colorClasses: 'bg-purple-100 text-purple-700 border-purple-200',
-    icon: CreditCard,
+    label: 'Autorizada',
+    colorClasses: 'bg-blue-100 text-blue-700 border-blue-200',
+    icon: CheckCircle2,
   },
   recibida: {
-    label: 'Recibida',
-    colorClasses: 'bg-green-100 text-green-700 border-green-200',
-    icon: Truck,
+    label: 'Autorizada',
+    colorClasses: 'bg-blue-100 text-blue-700 border-blue-200',
+    icon: CheckCircle2,
   },
   cancelada: {
-    label: 'Cancelada',
-    colorClasses: 'bg-red-100 text-red-700 border-red-200',
-    icon: XCircle,
+    label: 'Pendiente',
+    colorClasses: 'bg-amber-100 text-amber-700 border-amber-200',
+    icon: Clock,
   },
 };
 
@@ -100,6 +102,10 @@ function formatearFecha(fechaStr: string) {
   });
 }
 
+// Autorizada incluye los estados viejos equivalentes (pagada/recibida)
+const esAutorizada = (estado: string) =>
+  ['autorizada', 'pagada', 'recibida'].includes(estado);
+
 export function OrdenesCompraView({
   onVolver,
   ordenes,
@@ -107,6 +113,9 @@ export function OrdenesCompraView({
   proveedores = [],
   datosTaller,
   solicitanteDefault,
+  puedeCrear = false,
+  puedeAutorizar = false,
+  usuarioNombre = '',
   onCambiarEstado,
   onEliminar,
   onCrearOrden,
@@ -213,7 +222,7 @@ export function OrdenesCompraView({
             {stats.total} órdenes · {stats.pendientes} pendientes · {stats.recibidas} recibidas
           </p>
         </div>
-        {onCrearOrden && (
+        {onCrearOrden && puedeCrear && (
           <Button onClick={() => setDialogoNueva(true)} className="bg-blue-600 hover:bg-blue-700 w-fit">
             <Plus className="w-4 h-4 mr-2" />
             Nueva OC
@@ -270,9 +279,6 @@ export function OrdenesCompraView({
             <SelectItem value="todos">Todos los estados</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
             <SelectItem value="autorizada">Autorizada</SelectItem>
-            <SelectItem value="pagada">Pagada</SelectItem>
-            <SelectItem value="recibida">Recibida</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -346,31 +352,42 @@ export function OrdenesCompraView({
                       >
                         <Eye className="w-4 h-4 text-blue-600" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setOrdenDocumento(oc)}
-                        className="h-8 w-8 p-0"
-                        title="Ver documento imprimible"
-                      >
-                        <Printer className="w-4 h-4 text-slate-600" />
-                      </Button>
+                      {/* Imprimir solo cuando está autorizada (firmada por finanzas) */}
+                      {esAutorizada(oc.estado) ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setOrdenDocumento(oc)}
+                          className="h-8 w-8 p-0"
+                          title="Ver documento imprimible"
+                        >
+                          <Printer className="w-4 h-4 text-slate-600" />
+                        </Button>
+                      ) : (
+                        <span
+                          className="h-8 w-8 p-0 flex items-center justify-center"
+                          title="Debe estar autorizada para imprimir"
+                        >
+                          <Printer className="w-4 h-4 text-slate-300" />
+                        </span>
+                      )}
                       {onCambiarEstado && (
                         <Select
                           value={oc.estado}
-                          onValueChange={(val) =>
-                            onCambiarEstado(oc.id, val as OrdenCompra['estado'])
-                          }
+                          onValueChange={(val) => {
+                            // Autorizar es exclusivo de finanzas (queda firmado)
+                            if (val === 'autorizada' && !puedeAutorizar) return;
+                            onCambiarEstado(oc.id, val as OrdenCompra['estado'], val === 'autorizada' ? usuarioNombre : undefined);
+                          }}
                         >
                           <SelectTrigger className="h-8 w-8 p-0 border-0 bg-transparent hover:bg-slate-100 rounded-md">
                             <CheckCircle2 className="w-4 h-4 text-slate-500" />
                           </SelectTrigger>
                           <SelectContent align="end">
                             <SelectItem value="pendiente">Pendiente</SelectItem>
-                            <SelectItem value="autorizada">Autorizada</SelectItem>
-                            <SelectItem value="pagada">Pagada</SelectItem>
-                            <SelectItem value="recibida">Recibida</SelectItem>
-                            <SelectItem value="cancelada">Cancelada</SelectItem>
+                            <SelectItem value="autorizada" disabled={!puedeAutorizar}>
+                              Autorizada{puedeAutorizar ? '' : ' (solo finanzas)'}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       )}
@@ -395,7 +412,9 @@ export function OrdenesCompraView({
 
       {/* Modal de detalle de OC */}
       <Dialog open={dialogoDetalle} onOpenChange={setDialogoDetalle}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Tamaño hoja carta, igual que el wizard (sm: para ganarle al
+            sm:max-w-lg que trae DialogContent por defecto) */}
+        <DialogContent className="w-[95vw] sm:max-w-[1100px] max-h-[94vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-slate-900">
               <FileText className="w-5 h-5 text-blue-600" />
@@ -440,6 +459,19 @@ export function OrdenesCompraView({
                   <span className="text-sm text-slate-500">Proveedor</span>
                   <span className="text-slate-900">{ordenSeleccionada.proveedor}</span>
                 </div>
+                {ordenSeleccionada.autorizadaPor && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Autorizada por</span>
+                    <span className="text-slate-900">
+                      {ordenSeleccionada.autorizadaPor}
+                      {ordenSeleccionada.autorizadaFecha && (
+                        <span className="text-slate-400 text-xs ml-1">
+                          · {new Date(ordenSeleccionada.autorizadaFecha).toLocaleDateString('es-MX')}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-500">Fecha emisión</span>
                   <span className="text-slate-900">

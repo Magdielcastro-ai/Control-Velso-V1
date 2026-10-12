@@ -69,10 +69,17 @@ export function OrdenCompraDocumento({
               <FileText className="w-5 h-5 text-blue-600" />
               Orden de Compra {orden.numeroOc}
             </span>
-            <Button onClick={handlePrint} variant="outline" size="sm" className="border-slate-300">
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir / PDF
-            </Button>
+            {/* Solo se imprime/envía al proveedor una vez autorizada por finanzas */}
+            {orden.estado === 'autorizada' || orden.estado === 'pagada' || orden.estado === 'recibida' ? (
+              <Button onClick={handlePrint} variant="outline" size="sm" className="border-slate-300">
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir / PDF
+              </Button>
+            ) : (
+              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                Pendiente de autorización de finanzas
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -206,6 +213,14 @@ export function OrdenCompraDocumento({
                   ? 'Se requiere certificado de calidad'
                   : 'No se requiere certificado de calidad'}
               </p>
+              {orden.autorizadaPor && (
+                <p className="mt-1 text-slate-600">
+                  Autorizada por: <span className="font-semibold">{orden.autorizadaPor}</span>
+                  {orden.autorizadaFecha && (
+                    <span className="text-slate-400"> · {new Date(orden.autorizadaFecha).toLocaleDateString('es-MX')}</span>
+                  )}
+                </p>
+              )}
             </div>
           </div>
 

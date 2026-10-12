@@ -37,12 +37,16 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
   const moneda = cotizacion.moneda || 'MXN';
   const monedaConfig = getMonedaConfig(moneda);
 
+  // Imprime SOLO el documento de la cotización (una sola hoja):
+  // se oculta el resto de la app con la clase de impresión
   const handlePrint = () => {
+    document.body.classList.add('imprimiendo-cotizacion');
     window.print();
+    setTimeout(() => document.body.classList.remove('imprimiendo-cotizacion'), 500);
   };
 
   const handleGuardarPDF = () => {
-    window.print();
+    handlePrint();
   };
 
   return (
@@ -78,7 +82,7 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
         )}
       </div>
 
-      <Card ref={cotizacionRef} className="border-slate-300 shadow-lg print:shadow-none">
+      <Card ref={cotizacionRef} className="area-impresion border-slate-300 shadow-lg print:shadow-none">
         <CardContent className="p-8">
           <div className="flex justify-between items-start mb-8 border-b pb-6">
             <div>

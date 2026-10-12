@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, getPerfilUsuario, signIn as supabaseSignIn, signOut as supabaseSignOut } from '@/lib/supabase';
 
-export type UserRole = 'superadmin' | 'admin' | 'vendedor' | 'produccion';
+export type UserRole = 'superadmin' | 'admin' | 'vendedor' | 'produccion' | 'finanzas';
 
 export interface AuthUser {
   id: string;
@@ -326,6 +326,15 @@ export function useAuth() {
     return user?.rol === 'superadmin';
   }, [user]);
 
+  // Órdenes de compra: crear solo admin/superadmin; autorizar solo finanzas/superadmin
+  const canCrearOrdenesCompra = useCallback(() => {
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
+  }, [user]);
+
+  const canAutorizarOrdenesCompra = useCallback(() => {
+    return user?.rol === 'finanzas' || user?.rol === 'superadmin';
+  }, [user]);
+
   const canViewPiezasCatalogo = useCallback(() => {
     if (!user) return false;
     return user.rol !== 'produccion';
@@ -368,6 +377,8 @@ export function useAuth() {
     canManageProcesos,
     canViewProcesos,
     canDeleteProyectos,
+    canCrearOrdenesCompra,
+    canAutorizarOrdenesCompra,
     canViewPiezasCatalogo,
     canManagePiezasCatalogo,
   };

@@ -18,7 +18,8 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Crown
+  Crown,
+  DollarSign
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -27,7 +28,7 @@ interface UsuarioConEmail {
   id: string;
   nombre: string;
   email: string;
-  rol: 'superadmin' | 'admin' | 'vendedor' | 'produccion';
+  rol: 'superadmin' | 'admin' | 'vendedor' | 'produccion' | 'finanzas';
   activo: boolean;
   created_at: string;
 }
@@ -42,6 +43,7 @@ const ROLES = [
   { value: 'admin' as const, label: 'Administrador', icon: Shield, color: 'bg-purple-600' },
   { value: 'vendedor' as const, label: 'Vendedor', icon: User, color: 'bg-blue-600' },
   { value: 'produccion' as const, label: 'Producción', icon: Factory, color: 'bg-green-600' },
+  { value: 'finanzas' as const, label: 'Finanzas', icon: DollarSign, color: 'bg-emerald-600' },
 ];
 
 export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps) {
@@ -54,7 +56,7 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rol, setRol] = useState<'superadmin' | 'admin' | 'vendedor' | 'produccion'>('vendedor');
+  const [rol, setRol] = useState<'superadmin' | 'admin' | 'vendedor' | 'produccion' | 'finanzas'>('vendedor');
 
   // Determinar permisos basados en el rol
   const isSuperAdmin = userRol === 'superadmin';
