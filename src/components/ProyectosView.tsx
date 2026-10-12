@@ -28,14 +28,16 @@ import {
   ShoppingCart,
   ChevronDown,
   ChevronUp,
-  ClipboardList
+  ClipboardList,
+  Eye
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto } from '@/types/ventas';
 import { procesosAplanados, minutosCotizados } from '@/utils/proyectoDatos';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
-import type { OrdenCompra } from '@/types/ordenesCompra';
+import type { OrdenCompra, Proveedor } from '@/types/ordenesCompra';
+import { OrdenCompraDocumento, type DatosTallerOC } from '@/components/OrdenCompraDocumento';
 
 interface ProyectosViewProps {
   onVolver: () => void;
@@ -56,9 +58,11 @@ interface ProyectosViewProps {
   onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   userRol?: string;
   userId?: string;
-  // Órdenes de Compra (solo lectura: la creación se hace desde la sección Órdenes de Compra)
+  // Órdenes de Compra (solo lectura: la creación es en Órdenes de Compra
+  // y la autorización la firma finanzas en esa sección)
   ordenesCompra?: OrdenCompra[];
-  onCambiarEstadoOC?: (id: string, estado: OrdenCompra['estado']) => Promise<boolean> | void;
+  proveedores?: Proveedor[];
+  datosTallerOC?: DatosTallerOC;
   onEliminarOC?: (id: string) => void;
 }
 
@@ -118,11 +122,13 @@ export function ProyectosView({
   userRol = 'vendedor',
   userId,
   ordenesCompra = [],
-  onCambiarEstadoOC,
+  proveedores = [],
+  datosTallerOC,
   onEliminarOC
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
+  const [ocDocumento, setOcDocumento] = useState<OrdenCompra | null>(null);
   const [vendedorFiltro, setVendedorFiltro] = useState<string>('todos');
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [dialogoConvertir, setDialogoConvertir] = useState(false);
@@ -287,15 +293,6 @@ export function ProyectosView({
 
   const getOCsByProyecto = (proyectoId: string) => {
     return ordenesCompra.filter(oc => oc.proyectoId === proyectoId);
-  };
-
-  const siguienteEstadoOC = (estadoActual: OrdenCompra['estado']): OrdenCompra['estado'] => {
-    const estados: OrdenCompra['estado'][] = ['pendiente', 'autorizada', 'pagada', 'recibida'];
-    const idx = estados.indexOf(estadoActual);
-    if (idx >= 0 && idx < estados.length - 1) {
-      return estados[idx + 1];
-    }
-    return estados[0];
   };
 
   return (
@@ -787,16 +784,17 @@ export function ProyectosView({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {onCambiarEstadoOC && oc.estado !== 'cancelada' && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => onCambiarEstadoOC(oc.id, siguienteEstadoOC(oc.estado))}
-                                      className="text-xs h-7"
-                                    >
-                                      Cambiar Estado
-                                    </Button>
-                                  )}
+                                  {/* Ver la OC (documento imprimible) — el cambio de
+                                      estado es exclusivo de la sección Órdenes de Compra */}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setOcDocumento(oc)}
+                                    className="text-xs h-7"
+                                  >
+                                    <Eye className="w-3 h-3 mr-1" />
+                                    Ver orden
+                                  </Button>
                                   {onEliminarOC && (
                                     <Button
                                       variant="ghost"
@@ -873,6 +871,15 @@ export function ProyectosView({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Documento imprimible de la OC (botón "Ver orden" del segmento) */}
+      <OrdenCompraDocumento
+        open={ocDocumento !== null}
+        onOpenChange={(open) => { if (!open) setOcDocumento(null); }}
+        orden={ocDocumento}
+        proveedor={ocDocumento?.proveedorId ? proveedores.find(p => p.id === ocDocumento.proveedorId) : undefined}
+        datosTaller={datosTallerOC || { nombre: 'Soluciones Integrales Velso' }}
+      />
     </div>
   );
 }

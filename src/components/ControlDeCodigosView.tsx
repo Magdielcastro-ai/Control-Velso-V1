@@ -10,18 +10,17 @@ import {
   Package, 
   Settings,
   Save,
-  Calculator,
-  CheckCircle
+  Calculator
 } from 'lucide-react';
 import type { ProyectoVenta, MaterialProyecto, ProcesoProyecto, CostosAdicionalesProyecto } from '@/types/ventas';
 import { procesosAplanados, materialesAplanados, minutosCotizados, costoCotizadoProc, buscarReal } from '@/utils/proyectoDatos';
-import { toast } from 'sonner';
 
 interface ControlDeCodigosViewProps {
   proyecto: ProyectoVenta;
   onVolver: () => void;
+  ordenesCompra?: { proyectoId?: string; iva: number; total: number; numeroOc: string }[];
   onGuardarDatosReales: (id: string, datos: {
-    materialesReales: MaterialProyecto[];
+    materialesReales?: MaterialProyecto[];
     procesosReales?: ProcesoProyecto[];
     costosAdicionalesReales: CostosAdicionalesProyecto;
     costoTotalReal: number;
@@ -32,7 +31,8 @@ interface ControlDeCodigosViewProps {
 
 export function ControlDeCodigosView({ 
   proyecto, 
-  onVolver, 
+  onVolver,
+  ordenesCompra = [],
   onGuardarDatosReales 
 }: ControlDeCodigosViewProps) {
   // Los proyectos convertidos guardan material y procesos DENTRO de cada
@@ -84,24 +84,20 @@ export function ControlDeCodigosView({
     };
   }, [proyecto]);
 
-  // Inicializar materiales reales (copiar de cotizados si no existen)
-  const [materialesReales, setMaterialesReales] = useState<MaterialProyecto[]>(
-    proyecto.materialesReales || materialesCot.map(m => ({
-      ...m,
-      costoUnitarioReal: m.costoUnitarioCotizado,
-      costoTotalReal: m.costoTotalCotizado
-    }))
-  );
+  // Los materiales reales son de SOLO LECTURA: el costo real llega
+  // automáticamente desde las órdenes de compra del proyecto.
+  const materialesReales = useMemo<MaterialProyecto[]>(() =>
+    (proyecto.materialesReales && proyecto.materialesReales.length > 0)
+      ? proyecto.materialesReales
+      : materialesCot.map(m => ({
+          ...m,
+          costoUnitarioReal: m.costoUnitarioCotizado,
+          costoTotalReal: m.costoTotalCotizado
+        })),
+    [proyecto, materialesCot]);
 
-  // Congelado por material: los guardados quedan bloqueados hasta "Editar"
-  const [materialesEditando, setMaterialesEditando] = useState<Set<string>>(new Set());
-  // Materiales con cambios sin guardar (su botón Guardar solo se habilita así)
-  const [materialesSucios, setMaterialesSucios] = useState<Set<string>>(new Set());
-  // Cambios sin guardar (para alertar al salir)
+  // Cambios sin guardar (para alertar al salir) — solo costos adicionales
   const [hayCambiosSinGuardar, setHayCambiosSinGuardar] = useState(false);
-
-  // Los procesos reales son de SOLO LECTURA aquí: la captura de tiempos
-  // reales se hace en la sección Producción (hoja viajera)
 
   // Inicializar costos adicionales reales
   const [costosReales, setCostosReales] = useState<CostosAdicionalesProyecto>(
@@ -200,84 +196,16 @@ export function ControlDeCodigosView({
     };
   }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, costosReales]);
 
-  // Actualizar material real (solo si no está congelado)
-  const actualizarMaterialReal = (id: string, campo: 'costoUnitarioReal' | 'cantidad', valor: number) => {
-    setHayCambiosSinGuardar(true);
-    setMaterialesSucios(prev => new Set(prev).add(id));
-    setMaterialesReales(prev => prev.map(m => {
-      if (m.id !== id) return m;
-      const nuevo = { ...m, [campo]: valor };
-      if (campo === 'costoUnitarioReal' || campo === 'cantidad') {
-        nuevo.costoTotalReal = (nuevo.costoUnitarioReal || nuevo.costoUnitarioCotizado) * nuevo.cantidad;
-      }
-      return nuevo;
-    }));
-  };
-
-  // Un material congelado = guardado y no en modo edición
-  const materialCongelado = (m: MaterialProyecto) =>
-    (m as any).guardado === true && !materialesEditando.has(m.id);
-
-  // Guardar material: lo congela y persiste de inmediato
-  const handleGuardarMaterial = (materialId: string) => {
-    const nuevos = materialesReales.map(m =>
-      m.id === materialId ? ({ ...m, guardado: true } as any) : m
-    );
-    setMaterialesReales(nuevos);
-    setMaterialesEditando(prev => {
-      const s = new Set(prev);
-      s.delete(materialId);
-      return s;
-    });
-    setMaterialesSucios(prev => {
-      const s = new Set(prev);
-      s.delete(materialId);
-      return s;
-    });
-
-    const costoMaterialesReal = nuevos.reduce((sum, m) => sum + (m.costoTotalReal || m.costoTotalCotizado), 0);
-    // Los procesos reales se capturan en Producción — aquí solo se leen,
-    // NUNCA se reescriben (antes se pisaban con copias cotizadas)
-    const costoProcesosReal = procesosCot.reduce((sum, p) => {
-      const real = buscarReal(proyecto.procesosReales, p);
-      return sum + (real?.costoTotalReal != null ? Number(real.costoTotalReal) : p.costoTotalCotizado);
-    }, 0);
-    const costoExtras = (proyecto.procesosReales || [])
-      .filter((e: any) => e.tipo === 'herramienta_extra')
-      .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
-    const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
-    const costoTotalReal = costoMaterialesReal + costoProcesosReal + costoExtras + costosAdicionalesReal;
-    const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
-    const baseSinIVA = (proyecto.totalFacturado || proyecto.totalCotizado) / (1 + ivaPct / 100);
-    const utilidadReal = baseSinIVA - costoTotalReal;
-    const porcentajeUtilidadReal = baseSinIVA > 0 ? (utilidadReal / baseSinIVA) * 100 : 0;
-
-    onGuardarDatosReales(proyecto.id, {
-      materialesReales: nuevos,
-      costosAdicionalesReales: costosReales,
-      costoTotalReal,
-      utilidadReal,
-      porcentajeUtilidadReal,
-    });
-    toast.success('Material guardado y congelado');
-  };
-
-  // Editar material congelado: habilita sus campos de nuevo
-  const handleEditarMaterial = (materialId: string) => {
-    setMaterialesEditando(prev => new Set(prev).add(materialId));
-  };
-
   // Actualizar costo adicional real
   const actualizarCostoReal = (campo: keyof CostosAdicionalesProyecto, valor: number) => {
     setHayCambiosSinGuardar(true);
     setCostosReales(prev => ({ ...prev, [campo]: valor }));
   };
 
-  // Guardar cambios (materiales y costos adicionales; los procesos
-  // reales son de solo lectura aquí — se capturan en Producción)
+  // Guardar cambios (solo costos adicionales; materiales y procesos
+  // reales se alimentan de OCs y Producción — son de solo lectura aquí)
   const handleGuardar = () => {
     onGuardarDatosReales(proyecto.id, {
-      materialesReales,
       costosAdicionalesReales: costosReales,
       costoTotalReal: totales.costoTotalReal,
       utilidadReal: totales.utilidadReal,
@@ -319,7 +247,7 @@ export function ControlDeCodigosView({
       </div>
 
       {/* Desglose: cotización oficial vs costo directo vs utilidad */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Cotización oficial (valores originales, no modificables) */}
         <Card className="border-blue-200">
           <CardContent className="p-4 space-y-1.5">
@@ -389,6 +317,38 @@ export function ControlDeCodigosView({
             <p className="text-[10px] text-slate-400">
               Si gastas menos o fabricas más rápido, la utilidad sube; si gastas más, baja
             </p>
+          </CardContent>
+        </Card>
+
+        {/* IVA: transferible — comparativa cotización vs gastado en OCs */}
+        <Card className="border-slate-200">
+          <CardContent className="p-4 space-y-1.5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              IVA (transferible)
+            </p>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Considerado en cotización</span>
+              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Pagado en OCs del proyecto</span>
+              <span className="font-semibold text-violet-600">
+                ${ordenesCompra
+                  .filter(oc => oc.proyectoId === proyecto.id)
+                  .reduce((s, oc) => s + (Number(oc.iva) || 0), 0)
+                  .toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
+              <span className="text-slate-700 font-medium">Diferencia</span>
+              <span className="font-bold text-slate-700">
+                ${(ordenesCompra
+                  .filter(oc => oc.proyectoId === proyecto.id)
+                  .reduce((s, oc) => s + (Number(oc.iva) || 0), 0) - totales.ivaMonto
+                ).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400">El IVA es transferible y se maneja aparte</p>
           </CardContent>
         </Card>
       </div>
@@ -507,85 +467,59 @@ export function ControlDeCodigosView({
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab Materiales — con guardar/congelar por material */}
+        {/* Tab Materiales — SOLO LECTURA: el costo real llega de las OCs */}
         <TabsContent value="materiales" className="space-y-4">
           <Card className="border-slate-200">
             <CardHeader>
-              <CardTitle className="text-lg">Materiales Reales</CardTitle>
+              <CardTitle className="text-lg">Materiales: Cotizado vs Real</CardTitle>
               <p className="text-xs text-slate-500">
-                Guarda cada material para congelarlo. Para modificarlo después, usa Editar.
+                El costo real se registra automáticamente al crear la orden de compra del
+                material. Si un material tiene más de una compra, el real es la SUMA de sus OCs.
               </p>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {materialesReales.map((material) => {
-                  const congelado = materialCongelado(material);
+                  const compras = (material as any).comprasOC || [];
+                  const hayCompra = compras.length > 0;
+                  const realTotal = material.costoTotalReal ?? material.costoTotalCotizado;
+                  const diferente = hayCompra && Math.abs(realTotal - material.costoTotalCotizado) > 0.01;
                   return (
-                    <div key={material.id} className={`grid grid-cols-1 md:grid-cols-5 gap-4 p-4 rounded-lg ${congelado ? 'bg-green-50/60 border border-green-200' : 'bg-slate-50'}`}>
+                    <div key={material.id} className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-lg ${hayCompra ? 'bg-blue-50/50 border border-blue-200' : 'bg-slate-50'}`}>
                       <div>
                         <p className="text-sm font-medium">{material.nombre}</p>
                         <p className="text-xs text-slate-500">{material.tipo} · {material.forma}</p>
-                        {congelado && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-green-700 font-semibold mt-1">
-                            <CheckCircle className="w-3 h-3" /> Guardado
-                          </span>
-                        )}
-                        {(material as any).comprasOC?.length > 0 && (
+                        {hayCompra ? (
                           <span className="block text-[10px] text-blue-600 mt-0.5">
-                            Comprado en: {(material as any).comprasOC.map((c: any) => c.numero).join(', ')}
+                            Comprado en: {compras.map((c: any) => c.numero).join(', ')}
+                            {compras.length > 1 && ' (sumadas)'}
+                          </span>
+                        ) : (
+                          <span className="block text-[10px] text-slate-400 mt-0.5">
+                            Sin OC registrada — cuenta lo cotizado
                           </span>
                         )}
                       </div>
                       <div>
-                        <Label className="text-xs">Cantidad Real</Label>
-                        <Input
-                          type="number"
-                          value={material.cantidad}
-                          disabled={congelado}
-                          onChange={(e) => actualizarMaterialReal(material.id, 'cantidad', parseFloat(e.target.value) || 0)}
-                          className="mt-1"
-                        />
+                        <p className="text-xs text-slate-500">Cantidad</p>
+                        <p className="font-medium mt-1.5">{material.cantidad}</p>
                       </div>
                       <div>
-                        <Label className="text-xs">Costo Unitario Real ($)</Label>
-                        <Input
-                          type="number"
-                          value={material.costoUnitarioReal || material.costoUnitarioCotizado}
-                          disabled={congelado}
-                          onChange={(e) => actualizarMaterialReal(material.id, 'costoUnitarioReal', parseFloat(e.target.value) || 0)}
-                          className="mt-1"
-                        />
+                        <p className="text-xs text-slate-500">Costo cotizado</p>
+                        <p className="font-medium mt-1.5">
+                          ${material.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
                       <div>
-                        <Label className="text-xs">Costo Total Real</Label>
-                        <p className="font-semibold text-amber-600 mt-2">
-                          ${(material.costoTotalReal || material.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        <p className="text-xs text-slate-500">Costo real (órdenes de compra)</p>
+                        <p className={`font-semibold mt-1.5 ${diferente ? (realTotal > material.costoTotalCotizado ? 'text-red-600' : 'text-green-600') : 'text-slate-700'}`}>
+                          ${realTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </p>
-                        <p className="text-xs text-slate-400">
-                          Cotizado: ${material.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div className="flex items-end">
-                        {congelado ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full border-slate-300"
-                            onClick={() => handleEditarMaterial(material.id)}
-                          >
-                            Editar
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="w-full bg-green-600 hover:bg-green-700"
-                            disabled={!materialesSucios.has(material.id)}
-                            title={materialesSucios.has(material.id) ? 'Guardar y congelar' : 'No hay cambios por guardar'}
-                            onClick={() => handleGuardarMaterial(material.id)}
-                          >
-                            <Save className="w-3.5 h-3.5 mr-1" />
-                            Guardar
-                          </Button>
+                        {diferente && (
+                          <p className={`text-xs ${realTotal > material.costoTotalCotizado ? 'text-red-500' : 'text-green-600'}`}>
+                            {realTotal > material.costoTotalCotizado ? '+' : ''}
+                            ${(realTotal - material.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </p>
                         )}
                       </div>
                     </div>
