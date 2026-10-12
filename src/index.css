@@ -92,17 +92,21 @@
      Se activa con la clase 'imprimiendo-pendientes' en <body> para no
      afectar la impresión de cotizaciones y órdenes de compra */
   body.imprimiendo-pendientes *,
-  body.imprimiendo-hoja-viajera * {
+  body.imprimiendo-hoja-viajera *,
+  body.imprimiendo-cotizacion * {
     visibility: hidden;
   }
   body.imprimiendo-pendientes .area-impresion,
   body.imprimiendo-pendientes .area-impresion *,
   body.imprimiendo-hoja-viajera .area-impresion,
-  body.imprimiendo-hoja-viajera .area-impresion * {
+  body.imprimiendo-hoja-viajera .area-impresion *,
+  body.imprimiendo-cotizacion .area-impresion,
+  body.imprimiendo-cotizacion .area-impresion * {
     visibility: visible;
   }
   body.imprimiendo-pendientes .area-impresion,
-  body.imprimiendo-hoja-viajera .area-impresion {
+  body.imprimiendo-hoja-viajera .area-impresion,
+  body.imprimiendo-cotizacion .area-impresion {
     position: absolute;
     left: 0;
     top: 0;

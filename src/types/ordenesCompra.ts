@@ -14,6 +14,8 @@ export interface OrdenCompra {
   iva: number;
   total: number;
   estado: 'pendiente' | 'autorizada' | 'pagada' | 'recibida' | 'cancelada';
+  autorizadaPor?: string;
+  autorizadaFecha?: string;
   fechaOc: string;
   fechaEntrega?: string;
   terminosPago?: 'contado' | 'credito';
