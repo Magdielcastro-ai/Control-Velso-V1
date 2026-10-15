@@ -58,7 +58,7 @@
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
@@ -93,7 +93,8 @@
      afectar la impresión de cotizaciones y órdenes de compra */
   body.imprimiendo-pendientes *,
   body.imprimiendo-hoja-viajera *,
-  body.imprimiendo-cotizacion * {
+  body.imprimiendo-cotizacion *,
+  body.imprimiendo-oc * {
     visibility: hidden;
   }
   body.imprimiendo-pendientes .area-impresion,
@@ -101,12 +102,15 @@
   body.imprimiendo-hoja-viajera .area-impresion,
   body.imprimiendo-hoja-viajera .area-impresion *,
   body.imprimiendo-cotizacion .area-impresion,
-  body.imprimiendo-cotizacion .area-impresion * {
+  body.imprimiendo-cotizacion .area-impresion *,
+  body.imprimiendo-oc .area-impresion,
+  body.imprimiendo-oc .area-impresion * {
     visibility: visible;
   }
   body.imprimiendo-pendientes .area-impresion,
   body.imprimiendo-hoja-viajera .area-impresion,
-  body.imprimiendo-cotizacion .area-impresion {
+  body.imprimiendo-cotizacion .area-impresion,
+  body.imprimiendo-oc .area-impresion {
     position: absolute;
     left: 0;
     top: 0;

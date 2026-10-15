@@ -196,34 +196,67 @@ export function OrdenesCompraView({
       let matchVencimiento = true;
       if (vencimientoFiltro !== 'todas') {
         const facturadaSinPagar = !!oc.numeroFactura && !oc.pagada;
+        const esVelso = (oc.proveedor || '').trim().toLowerCase() === 'velso';
         if (vencimientoFiltro === 'vencidas') {
-          matchVencimiento = facturadaSinPagar && !!oc.fechaVencimiento &&
-            new Date(oc.fechaVencimiento + 'T00:00:00') < inicioSemana(0);
-        } else if (vencimientoFiltro === 'esta_semana') {
-          matchVencimiento = facturadaSinPagar && !!oc.fechaVencimiento &&
-            (enSemana(oc.fechaVencimiento, 0) || new Date(oc.fechaVencimiento + 'T00:00:00') < inicioSemana(0));
-        } else if (vencimientoFiltro === 'proxima_semana') {
-          matchVencimiento = facturadaSinPagar && !!oc.fechaVencimiento && enSemana(oc.fechaVencimiento, 1);
+          const hoy = new Date();
+          hoy.setHours(0, 0, 0, 0);
+          matchVencimiento = facturadaSinPagar && !esVelso && !!oc.fechaVencimiento &&
+            new Date(oc.fechaVencimiento + 'T00:00:00') < hoy;
+        } else if (vencimientoFiltro.startsWith('semana_')) {
+          const offset = parseInt(vencimientoFiltro.replace('semana_', ''));
+          matchVencimiento = facturadaSinPagar && !esVelso && !!oc.fechaVencimiento &&
+            enSemana(oc.fechaVencimiento, offset);
         }
       }
       return matchEstado && matchBusqueda && matchVencimiento;
     });
   }, [ordenesConNombreProyecto, busqueda, estadoFiltro, vencimientoFiltro]);
 
-  // Cuentas por pagar: facturas registradas sin pagar (se acumulan solas)
+  // Cuentas por pagar: facturas sin pagar (VELSO siempre cuenta como pagada).
+  // Las no pagadas se acumulan solas a la semana siguiente.
   const cuentasPorPagar = useMemo(() => {
-    const sinPagar = ordenes.filter(o => o.numeroFactura && !o.pagada && o.fechaVencimiento);
+    const esVelso = (o: OrdenCompra) => (o.proveedor || '').trim().toLowerCase() === 'velso';
+    const sinPagar = ordenes.filter(o => o.numeroFactura && !o.pagada && o.fechaVencimiento && !esVelso(o));
     const suma = (lista: typeof sinPagar) => lista.reduce((s, o) => s + (o.total || 0), 0);
-    const vencidas = sinPagar.filter(o => new Date(o.fechaVencimiento! + 'T00:00:00') < inicioSemana(0));
-    const estaSemana = sinPagar.filter(o => enSemana(o.fechaVencimiento!, 0));
-    const proximaSemana = sinPagar.filter(o => enSemana(o.fechaVencimiento!, 1));
+    // Vencidas = ya pasó su fecha de pago (según días de crédito + fecha factura)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const vencidas = sinPagar.filter(o => new Date(o.fechaVencimiento! + 'T00:00:00') < hoy);
+
+    // Última semana con algo por pagar (para proyectar hasta ahí)
+    const maxOffset = sinPagar.reduce((max, o) => {
+      const f = new Date(o.fechaVencimiento! + 'T00:00:00');
+      const diff = Math.floor((f.getTime() - inicioSemana(0).getTime()) / (7 * 24 * 60 * 60 * 1000));
+      return Math.max(max, diff);
+    }, 1);
+
+    // Semanas disponibles para el filtro: 0 (actual) hasta la última con adeudo
+    const semanas = Array.from({ length: maxOffset + 1 }, (_, i) => {
+      const ini = inicioSemana(i);
+      const fin = new Date(ini);
+      fin.setDate(fin.getDate() + 4); // lunes a viernes
+      const fmt = (d: Date) => d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+      const lista = sinPagar.filter(o => enSemana(o.fechaVencimiento!, i));
+      return {
+        offset: i,
+        etiqueta: i === 0 ? 'Esta semana' : `Semana del ${fmt(ini)} al ${fmt(fin)}`,
+        cantidad: lista.length,
+        monto: suma(lista),
+      };
+    });
+
     return {
       vencidas: { cantidad: vencidas.length, monto: suma(vencidas) },
-      estaSemana: { cantidad: estaSemana.length, monto: suma(estaSemana) },
-      proximaSemana: { cantidad: proximaSemana.length, monto: suma(proximaSemana) },
+      semanas,
       total: { cantidad: sinPagar.length, monto: suma(sinPagar) },
     };
   }, [ordenes]);
+
+  // Tarjeta 3: la semana seleccionada en el filtro (por defecto la próxima)
+  const semanaSeleccionada = useMemo(() => {
+    const match = cuentasPorPagar.semanas.find(s => `semana_${s.offset}` === vencimientoFiltro);
+    return match || cuentasPorPagar.semanas[1] || cuentasPorPagar.semanas[0];
+  }, [cuentasPorPagar, vencimientoFiltro]);
 
   // Estadísticas
   const stats = useMemo(() => {
@@ -314,7 +347,7 @@ export function OrdenesCompraView({
         </Card>
       </div>
 
-      {/* Cuentas por pagar a proveedores (semana actual y siguiente) */}
+      {/* Cuentas por pagar a proveedores (semana actual y proyección) */}
       {cuentasPorPagar.total.cantidad > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="border-red-200 bg-red-50/50">
@@ -330,18 +363,20 @@ export function OrdenesCompraView({
             <CardContent className="p-4">
               <p className="text-sm text-amber-600">Vencen esta semana</p>
               <p className="text-xl font-bold text-amber-700">
-                ${cuentasPorPagar.estaSemana.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${(cuentasPorPagar.semanas[0]?.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </p>
-              <p className="text-xs text-amber-500">{cuentasPorPagar.estaSemana.cantidad} facturas</p>
+              <p className="text-xs text-amber-500">{cuentasPorPagar.semanas[0]?.cantidad || 0} facturas</p>
             </CardContent>
           </Card>
           <Card className="border-blue-200 bg-blue-50/50">
             <CardContent className="p-4">
-              <p className="text-sm text-blue-600">Próxima semana</p>
-              <p className="text-xl font-bold text-blue-700">
-                ${cuentasPorPagar.proximaSemana.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <p className="text-sm text-blue-600">
+                {semanaSeleccionada?.etiqueta || 'Semana seleccionada'}
               </p>
-              <p className="text-xs text-blue-500">{cuentasPorPagar.proximaSemana.cantidad} facturas</p>
+              <p className="text-xl font-bold text-blue-700">
+                ${(semanaSeleccionada?.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-blue-500">{semanaSeleccionada?.cantidad || 0} facturas</p>
             </CardContent>
           </Card>
           <Card className="border-slate-300 bg-slate-50">
@@ -380,14 +415,17 @@ export function OrdenesCompraView({
           </SelectContent>
         </Select>
         <Select value={vencimientoFiltro} onValueChange={setVencimientoFiltro}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Vencimiento de pago" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todos los vencimientos</SelectItem>
             <SelectItem value="vencidas">Vencidas (acumuladas)</SelectItem>
-            <SelectItem value="esta_semana">Vencen esta semana</SelectItem>
-            <SelectItem value="proxima_semana">Vencen próxima semana</SelectItem>
+            {cuentasPorPagar.semanas.map((s) => (
+              <SelectItem key={s.offset} value={`semana_${s.offset}`}>
+                {s.etiqueta}{s.cantidad > 0 ? ` · ${s.cantidad} factura${s.cantidad !== 1 ? 's' : ''}` : ''}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

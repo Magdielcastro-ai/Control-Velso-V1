@@ -57,7 +57,12 @@ export function OrdenCompraDocumento({
   if (!orden) return null;
 
   const moneda = orden.moneda || 'MXN';
-  const handlePrint = () => window.print();
+  // Imprime SOLO el documento de la OC (una sola hoja)
+  const handlePrint = () => {
+    document.body.classList.add('imprimiendo-oc');
+    window.print();
+    setTimeout(() => document.body.classList.remove('imprimiendo-oc'), 500);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -78,7 +83,7 @@ export function OrdenCompraDocumento({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="bg-white text-slate-900 p-6 print:p-0">
+        <div className="area-impresion bg-white text-slate-900 p-6 print:p-0">
           {/* ─── ENCABEZADO VELSO ─── */}
           <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4">
             <div>
