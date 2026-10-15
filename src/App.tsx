@@ -207,6 +207,7 @@ function App() {
     canDeleteProyectos,
     canCrearOrdenesCompra,
     canAutorizarOrdenesCompra,
+    canEliminarOrdenesCompra,
     canViewPiezasCatalogo,
     canManagePiezasCatalogo,
   } = useAuth();
@@ -237,6 +238,8 @@ function App() {
     ordenes: ordenesCompra,
     crearOrdenCompra,
     actualizarEstado: actualizarEstadoOC,
+    registrarFactura,
+    marcarPagada,
     eliminarOrdenCompra,
     refrescarDesdeSupabase: refrescarOrdenes,
   } = useOrdenesCompraStore();
@@ -253,7 +256,10 @@ function App() {
   // Al crear una OC ligada a un proyecto: los items ligados a un material
   // cotizado acumulan su compra (permite re-compras por errores de
   // maquinado), y los items libres entran como "compra extra".
-  const registrarComprasEnProyecto = async (proyectoId: string, ocId: string, ocNumero: string, items: any[]) => {
+  // REGLA VELSO: si el proveedor es VELSO (material del taller ya pagado
+  // por otro cliente), la compra se registra como referencia pero con
+  // costo real $0 — ese ahorro sube la utilidad del proyecto.
+  const registrarComprasEnProyecto = async (proyectoId: string, ocId: string, ocNumero: string, items: any[], esProveedorVelso: boolean) => {
     const proyecto = proyectos.find(p => p.id === proyectoId);
     if (!proyecto) return;
 
@@ -265,26 +271,43 @@ function App() {
           costoTotalReal: m.costoTotalCotizado,
         }));
 
+    const costoRealDeCompras = (compras: any[]) =>
+      compras
+        .filter((c: any) => !c.cubierto)
+        .reduce((s: number, c: any) => s + (Number(c.total) || 0), 0);
+
     const compraExtra = (item: any) => ({
       id: `oc-${ocId}-${item.id}`,
       nombre: `${item.nombre} (compra extra)`,
       tipo: 'compra_extra',
       forma: '',
       cantidad: item.cantidad,
-      unidad: item.unidad || 'pieza',
+      unidad: item.unidad || 'piezas',
       costoUnitarioCotizado: 0,
       margenPorcentaje: 0,
       costoTotalCotizado: 0,
-      costoUnitarioReal: item.precioUnitario,
-      costoTotalReal: item.total,
-      comprasOC: [{ ocId, numero: ocNumero, descripcion: item.nombre, total: item.total }],
+      costoUnitarioReal: esProveedorVelso ? 0 : item.precioUnitario,
+      costoTotalReal: esProveedorVelso ? 0 : item.total,
+      comprasOC: [{
+        ocId,
+        numero: ocNumero,
+        descripcion: item.nombre,
+        total: item.total,
+        cubierto: esProveedorVelso, // VELSO: ya lo pagó otro cliente
+      }],
     });
 
     for (const item of items) {
       const mat = item.materialId ? actuales.find((m: any) => m.id === item.materialId) : null;
       if (mat) {
-        mat.comprasOC = [...(mat.comprasOC || []), { ocId, numero: ocNumero, descripcion: item.nombre, total: item.total }];
-        mat.costoTotalReal = mat.comprasOC.reduce((s: number, c: any) => s + (Number(c.total) || 0), 0);
+        mat.comprasOC = [...(mat.comprasOC || []), {
+          ocId,
+          numero: ocNumero,
+          descripcion: item.nombre,
+          total: item.total,
+          cubierto: esProveedorVelso,
+        }];
+        mat.costoTotalReal = costoRealDeCompras(mat.comprasOC);
       } else {
         actuales.push(compraExtra(item));
       }
@@ -303,13 +326,14 @@ function App() {
       .map((m: any) => {
         if (!m.comprasOC) return m;
         const compras = m.comprasOC.filter((c: any) => c.ocId !== ocId);
+        const costoRestante = compras
+          .filter((c: any) => !c.cubierto)
+          .reduce((s: number, c: any) => s + (Number(c.total) || 0), 0);
         return {
           ...m,
           comprasOC: compras,
           // Sin compras registradas: vuelve a contar como cotizado
-          costoTotalReal: compras.length > 0
-            ? compras.reduce((s: number, c: any) => s + (Number(c.total) || 0), 0)
-            : undefined,
+          costoTotalReal: compras.length > 0 ? costoRestante : undefined,
         };
       });
 
@@ -320,7 +344,11 @@ function App() {
     const ocCreada = await crearOrdenCompra(datos);
     if (!ocCreada) return false;
     if (ocCreada.proyectoId) {
-      await registrarComprasEnProyecto(ocCreada.proyectoId, ocCreada.id, ocCreada.numeroOc, ocCreada.items || []);
+      const esVelso = (ocCreada.proveedor || '').trim().toLowerCase() === 'velso';
+      await registrarComprasEnProyecto(ocCreada.proyectoId, ocCreada.id, ocCreada.numeroOc, ocCreada.items || [], esVelso);
+      if (esVelso) {
+        toast.info('Proveedor VELSO: el material de taller se registró con costo $0 — sube la utilidad del proyecto');
+      }
     }
     return true;
   };
@@ -1117,7 +1145,7 @@ function App() {
               userRol={user.rol}
               userId={user.id}
               ordenesCompra={ordenesCompra}
-              onEliminarOC={handleEliminarOrdenCompra}
+              onEliminarOC={canEliminarOrdenesCompra() ? handleEliminarOrdenCompra : undefined}
               proveedores={proveedores}
               datosTallerOC={
                 talleres[0]
@@ -1287,9 +1315,12 @@ function App() {
               solicitanteDefault={user?.nombre || user?.email || ''}
               puedeCrear={canCrearOrdenesCompra()}
               puedeAutorizar={canAutorizarOrdenesCompra()}
+              puedeGestionarPagos={canAutorizarOrdenesCompra()}
               usuarioNombre={user?.nombre || user?.email || ''}
               onCambiarEstado={actualizarEstadoOC}
-              onEliminar={handleEliminarOrdenCompra}
+              onRegistrarFactura={registrarFactura}
+              onMarcarPagada={marcarPagada}
+              onEliminar={canEliminarOrdenesCompra() ? handleEliminarOrdenCompra : undefined}
               onCrearOrden={handleCrearOrdenCompra}
             />
           </>
