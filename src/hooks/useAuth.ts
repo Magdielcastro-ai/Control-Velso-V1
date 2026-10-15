@@ -331,8 +331,14 @@ export function useAuth() {
     return user?.rol === 'admin' || user?.rol === 'superadmin';
   }, [user]);
 
+  // Eliminar OCs: solo superadmin o finanzas (la cascada limpia el proyecto)
   const canAutorizarOrdenesCompra = useCallback(() => {
     return user?.rol === 'finanzas' || user?.rol === 'superadmin';
+  }, [user]);
+
+  // Eliminar OCs: solo superadmin o finanzas (la cascada limpia el proyecto)
+  const canEliminarOrdenesCompra = useCallback(() => {
+    return user?.rol === 'superadmin' || user?.rol === 'finanzas';
   }, [user]);
 
   const canViewPiezasCatalogo = useCallback(() => {
@@ -379,6 +385,7 @@ export function useAuth() {
     canDeleteProyectos,
     canCrearOrdenesCompra,
     canAutorizarOrdenesCompra,
+    canEliminarOrdenesCompra,
     canViewPiezasCatalogo,
     canManagePiezasCatalogo,
   };

@@ -92,14 +92,14 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
         </tbody>
       </table>
 
-      {/* Procesos: cotizado fijo + fecha/hora por proceso + reales si ya se capturaron */}
+      {/* Procesos: SIN tiempos cotizados a petición del usuario
+          (los operadores no deben ver el tiempo esperado).
+          Solo ruta de procesos + fecha/hora/reales para captura en piso */}
       <table className="w-full text-xs border border-slate-300 mb-3">
         <thead>
           <tr className="bg-slate-800 text-white">
             <th className="px-2 py-1.5 text-left w-6">#</th>
             <th className="px-2 py-1.5 text-left">PROCESO</th>
-            <th className="px-2 py-1.5 text-right w-16">MIN/PZA COT.</th>
-            <th className="px-2 py-1.5 text-right w-16">MIN TOTAL COT.</th>
             <th className="px-2 py-1.5 text-center w-20">FECHA</th>
             <th className="px-2 py-1.5 text-center w-16">HORA INICIO</th>
             <th className="px-2 py-1.5 text-center w-16">HORA FIN</th>
@@ -114,8 +114,6 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
               <tr key={proc.id || idx} className="border-b border-slate-200">
                 <td className="px-2 py-4">{idx + 1}</td>
                 <td className="px-2 py-4 font-medium">{proc.nombre}</td>
-                <td className="px-2 py-4 text-right">{proc.tiempoMinutosPorPieza ?? '—'}</td>
-                <td className="px-2 py-4 text-right">{proc.tiempoMinutos ?? '—'}</td>
                 <td className="px-2 py-4" />
                 <td className="px-2 py-4" />
                 <td className="px-2 py-4" />
@@ -128,17 +126,6 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
               </tr>
             );
           })}
-          {/* Fila de totales */}
-          <tr className="bg-slate-100 font-semibold">
-            <td className="px-2 py-2" colSpan={2}>TOTALES</td>
-            <td className="px-2 py-2 text-right">
-              {(pieza.procesos || []).reduce((s: number, p: any) => s + (Number(p.tiempoMinutosPorPieza) || 0), 0)}
-            </td>
-            <td className="px-2 py-2 text-right">
-              {(pieza.procesos || []).reduce((s: number, p: any) => s + (Number(p.tiempoMinutos) || 0), 0)}
-            </td>
-            <td className="px-2 py-2" colSpan={5} />
-          </tr>
         </tbody>
       </table>
 

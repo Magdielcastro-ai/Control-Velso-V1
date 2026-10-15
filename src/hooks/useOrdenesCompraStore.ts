@@ -38,6 +38,12 @@ export const useOrdenesCompraStore = () => {
     estado: row.estado || 'pendiente',
     autorizadaPor: row.autorizada_por || undefined,
     autorizadaFecha: row.autorizada_fecha || undefined,
+    numeroFactura: row.numero_factura || undefined,
+    fechaFacturacion: row.fecha_facturacion || undefined,
+    fechaVencimiento: row.fecha_vencimiento || undefined,
+    pagada: row.pagada ?? false,
+    fechaPago: row.fecha_pago || undefined,
+    pagadaPor: row.pagada_por || undefined,
     fechaOc: row.fecha_oc || new Date().toISOString(),
     fechaEntrega: row.fecha_entrega || undefined,
     terminosPago: row.terminos_pago || 'contado',
@@ -298,6 +304,70 @@ export const useOrdenesCompraStore = () => {
     }
   }, []);
 
+  // Registrar factura del proveedor: calcula el vencimiento según los
+  // días de crédito del proveedor (contado = mismo día de facturación)
+  const registrarFactura = useCallback(async (
+    id: string,
+    numeroFactura: string,
+    fechaFacturacion: string,
+    diasCredito: number
+  ) => {
+    try {
+      const fecha = new Date(fechaFacturacion + 'T00:00:00');
+      fecha.setDate(fecha.getDate() + (diasCredito || 0));
+      const vencimiento = fecha.toISOString().split('T')[0];
+
+      const { error } = await supabase
+        .from('ordenes_compra')
+        .update({
+          numero_factura: numeroFactura,
+          fecha_facturacion: fechaFacturacion,
+          fecha_vencimiento: vencimiento,
+        })
+        .eq('id', id);
+
+      if (error) {
+        toast.error('Error registrando factura: ' + error.message);
+        return false;
+      }
+
+      setOrdenes(prev => prev.map(o => o.id === id ? {
+        ...o,
+        numeroFactura,
+        fechaFacturacion,
+        fechaVencimiento: vencimiento,
+      } : o));
+      toast.success(`Factura ${numeroFactura} registrada · vence ${vencimiento}`);
+      return true;
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + e.message);
+      return false;
+    }
+  }, []);
+
+  // Marcar factura como pagada (finanzas)
+  const marcarPagada = useCallback(async (id: string, pagadaPor: string) => {
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { error } = await supabase
+        .from('ordenes_compra')
+        .update({ pagada: true, fecha_pago: hoy, pagada_por: pagadaPor })
+        .eq('id', id);
+
+      if (error) {
+        toast.error('Error marcando pago: ' + error.message);
+        return false;
+      }
+
+      setOrdenes(prev => prev.map(o => o.id === id ? { ...o, pagada: true, fechaPago: hoy, pagadaPor } : o));
+      toast.success('Factura marcada como pagada');
+      return true;
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + e.message);
+      return false;
+    }
+  }, []);
+
   const eliminarOrdenCompra = useCallback(async (id: string) => {
     console.log('[useOrdenesCompraStore] Eliminando orden:', id);
 
@@ -337,6 +407,8 @@ export const useOrdenesCompraStore = () => {
     error,
     crearOrdenCompra,
     actualizarEstado,
+    registrarFactura,
+    marcarPagada,
     eliminarOrdenCompra,
     refrescarDesdeSupabase,
     cargarOrdenes,

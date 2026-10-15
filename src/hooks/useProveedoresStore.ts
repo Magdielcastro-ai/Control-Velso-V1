@@ -19,6 +19,7 @@ export const useProveedoresStore = () => {
     email: row.email || undefined,
     contacto: row.contacto || undefined,
     diasCredito: Number(row.dias_credito) || 0,
+    moneda: row.moneda || 'MXN',
     createdAt: row.created_at || undefined,
   });
 
@@ -73,6 +74,7 @@ export const useProveedoresStore = () => {
     email?: string;
     contacto?: string;
     diasCredito?: number;
+    moneda?: 'MXN' | 'USD';
   }): Promise<Proveedor | null> => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -95,6 +97,7 @@ export const useProveedoresStore = () => {
         email: datos.email?.trim() || null,
         contacto: datos.contacto?.trim() || null,
         dias_credito: Number(datos.diasCredito) || 0,
+        moneda: datos.moneda || 'MXN',
       };
 
       const { data, error } = await supabase
@@ -128,6 +131,7 @@ export const useProveedoresStore = () => {
     email: string;
     contacto: string;
     diasCredito: number;
+    moneda?: 'MXN' | 'USD';
   }>): Promise<boolean> => {
     try {
       const updateData: any = { updated_at: new Date().toISOString() };
@@ -138,6 +142,7 @@ export const useProveedoresStore = () => {
       if (datos.email !== undefined) updateData.email = datos.email;
       if (datos.contacto !== undefined) updateData.contacto = datos.contacto;
       if (datos.diasCredito !== undefined) updateData.dias_credito = datos.diasCredito;
+      if (datos.moneda !== undefined) updateData.moneda = datos.moneda;
 
       const { error } = await supabase
         .from('proveedores')

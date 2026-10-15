@@ -39,6 +39,7 @@ const formVacio = {
   email: '',
   contacto: '',
   diasCredito: '0',
+  moneda: 'MXN',
 };
 
 export function ProveedoresView({
@@ -77,6 +78,7 @@ export function ProveedoresView({
       email: p.email || '',
       contacto: p.contacto || '',
       diasCredito: String(p.diasCredito ?? 0),
+      moneda: p.moneda || 'MXN',
     });
     setEditandoId(p.id);
     setMostrarFormulario(true);
@@ -93,6 +95,7 @@ export function ProveedoresView({
       email: form.email.trim() || undefined,
       contacto: form.contacto.trim() || undefined,
       diasCredito: Number(form.diasCredito) || 0,
+      moneda: form.moneda as 'MXN' | 'USD',
     };
     const ok = editandoId
       ? await onActualizar(editandoId, datos)
@@ -174,6 +177,17 @@ export function ProveedoresView({
                   value={form.diasCredito}
                   onChange={e => setForm(f => ({ ...f, diasCredito: e.target.value }))}
                 />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Moneda</Label>
+                <select
+                  value={form.moneda}
+                  onChange={e => setForm(f => ({ ...f, moneda: e.target.value }))}
+                  className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
+                >
+                  <option value="MXN">MXN</option>
+                  <option value="USD">USD</option>
+                </select>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Domicilio</Label>

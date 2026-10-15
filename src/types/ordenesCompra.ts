@@ -16,6 +16,12 @@ export interface OrdenCompra {
   estado: 'pendiente' | 'autorizada' | 'pagada' | 'recibida' | 'cancelada';
   autorizadaPor?: string;
   autorizadaFecha?: string;
+  numeroFactura?: string;
+  fechaFacturacion?: string;
+  fechaVencimiento?: string;
+  pagada?: boolean;
+  fechaPago?: string;
+  pagadaPor?: string;
   fechaOc: string;
   fechaEntrega?: string;
   terminosPago?: 'contado' | 'credito';
@@ -48,5 +54,6 @@ export interface Proveedor {
   email?: string;
   contacto?: string;
   diasCredito?: number;
+  moneda?: 'MXN' | 'USD';
   createdAt?: string;
 }
