@@ -286,8 +286,11 @@ function App() {
       costoUnitarioCotizado: 0,
       margenPorcentaje: 0,
       costoTotalCotizado: 0,
-      costoUnitarioReal: esProveedorVelso ? 0 : item.precioUnitario,
-      costoTotalReal: esProveedorVelso ? 0 : item.total,
+      // VELSO (material del taller ya pagado por otro cliente):
+      // item ligado → costo real $0; item libre → costo NEGATIVO,
+      // porque se está recuperando/vendiendo material que ya era nuestro
+      costoUnitarioReal: esProveedorVelso ? -item.precioUnitario : item.precioUnitario,
+      costoTotalReal: esProveedorVelso ? -item.total : item.total,
       comprasOC: [{
         ocId,
         numero: ocNumero,
