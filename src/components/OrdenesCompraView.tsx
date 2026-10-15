@@ -47,8 +47,11 @@ export interface OrdenesCompraViewProps {
   solicitanteDefault?: string;
   puedeCrear?: boolean;      // solo admin/superadmin
   puedeAutorizar?: boolean;  // solo finanzas/superadmin
+  puedeGestionarPagos?: boolean; // finanzas/superadmin: registrar factura y marcar pagada
   usuarioNombre?: string;    // firma de la autorización
   onCambiarEstado?: (id: string, estado: OrdenCompra['estado'], autorizadoPor?: string) => void;
+  onRegistrarFactura?: (id: string, numeroFactura: string, fechaFacturacion: string, diasCredito: number) => Promise<boolean> | void;
+  onMarcarPagada?: (id: string, pagadaPor: string) => Promise<boolean> | void;
   onEliminar?: (id: string) => void;
   onCrearOrden?: (datos: any) => Promise<any>;
 }
@@ -115,17 +118,41 @@ export function OrdenesCompraView({
   solicitanteDefault,
   puedeCrear = false,
   puedeAutorizar = false,
+  puedeGestionarPagos = false,
   usuarioNombre = '',
   onCambiarEstado,
+  onRegistrarFactura,
+  onMarcarPagada,
   onEliminar,
   onCrearOrden,
 }: OrdenesCompraViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('todos');
+  const [vencimientoFiltro, setVencimientoFiltro] = useState<string>('todas');
   const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCompra | null>(null);
   const [dialogoDetalle, setDialogoDetalle] = useState(false);
   const [dialogoNueva, setDialogoNueva] = useState(false);
   const [ordenDocumento, setOrdenDocumento] = useState<OrdenCompra | null>(null);
+  // Registro de factura del proveedor
+  const [ocFactura, setOcFactura] = useState<OrdenCompra | null>(null);
+  const [numeroFacturaInput, setNumeroFacturaInput] = useState('');
+  const [fechaFacturacionInput, setFechaFacturacionInput] = useState(new Date().toISOString().split('T')[0]);
+
+  // Semana actual (lunes a domingo) para filtros de vencimiento
+  const inicioSemana = (offsetSemanas: number) => {
+    const d = new Date();
+    const diaSemana = (d.getDay() + 6) % 7; // lunes = 0
+    d.setDate(d.getDate() - diaSemana + offsetSemanas * 7);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  const enSemana = (fechaStr: string, offset: number) => {
+    const ini = inicioSemana(offset);
+    const fin = new Date(ini);
+    fin.setDate(fin.getDate() + 7);
+    const f = new Date(fechaStr + 'T00:00:00');
+    return f >= ini && f < fin;
+  };
 
   const proveedorMap = useMemo(() => {
     const map: Record<string, Proveedor> = {};
@@ -165,9 +192,38 @@ export function OrdenesCompraView({
           (oc.proveedor || '').toLowerCase().includes(busquedaLower) ||
           oc.proyectoNombreDisplay.toLowerCase().includes(busquedaLower)
         : true;
-      return matchEstado && matchBusqueda;
+      // Filtro de vencimiento de pago (las no pagadas se acumulan)
+      let matchVencimiento = true;
+      if (vencimientoFiltro !== 'todas') {
+        const facturadaSinPagar = !!oc.numeroFactura && !oc.pagada;
+        if (vencimientoFiltro === 'vencidas') {
+          matchVencimiento = facturadaSinPagar && !!oc.fechaVencimiento &&
+            new Date(oc.fechaVencimiento + 'T00:00:00') < inicioSemana(0);
+        } else if (vencimientoFiltro === 'esta_semana') {
+          matchVencimiento = facturadaSinPagar && !!oc.fechaVencimiento &&
+            (enSemana(oc.fechaVencimiento, 0) || new Date(oc.fechaVencimiento + 'T00:00:00') < inicioSemana(0));
+        } else if (vencimientoFiltro === 'proxima_semana') {
+          matchVencimiento = facturadaSinPagar && !!oc.fechaVencimiento && enSemana(oc.fechaVencimiento, 1);
+        }
+      }
+      return matchEstado && matchBusqueda && matchVencimiento;
     });
-  }, [ordenesConNombreProyecto, busqueda, estadoFiltro]);
+  }, [ordenesConNombreProyecto, busqueda, estadoFiltro, vencimientoFiltro]);
+
+  // Cuentas por pagar: facturas registradas sin pagar (se acumulan solas)
+  const cuentasPorPagar = useMemo(() => {
+    const sinPagar = ordenes.filter(o => o.numeroFactura && !o.pagada && o.fechaVencimiento);
+    const suma = (lista: typeof sinPagar) => lista.reduce((s, o) => s + (o.total || 0), 0);
+    const vencidas = sinPagar.filter(o => new Date(o.fechaVencimiento! + 'T00:00:00') < inicioSemana(0));
+    const estaSemana = sinPagar.filter(o => enSemana(o.fechaVencimiento!, 0));
+    const proximaSemana = sinPagar.filter(o => enSemana(o.fechaVencimiento!, 1));
+    return {
+      vencidas: { cantidad: vencidas.length, monto: suma(vencidas) },
+      estaSemana: { cantidad: estaSemana.length, monto: suma(estaSemana) },
+      proximaSemana: { cantidad: proximaSemana.length, monto: suma(proximaSemana) },
+      total: { cantidad: sinPagar.length, monto: suma(sinPagar) },
+    };
+  }, [ordenes]);
 
   // Estadísticas
   const stats = useMemo(() => {
@@ -258,6 +314,48 @@ export function OrdenesCompraView({
         </Card>
       </div>
 
+      {/* Cuentas por pagar a proveedores (semana actual y siguiente) */}
+      {cuentasPorPagar.total.cantidad > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border-red-200 bg-red-50/50">
+            <CardContent className="p-4">
+              <p className="text-sm text-red-600">Vencidas (acumuladas)</p>
+              <p className="text-xl font-bold text-red-700">
+                ${cuentasPorPagar.vencidas.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-red-500">{cuentasPorPagar.vencidas.cantidad} facturas</p>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardContent className="p-4">
+              <p className="text-sm text-amber-600">Vencen esta semana</p>
+              <p className="text-xl font-bold text-amber-700">
+                ${cuentasPorPagar.estaSemana.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-amber-500">{cuentasPorPagar.estaSemana.cantidad} facturas</p>
+            </CardContent>
+          </Card>
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardContent className="p-4">
+              <p className="text-sm text-blue-600">Próxima semana</p>
+              <p className="text-xl font-bold text-blue-700">
+                ${cuentasPorPagar.proximaSemana.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-blue-500">{cuentasPorPagar.proximaSemana.cantidad} facturas</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-300 bg-slate-50">
+            <CardContent className="p-4">
+              <p className="text-sm text-slate-600">Total por pagar</p>
+              <p className="text-xl font-bold text-slate-900">
+                ${cuentasPorPagar.total.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-slate-500">{cuentasPorPagar.total.cantidad} facturas activas</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Filtros y búsqueda */}
       <div className="flex flex-wrap gap-2">
         <div className="flex-1 min-w-[200px]">
@@ -279,6 +377,17 @@ export function OrdenesCompraView({
             <SelectItem value="todos">Todos los estados</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
             <SelectItem value="autorizada">Autorizada</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={vencimientoFiltro} onValueChange={setVencimientoFiltro}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Vencimiento de pago" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todos los vencimientos</SelectItem>
+            <SelectItem value="vencidas">Vencidas (acumuladas)</SelectItem>
+            <SelectItem value="esta_semana">Vencen esta semana</SelectItem>
+            <SelectItem value="proxima_semana">Vencen próxima semana</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -305,7 +414,7 @@ export function OrdenesCompraView({
                   <div className="flex flex-col md:flex-row md:items-center gap-4">
                     {/* Número + Proyecto */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Hash className="w-4 h-4 text-slate-400" />
                         <span className="font-semibold text-slate-900">
                           {oc.numeroOc}
@@ -317,6 +426,12 @@ export function OrdenesCompraView({
                           <EstadoIcon className="w-3 h-3 mr-1" />
                           {config.label}
                         </Badge>
+                        {oc.pagada && (
+                          <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-200">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Pagada
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-slate-600">
                         <Building2 className="w-3.5 h-3.5 text-slate-400" />
@@ -326,6 +441,26 @@ export function OrdenesCompraView({
                         <Package className="w-3.5 h-3.5 text-slate-400" />
                         <span className="truncate">{oc.proveedor}</span>
                       </div>
+                      {oc.numeroFactura && (
+                        <div className="flex items-center gap-2 text-xs mt-0.5">
+                          <FileText className="w-3 h-3 text-slate-400" />
+                          <span className="text-slate-600">
+                            Fact. {oc.numeroFactura}
+                            {oc.fechaVencimiento && !oc.pagada && (
+                              <span className={`ml-1 font-medium ${
+                                new Date(oc.fechaVencimiento + 'T00:00:00') < inicioSemana(0)
+                                  ? 'text-red-600'
+                                  : 'text-slate-500'
+                              }`}>
+                                · vence {formatearFecha(oc.fechaVencimiento)}
+                              </span>
+                            )}
+                            {oc.pagada && oc.fechaPago && (
+                              <span className="ml-1 text-green-600">· pagada {formatearFecha(oc.fechaPago)}</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Fecha + Total */}
@@ -352,6 +487,38 @@ export function OrdenesCompraView({
                       >
                         <Eye className="w-4 h-4 text-blue-600" />
                       </Button>
+                      {/* Registrar factura (finanzas) cuando está autorizada y sin pagar */}
+                      {puedeGestionarPagos && esAutorizada(oc.estado) && !oc.pagada && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setOcFactura(oc);
+                            setNumeroFacturaInput(oc.numeroFactura || '');
+                            setFechaFacturacionInput(oc.fechaFacturacion || new Date().toISOString().split('T')[0]);
+                          }}
+                          className="h-8 w-8 p-0"
+                          title="Registrar factura del proveedor"
+                        >
+                          <FileText className="w-4 h-4 text-violet-600" />
+                        </Button>
+                      )}
+                      {/* Marcar pagada (finanzas) cuando hay factura registrada */}
+                      {puedeGestionarPagos && oc.numeroFactura && !oc.pagada && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`¿Marcar la factura ${oc.numeroFactura} de ${oc.numeroOc} como PAGADA?`)) {
+                              onMarcarPagada?.(oc.id, usuarioNombre);
+                            }
+                          }}
+                          className="h-8 w-8 p-0"
+                          title="Marcar como pagada"
+                        >
+                          <DollarSign className="w-4 h-4 text-green-600" />
+                        </Button>
+                      )}
                       {/* Imprimir solo cuando está autorizada (firmada por finanzas) */}
                       {esAutorizada(oc.estado) ? (
                         <Button
@@ -572,7 +739,7 @@ export function OrdenesCompraView({
       </Dialog>
 
       {/* Diálogo: Nueva OC */}
-      {onCrearOrden && (
+      {onCrearOrden && puedeCrear && (
         <NuevaOrdenCompraDialog
           open={dialogoNueva}
           onOpenChange={setDialogoNueva}
@@ -582,6 +749,63 @@ export function OrdenesCompraView({
           onCrearOrden={onCrearOrden}
         />
       )}
+
+      {/* Diálogo: Registrar factura del proveedor (calcula vencimiento por crédito) */}
+      <Dialog open={ocFactura !== null} onOpenChange={(open) => { if (!open) setOcFactura(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-violet-600" />
+              Registrar factura · {ocFactura?.numeroOc}
+            </DialogTitle>
+          </DialogHeader>
+          {ocFactura && (
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-slate-500">
+                Proveedor: <span className="font-medium text-slate-800">{ocFactura.proveedor}</span>
+                {' · '}
+                {(() => {
+                  const prov = proveedores.find(p => p.id === ocFactura.proveedorId);
+                  const dias = prov?.diasCredito || 0;
+                  return dias > 0 ? `Crédito ${dias} días` : 'Contado';
+                })()}
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Número de factura *</label>
+                <Input
+                  value={numeroFacturaInput}
+                  onChange={(e) => setNumeroFacturaInput(e.target.value)}
+                  placeholder="Ej. FAC-2026-118"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Fecha de facturación *</label>
+                <Input
+                  type="date"
+                  value={fechaFacturacionInput}
+                  onChange={(e) => setFechaFacturacionInput(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full bg-violet-600 hover:bg-violet-700"
+                disabled={!numeroFacturaInput.trim() || !fechaFacturacionInput}
+                onClick={async () => {
+                  const prov = proveedores.find(p => p.id === ocFactura.proveedorId);
+                  const ok = await onRegistrarFactura?.(
+                    ocFactura.id,
+                    numeroFacturaInput.trim(),
+                    fechaFacturacionInput,
+                    prov?.diasCredito || 0
+                  );
+                  if (ok !== false) setOcFactura(null);
+                }}
+              >
+                Guardar factura y calcular vencimiento
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Documento imprimible */}
       <OrdenCompraDocumento

@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -58,7 +57,7 @@ interface NuevaOrdenCompraDialogProps {
   }) => Promise<any>;
 }
 
-const itemVacio: ItemForm = { nombre: '', cantidad: '1', unidad: 'pieza', precioUnitario: '', referencia: '' };
+const itemVacio: ItemForm = { nombre: '', cantidad: '1', unidad: 'piezas', precioUnitario: '', referencia: '' };
 
 // Código de taller para gastos internos — siempre activo.
 // El 0007 de cada año está reservado para esto.
@@ -80,9 +79,7 @@ export function NuevaOrdenCompraDialog({
   const [ivaPorcentaje, setIvaPorcentaje] = useState('16');
   const [terminosPago, setTerminosPago] = useState<'contado' | 'credito'>('contado');
   const [moneda, setMoneda] = useState<'MXN' | 'USD'>('MXN');
-  const [certificadoCalidad, setCertificadoCalidad] = useState(false);
   const [solicitanteNombre, setSolicitanteNombre] = useState(solicitanteDefault || '');
-  const [solicitanteCodigo, setSolicitanteCodigo] = useState('');
   const [fechaEntrega, setFechaEntrega] = useState('');
   const [notas, setNotas] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -189,10 +186,18 @@ export function NuevaOrdenCompraDialog({
     setIvaPorcentaje('16');
     setTerminosPago('contado');
     setMoneda('MXN');
-    setCertificadoCalidad(false);
-    setSolicitanteCodigo('');
     setFechaEntrega('');
     setNotas('');
+  };
+
+  // Al elegir proveedor se aplican sus términos y moneda del catálogo
+  const handleCambiarProveedor = (id: string) => {
+    setProveedorId(id);
+    const prov = proveedores.find(p => p.id === id);
+    if (prov) {
+      setTerminosPago(prov.diasCredito && prov.diasCredito > 0 ? 'credito' : 'contado');
+      setMoneda(prov.moneda || 'MXN');
+    }
   };
 
   const handleGuardar = async () => {
@@ -219,7 +224,7 @@ export function NuevaOrdenCompraDialog({
           id: `item-${Date.now()}-${idx}`,
           nombre: it.nombre.trim(),
           cantidad,
-          unidad: it.unidad || 'pieza',
+          unidad: it.unidad || 'piezas',
           precioUnitario,
           total: cantidad * precioUnitario,
           referencia: it.referencia?.trim() || undefined,
@@ -233,9 +238,7 @@ export function NuevaOrdenCompraDialog({
       fechaEntrega: fechaEntrega || undefined,
       terminosPago,
       moneda,
-      certificadoCalidad,
       solicitanteNombre: solicitanteNombre || undefined,
-      solicitanteCodigo: solicitanteCodigo || undefined,
       notas: notas || undefined,
     });
     setGuardando(false);
@@ -298,7 +301,7 @@ export function NuevaOrdenCompraDialog({
           {/* 2. Proveedor — solo del catálogo (la alta es en la sección Proveedores) */}
           <div className="space-y-2">
             <Label>Proveedor *</Label>
-            <Select value={proveedorId} onValueChange={setProveedorId}>
+            <Select value={proveedorId} onValueChange={handleCambiarProveedor}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un proveedor del catálogo..." />
               </SelectTrigger>
@@ -524,21 +527,6 @@ export function NuevaOrdenCompraDialog({
                   onChange={e => setIvaPorcentaje(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>Código solicitante</Label>
-                <Input
-                  placeholder="Ej. VLS-01"
-                  value={solicitanteCodigo}
-                  onChange={e => setSolicitanteCodigo(e.target.value)}
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer pt-1">
-                <Checkbox
-                  checked={certificadoCalidad}
-                  onCheckedChange={v => setCertificadoCalidad(v === true)}
-                />
-                Certificado de calidad
-              </label>
             </div>
 
             <div className="space-y-3">
