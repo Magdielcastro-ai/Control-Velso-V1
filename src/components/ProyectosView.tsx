@@ -292,7 +292,10 @@ export function ProyectosView({
   };
 
   const getOCsByProyecto = (proyectoId: string) => {
-    return ordenesCompra.filter(oc => oc.proyectoId === proyectoId);
+    // Siempre de la más nueva a la más antigua
+    return ordenesCompra
+      .filter(oc => oc.proyectoId === proyectoId)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   };
 
   return (
