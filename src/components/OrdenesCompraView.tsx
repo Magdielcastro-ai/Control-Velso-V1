@@ -490,53 +490,61 @@ export function OrdenesCompraView({
                       {/* Registrar factura (finanzas) cuando está autorizada y sin pagar */}
                       {puedeGestionarPagos && esAutorizada(oc.estado) && !oc.pagada && (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             setOcFactura(oc);
                             setNumeroFacturaInput(oc.numeroFactura || '');
                             setFechaFacturacionInput(oc.fechaFacturacion || new Date().toISOString().split('T')[0]);
                           }}
-                          className="h-8 w-8 p-0"
+                          className="h-8 text-xs text-violet-600 border-violet-300"
                           title="Registrar factura del proveedor"
                         >
-                          <FileText className="w-4 h-4 text-violet-600" />
+                          <FileText className="w-3.5 h-3.5 mr-1" />
+                          Factura
                         </Button>
                       )}
                       {/* Marcar pagada (finanzas) cuando hay factura registrada */}
                       {puedeGestionarPagos && oc.numeroFactura && !oc.pagada && (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             if (confirm(`¿Marcar la factura ${oc.numeroFactura} de ${oc.numeroOc} como PAGADA?`)) {
                               onMarcarPagada?.(oc.id, usuarioNombre);
                             }
                           }}
-                          className="h-8 w-8 p-0"
+                          className="h-8 text-xs text-green-700 border-green-300"
                           title="Marcar como pagada"
                         >
-                          <DollarSign className="w-4 h-4 text-green-600" />
+                          <DollarSign className="w-3.5 h-3.5 mr-1" />
+                          Pagada
                         </Button>
                       )}
-                      {/* Imprimir solo cuando está autorizada (firmada por finanzas) */}
-                      {esAutorizada(oc.estado) ? (
+                      {/* Imprimir: permitido siempre (aunque no esté autorizada) */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setOrdenDocumento(oc)}
+                        className="h-8 w-8 p-0"
+                        title="Ver documento imprimible"
+                      >
+                        <Printer className="w-4 h-4 text-slate-600" />
+                      </Button>
+                      {/* Autorizar: botón visible, solo finanzas/superadmin (queda firmado) */}
+                      {puedeAutorizar && oc.estado === 'pendiente' && (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => setOrdenDocumento(oc)}
-                          className="h-8 w-8 p-0"
-                          title="Ver documento imprimible"
+                          className="h-8 text-xs text-blue-600 border-blue-300"
+                          onClick={() => {
+                            if (confirm(`¿Autorizar la orden ${oc.numeroOc}? Quedará firmada por ti (${usuarioNombre}).`)) {
+                              onCambiarEstado?.(oc.id, 'autorizada', usuarioNombre);
+                            }
+                          }}
                         >
-                          <Printer className="w-4 h-4 text-slate-600" />
+                          Autorizar
                         </Button>
-                      ) : (
-                        <span
-                          className="h-8 w-8 p-0 flex items-center justify-center"
-                          title="Debe estar autorizada para imprimir"
-                        >
-                          <Printer className="w-4 h-4 text-slate-300" />
-                        </span>
                       )}
                       {onCambiarEstado && (
                         <Select
