@@ -489,16 +489,6 @@ export function ControlDeCodigosView({
                       <div>
                         <p className="text-sm font-medium">{material.nombre}</p>
                         <p className="text-xs text-slate-500">{material.tipo} · {material.forma}</p>
-                        {hayCompra ? (
-                          <span className="block text-[10px] text-blue-600 mt-0.5">
-                            Comprado en: {compras.map((c: any) => c.numero).join(', ')}
-                            {compras.length > 1 && ' (sumadas)'}
-                          </span>
-                        ) : (
-                          <span className="block text-[10px] text-slate-400 mt-0.5">
-                            Sin OC registrada — cuenta lo cotizado
-                          </span>
-                        )}
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Cantidad</p>
@@ -522,6 +512,33 @@ export function ControlDeCodigosView({
                           </p>
                         )}
                       </div>
+                      {/* Cada OC que compró este material, individualmente */}
+                      {hayCompra && (
+                        <div className="md:col-span-4 border-t border-blue-100 pt-2 space-y-1">
+                          {compras.map((c: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-xs bg-white/70 rounded px-2 py-1">
+                              <span className="text-blue-700 font-medium">{c.numero}</span>
+                              <span className="text-slate-500 truncate mx-2">{c.descripcion}</span>
+                              {c.cubierto ? (
+                                <span className="text-emerald-700 font-medium shrink-0">
+                                  VELSO · ya pagado · +${Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })} de utilidad
+                                </span>
+                              ) : (
+                                <span className="text-slate-700 shrink-0">
+                                  ${Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!hayCompra && (
+                        <div className="md:col-span-4">
+                          <span className="text-[10px] text-slate-400">
+                            Sin OC registrada — cuenta lo cotizado
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
