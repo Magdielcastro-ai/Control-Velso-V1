@@ -69,17 +69,12 @@ export function OrdenCompraDocumento({
               <FileText className="w-5 h-5 text-blue-600" />
               Orden de Compra {orden.numeroOc}
             </span>
-            {/* Solo se imprime/envía al proveedor una vez autorizada por finanzas */}
-            {orden.estado === 'autorizada' || orden.estado === 'pagada' || orden.estado === 'recibida' ? (
-              <Button onClick={handlePrint} variant="outline" size="sm" className="border-slate-300">
-                <Printer className="w-4 h-4 mr-2" />
-                Imprimir / PDF
-              </Button>
-            ) : (
-              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                Pendiente de autorización de finanzas
-              </span>
-            )}
+            {/* La impresión siempre está disponible; la firma de
+                autorización se muestra cuando finanzas la autorizó */}
+            <Button onClick={handlePrint} variant="outline" size="sm" className="border-slate-300">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimir / PDF
+            </Button>
           </DialogTitle>
         </DialogHeader>
 

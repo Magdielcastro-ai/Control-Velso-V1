@@ -86,7 +86,7 @@ export const useOrdenesCompraStore = () => {
       const { data, error: supabaseError } = await supabase
         .from('ordenes_compra')
         .select('*')
-        .order('fecha_oc', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (supabaseError) {
         console.error('[useOrdenesCompraStore] ERROR SUPABASE:', supabaseError);
