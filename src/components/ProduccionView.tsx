@@ -465,6 +465,15 @@ export function ProduccionView({
                               </div>
                             </div>
 
+                            {/* Imagen de la pieza */}
+                            {pieza.imagen && (
+                              <img
+                                src={pieza.imagen}
+                                alt={pieza.nombre}
+                                className="max-h-36 object-contain rounded border border-slate-200 bg-white"
+                              />
+                            )}
+
                             {/* Material de la pieza */}
                             {pieza.material && (
                               <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-100 rounded p-2">

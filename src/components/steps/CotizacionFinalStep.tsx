@@ -171,6 +171,14 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                   <Badge variant="outline">Dibujo: {cotizacion.proyecto.dibujo}</Badge>
                 )}
               </div>
+              {/* Imagen del proyecto: se imprime cuando las piezas no llevan imagen individual */}
+              {cotizacion.proyecto.imagen && !cotizacion.piezas.some((p) => p.imagen) && (
+                <img
+                  src={cotizacion.proyecto.imagen}
+                  alt={cotizacion.proyecto.nombre}
+                  className="mt-3 max-h-48 object-contain rounded print:max-h-40"
+                />
+              )}
             </div>
           </div>
 
@@ -223,6 +231,14 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                             <div className="text-slate-500 text-xs mt-0.5">
                               Código: {pieza.codigo}
                             </div>
+                          )}
+                          {/* Imagen de la pieza (si no hay, no se imprime recuadro) */}
+                          {pieza.imagen && (
+                            <img
+                              src={pieza.imagen}
+                              alt={pieza.nombre}
+                              className="mt-1.5 max-h-28 max-w-[140px] object-contain rounded print:max-h-24"
+                            />
                           )}
                           {/* Descripción breve de la pieza (se captura en la pestaña Piezas) */}
                           {pieza.descripcion && (
