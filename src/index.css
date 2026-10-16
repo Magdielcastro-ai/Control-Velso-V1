@@ -88,25 +88,21 @@
     box-shadow: none !important;
   }
 
-  /* Imprimir solo el área marcada (bullet journal de pendientes).
-     Se activa con la clase 'imprimiendo-pendientes' en <body> para no
-     afectar la impresión de cotizaciones y órdenes de compra */
+  /* Imprimir solo el área marcada (bullet journal de pendientes y hoja
+     viajera). Se activa con la clase en <body> para no afectar otras
+     impresiones */
   body.imprimiendo-pendientes *,
-  body.imprimiendo-hoja-viajera *,
-  body.imprimiendo-cotizacion * {
+  body.imprimiendo-hoja-viajera * {
     visibility: hidden;
   }
   body.imprimiendo-pendientes .area-impresion,
   body.imprimiendo-pendientes .area-impresion *,
   body.imprimiendo-hoja-viajera .area-impresion,
-  body.imprimiendo-hoja-viajera .area-impresion *,
-  body.imprimiendo-cotizacion .area-impresion,
-  body.imprimiendo-cotizacion .area-impresion * {
+  body.imprimiendo-hoja-viajera .area-impresion * {
     visibility: visible;
   }
   body.imprimiendo-pendientes .area-impresion,
-  body.imprimiendo-hoja-viajera .area-impresion,
-  body.imprimiendo-cotizacion .area-impresion {
+  body.imprimiendo-hoja-viajera .area-impresion {
     position: absolute;
     left: 0;
     top: 0;
@@ -114,8 +110,9 @@
     padding: 1.5rem;
   }
 
-  /* OC: el documento se clona a <body> al imprimir y se oculta el resto
-     con display:none (visibility conservaba espacio y daba páginas vacías) */
+  /* OC y Cotización: el documento se clona a <body> al imprimir y se
+     oculta el resto con display:none (visibility conservaba espacio y
+     daba páginas extra en blanco) */
   body.imprimiendo-oc > *:not(#oc-print-root) {
     display: none !important;
   }
@@ -126,6 +123,18 @@
     top: 0;
     width: 100%;
     padding: 1.5rem;
+    background: white;
+  }
+  body.imprimiendo-cotizacion > *:not(#cotizacion-print-root) {
+    display: none !important;
+  }
+  body.imprimiendo-cotizacion #cotizacion-print-root {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 1rem;
     background: white;
   }
 }

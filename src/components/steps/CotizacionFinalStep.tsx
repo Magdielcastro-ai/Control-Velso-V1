@@ -1,24 +1,11 @@
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Printer, 
-  Download, 
+import {
+  Printer,
+  Download,
   ArrowLeft,
   Home,
   CheckCircle,
-  Calendar,
-  FileText,
-  Phone,
-  Mail,
-  MapPin,
-  Clock,
-  CreditCard,
-  Percent,
-  ShieldCheck,
-  StickyNote,
-  CalendarDays,
 } from 'lucide-react';
 import type { Cotizacion, Moneda } from '@/types/cotizacion';
 import { formatearMoneda, getMonedaConfig } from '@/types/cotizacion';
@@ -37,12 +24,28 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
   const moneda = cotizacion.moneda || 'MXN';
   const monedaConfig = getMonedaConfig(moneda);
 
-  // Imprime SOLO el documento de la cotización (una sola hoja):
-  // se oculta el resto de la app con la clase de impresión
+  // Imprime SOLO el documento (una sola hoja): se clona a <body> y todo
+  // lo demás se oculta con display:none — la técnica de visibility dejaba
+  // páginas extra en blanco
   const handlePrint = () => {
+    const nodo = cotizacionRef.current;
+    if (!nodo) return;
+
+    const anterior = document.getElementById('cotizacion-print-root');
+    anterior?.remove();
+
+    const contenedor = document.createElement('div');
+    contenedor.id = 'cotizacion-print-root';
+    contenedor.appendChild(nodo.cloneNode(true));
+    document.body.appendChild(contenedor);
     document.body.classList.add('imprimiendo-cotizacion');
+
     window.print();
-    setTimeout(() => document.body.classList.remove('imprimiendo-cotizacion'), 500);
+
+    setTimeout(() => {
+      contenedor.remove();
+      document.body.classList.remove('imprimiendo-cotizacion');
+    }, 500);
   };
 
   const handleGuardarPDF = () => {
@@ -82,47 +85,35 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
         )}
       </div>
 
-      <Card ref={cotizacionRef} className="area-impresion border-slate-300 shadow-lg print:shadow-none">
-        <CardContent className="p-8">
-          <div className="flex justify-between items-start mb-8 border-b pb-6">
-            <div>
-              <div className="flex flex-col items-center mb-4">
-                <img src="/logo-velso-pdf.png" alt="Logo Velso" className="w-48 h-auto object-contain mb-3" />
-                <h1 className="text-2xl font-bold text-slate-900">
+      {/* ═══ DOCUMENTO IMPRIMIBLE (compacto, 1 hoja carta) ═══ */}
+      <div ref={cotizacionRef} className="area-impresion bg-white border border-slate-300 rounded-lg shadow-lg print:shadow-none print:border-0 print:rounded-none">
+        <div className="p-5 print:p-0 text-slate-900">
+
+          {/* ─── ENCABEZADO: logo + datos Velso | folio ─── */}
+          <div className="flex justify-between items-start border-b-2 border-slate-800 pb-2 mb-2">
+            <div className="flex items-center gap-3">
+              <img src="/logo-velso-pdf.png" alt="Logo Velso" className="w-24 h-auto object-contain" />
+              <div>
+                <h1 className="text-base font-bold leading-tight">
                   {cotizacion.datosTaller.nombre || 'Taller CNC'}
                 </h1>
                 {cotizacion.datosTaller.rfc && (
-                  <p className="text-sm text-slate-500">RFC: {cotizacion.datosTaller.rfc}</p>
+                  <p className="text-[10px] text-slate-500">RFC: {cotizacion.datosTaller.rfc}</p>
                 )}
-              </div>
-              {cotizacion.datosTaller.direccion && (
-                <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
-                  <MapPin className="w-4 h-4" />
-                  {cotizacion.datosTaller.direccion}
+                {cotizacion.datosTaller.direccion && (
+                  <p className="text-[10px] text-slate-600">{cotizacion.datosTaller.direccion}</p>
+                )}
+                <p className="text-[10px] text-slate-600">
+                  {[cotizacion.datosTaller.telefono, cotizacion.datosTaller.email].filter(Boolean).join(' · ')}
                 </p>
-              )}
-              <div className="flex gap-4 mt-2">
-                {cotizacion.datosTaller.telefono && (
-                  <p className="text-sm text-slate-600 flex items-center gap-1">
-                    <Phone className="w-4 h-4" />
-                    {cotizacion.datosTaller.telefono}
-                  </p>
-                )}
-                {cotizacion.datosTaller.email && (
-                  <p className="text-sm text-slate-600 flex items-center gap-1">
-                    <Mail className="w-4 h-4" />
-                    {cotizacion.datosTaller.email}
-                  </p>
-                )}
               </div>
             </div>
-            <div className="text-right">
-              <Badge variant="outline" className="text-lg px-4 py-2 border-2 border-blue-600 text-blue-600">
+            <div className="text-right shrink-0">
+              <span className="inline-block text-sm font-bold px-3 py-0.5 border-2 border-blue-600 text-blue-600 rounded">
                 COTIZACIÓN
-              </Badge>
-              <p className="text-sm text-slate-500 mt-2">{cotizacion.numero}</p>
-              <p className="text-sm text-slate-500">
-                <Calendar className="w-4 h-4 inline mr-1" />
+              </span>
+              <p className="text-xs text-slate-600 mt-1 font-medium">{cotizacion.numero}</p>
+              <p className="text-[10px] text-slate-500">
                 {new Date(cotizacion.fecha).toLocaleDateString('es-MX', {
                   year: 'numeric',
                   month: 'long',
@@ -132,322 +123,188 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
             </div>
           </div>
 
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Cliente
-            </h3>
-            <div className="bg-slate-50 p-4 rounded-lg">
-              <p className="font-semibold text-slate-900">
-                {cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre}
-              </p>
-              {cotizacion.datosCliente.empresa && cotizacion.datosCliente.nombre !== cotizacion.datosCliente.empresa && (
-                <p className="text-sm text-slate-600">Contacto: {cotizacion.datosCliente.nombre}</p>
-              )}
-              {cotizacion.datosCliente.direccion && (
-                <p className="text-sm text-slate-600">{cotizacion.datosCliente.direccion}</p>
-              )}
-              <div className="flex gap-4 mt-1">
-                {cotizacion.datosCliente.telefono && (
-                  <p className="text-sm text-slate-600">{cotizacion.datosCliente.telefono}</p>
-                )}
-                {cotizacion.datosCliente.email && (
-                  <p className="text-sm text-slate-600">{cotizacion.datosCliente.email}</p>
-                )}
-              </div>
-            </div>
+          {/* ─── CLIENTE: una sola franja compacta ─── */}
+          <div className="mb-2 text-[11px] border border-slate-200 rounded px-2 py-1.5 bg-slate-50 leading-snug">
+            <span className="font-semibold text-slate-500 uppercase text-[9px] tracking-wide mr-2">Cliente:</span>
+            <span className="font-semibold text-slate-900">
+              {cotizacion.datosCliente.empresa || cotizacion.datosCliente.nombre}
+            </span>
+            {cotizacion.datosCliente.empresa && cotizacion.datosCliente.nombre !== cotizacion.datosCliente.empresa && (
+              <span className="text-slate-600"> · Contacto: {cotizacion.datosCliente.nombre}</span>
+            )}
+            {cotizacion.datosCliente.direccion && (
+              <span className="text-slate-600"> · {cotizacion.datosCliente.direccion}</span>
+            )}
+            {cotizacion.datosCliente.telefono && (
+              <span className="text-slate-600"> · Tel: {cotizacion.datosCliente.telefono}</span>
+            )}
+            {cotizacion.datosCliente.email && (
+              <span className="text-slate-600"> · {cotizacion.datosCliente.email}</span>
+            )}
           </div>
 
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              <FileText className="w-4 h-4 inline mr-1" />
-              Proyecto
-            </h3>
-            <div className="border-l-4 border-blue-600 pl-4">
-              <h2 className="text-xl font-bold text-slate-900">{cotizacion.proyecto.nombre}</h2>
-              <p className="text-slate-700 mt-2 whitespace-pre-wrap">{cotizacion.proyecto.descripcion}</p>
-              <div className="flex gap-4 mt-3">
-                <Badge variant="secondary">Cantidad: {cotizacion.proyecto.cantidad} pzas</Badge>
-                {cotizacion.proyecto.dibujo && (
-                  <Badge variant="outline">Dibujo: {cotizacion.proyecto.dibujo}</Badge>
+          {/* ─── PROYECTO: recuadro ─── */}
+          <div className="mb-2 border border-slate-300 rounded px-3 py-2">
+            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide">Proyecto</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-slate-900">{cotizacion.proyecto.nombre}</h2>
+                {cotizacion.proyecto.descripcion && (
+                  <p className="text-[11px] text-slate-700 whitespace-pre-wrap leading-snug">{cotizacion.proyecto.descripcion}</p>
                 )}
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Cantidad: {cotizacion.proyecto.cantidad} pzas
+                  {cotizacion.proyecto.dibujo && ` · Dibujo: ${cotizacion.proyecto.dibujo}`}
+                </p>
               </div>
-              {/* Imagen del proyecto: se imprime cuando las piezas no llevan imagen individual */}
+              {/* Imagen del proyecto: solo si las piezas no llevan imagen individual */}
               {cotizacion.proyecto.imagen && !cotizacion.piezas.some((p) => p.imagen) && (
                 <img
                   src={cotizacion.proyecto.imagen}
                   alt={cotizacion.proyecto.nombre}
-                  className="mt-3 max-h-48 object-contain rounded print:max-h-40"
+                  className="max-h-28 max-w-[160px] object-contain rounded shrink-0"
                 />
               )}
             </div>
           </div>
 
-          {/* ─── TABLA DE PARTIDAS ─── */}
-          <div className="mb-8 print:mb-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3 print:mb-2">
-              Items
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 print:bg-slate-100">
-                    <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-10">
-                      #
-                    </th>
-                    <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2">
-                      Descripción
-                    </th>
-                    <th className="text-left p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2">
-                      Material
-                    </th>
-                    <th className="text-right p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-16">
-                      Cant.
-                    </th>
-                    <th className="text-right p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-28">
-                      Precio Unit.
-                    </th>
-                    <th className="text-right p-2.5 font-semibold text-slate-700 border-b-2 border-slate-300 print:p-2 w-28">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cotizacion.piezas.map((pieza, idx) => {
-                    const unitPrice = pieza.totalPieza;
-                    const lineTotal = unitPrice * pieza.cantidad;
-                    return (
-                      <tr
-                        key={pieza.id}
-                        className="border-b border-slate-200 hover:bg-slate-50 print:hover:bg-transparent"
-                      >
-                        <td className="p-2.5 text-slate-500 align-top print:p-2">
-                          {idx + 1}
-                        </td>
-                        <td className="p-2.5 align-top print:p-2">
-                          <div className="font-semibold text-slate-900">
-                            {pieza.nombre}
+          {/* ─── ITEMS: recuadro con tabla compacta ─── */}
+          <div className="mb-2 border border-slate-300 rounded px-2 py-1.5">
+            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Items</p>
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="text-left px-1.5 py-1 font-semibold text-slate-700 border-b border-slate-300 w-6">#</th>
+                  <th className="text-left px-1.5 py-1 font-semibold text-slate-700 border-b border-slate-300">Descripción</th>
+                  <th className="text-left px-1.5 py-1 font-semibold text-slate-700 border-b border-slate-300">Material</th>
+                  <th className="text-right px-1.5 py-1 font-semibold text-slate-700 border-b border-slate-300 w-10">Cant.</th>
+                  <th className="text-right px-1.5 py-1 font-semibold text-slate-700 border-b border-slate-300 w-24">Precio Unit.</th>
+                  <th className="text-right px-1.5 py-1 font-semibold text-slate-700 border-b border-slate-300 w-24">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cotizacion.piezas.map((pieza, idx) => {
+                  const unitPrice = pieza.totalPieza;
+                  const lineTotal = unitPrice * pieza.cantidad;
+                  return (
+                    <tr key={pieza.id} className="border-b border-slate-200">
+                      <td className="px-1.5 py-1.5 text-slate-500 align-top">{idx + 1}</td>
+                      <td className="px-1.5 py-1.5 align-top">
+                        <div className="font-semibold text-slate-900 leading-tight">{pieza.nombre}</div>
+                        {pieza.codigo && (
+                          <div className="text-slate-500 text-[9px]">Código: {pieza.codigo}</div>
+                        )}
+                        {/* Imagen de la pieza (si no hay, no se imprime recuadro) */}
+                        {pieza.imagen && (
+                          <img
+                            src={pieza.imagen}
+                            alt={pieza.nombre}
+                            className="mt-1 max-h-20 max-w-[110px] object-contain rounded"
+                          />
+                        )}
+                        {pieza.descripcion && (
+                          <div className="text-slate-600 text-[10px] mt-0.5 italic leading-snug">{pieza.descripcion}</div>
+                        )}
+                        {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 && (
+                          <div className="text-[9px] text-slate-500">
+                            {pieza.procesos.filter(p => p.tipo === 'otro').map(p => p.nombre).join(', ')}
                           </div>
-                          {pieza.codigo && (
-                            <div className="text-slate-500 text-xs mt-0.5">
-                              Código: {pieza.codigo}
+                        )}
+                      </td>
+                      <td className="px-1.5 py-1.5 align-top">
+                        {pieza.material ? (
+                          <div>
+                            <div className="font-medium text-slate-800 leading-tight">{pieza.material.nombre}</div>
+                            <div className="text-[9px] text-slate-500">
+                              {pieza.material.tipo}
+                              {pieza.material.forma && ` · ${pieza.material.forma}`}
                             </div>
-                          )}
-                          {/* Imagen de la pieza (si no hay, no se imprime recuadro) */}
-                          {pieza.imagen && (
-                            <img
-                              src={pieza.imagen}
-                              alt={pieza.nombre}
-                              className="mt-1.5 max-h-28 max-w-[140px] object-contain rounded print:max-h-24"
-                            />
-                          )}
-                          {/* Descripción breve de la pieza (se captura en la pestaña Piezas) */}
-                          {pieza.descripcion && (
-                            <div className="text-slate-600 text-xs mt-1 italic">
-                              {pieza.descripcion}
-                            </div>
-                          )}
-                          {pieza.procesos.filter(p => p.tipo === 'otro').length > 0 && (
-                            <div className="text-xs text-slate-500 mt-1">
-                              {pieza.procesos
-                                .filter(p => p.tipo === 'otro')
-                                .map(p => p.nombre)
-                                .join(', ')}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2.5 align-top print:p-2">
-                          {pieza.material ? (
-                            <div>
-                              <div className="font-medium text-slate-800">
-                                {pieza.material.nombre}
-                              </div>
-                              <div className="text-xs text-slate-500">
-                                {pieza.material.tipo}
-                                {pieza.material.forma && ` · ${pieza.material.forma}`}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-xs">Sin material</span>
-                          )}
-                        </td>
-                        <td className="p-2.5 text-right align-top font-medium print:p-2">
-                          {pieza.cantidad}
-                        </td>
-                        <td className="p-2.5 text-right align-top print:p-2">
-                          <span className="font-medium">{formatearMoneda(unitPrice, moneda)}</span>
-                        </td>
-                        <td className="p-2.5 text-right align-top print:p-2">
-                          <span className="font-semibold text-slate-900">
-                            {formatearMoneda(lineTotal, moneda)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[10px]">Sin material</span>
+                        )}
+                      </td>
+                      <td className="px-1.5 py-1.5 text-right align-top font-medium">{pieza.cantidad}</td>
+                      <td className="px-1.5 py-1.5 text-right align-top">
+                        <span className="font-medium">{formatearMoneda(unitPrice, moneda)}</span>
+                      </td>
+                      <td className="px-1.5 py-1.5 text-right align-top">
+                        <span className="font-semibold text-slate-900">{formatearMoneda(lineTotal, moneda)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
 
-                  {/* ─── Costos Adicionales como filas de partida ─── */}
-                  {renderCostoAdicionalRow(
-                    cotizacion.piezas.length + 1,
-                    'Envío / Entrega',
-                    cotizacion.costosAdicionales.envio,
-                    moneda
-                  )}
-                  {renderCostoAdicionalRow(
-                    cotizacion.piezas.length + 2,
-                    'Diseño CAD/CAM',
-                    cotizacion.costosAdicionales.diseno,
-                    moneda
-                  )}
-                  {renderCostoAdicionalRow(
-                    cotizacion.piezas.length + 3,
-                    'Estudio de Material',
-                    cotizacion.costosAdicionales.estudioMaterial,
-                    moneda
-                  )}
-                  {renderCostoAdicionalRow(
-                    cotizacion.piezas.length + 4,
-                    'Prueba de Dureza',
-                    cotizacion.costosAdicionales.pruebaDureza,
-                    moneda
-                  )}
-                </tbody>
-              </table>
-            </div>
+                {/* Costos adicionales como filas de partida */}
+                {renderCostoAdicionalRow(cotizacion.piezas.length + 1, 'Envío / Entrega', cotizacion.costosAdicionales.envio, moneda)}
+                {renderCostoAdicionalRow(cotizacion.piezas.length + 2, 'Diseño CAD/CAM', cotizacion.costosAdicionales.diseno, moneda)}
+                {renderCostoAdicionalRow(cotizacion.piezas.length + 3, 'Estudio de Material', cotizacion.costosAdicionales.estudioMaterial, moneda)}
+                {renderCostoAdicionalRow(cotizacion.piezas.length + 4, 'Prueba de Dureza', cotizacion.costosAdicionales.pruebaDureza, moneda)}
+              </tbody>
+            </table>
           </div>
 
-          {/* ─── RESUMEN DE TOTALES ─── */}
-          <div className="border-t-2 border-slate-300 pt-6 mb-8 print:border-t print:pt-4">
-            <div className="w-full md:w-1/2 ml-auto print:w-3/5">
-              {/* Subtotal */}
-              <div className="flex justify-between items-center py-2 text-sm">
+          {/* ─── TOTALES: bloque compacto a la derecha ─── */}
+          <div className="flex justify-end mb-2">
+            <div className="w-72 text-[11px]">
+              <div className="flex justify-between py-0.5">
                 <span className="text-slate-600">Subtotal</span>
-                <span className="font-semibold text-slate-800">
-                  {formatearMoneda(cotizacion.subtotal, moneda)}
-                </span>
+                <span className="font-semibold text-slate-800">{formatearMoneda(cotizacion.subtotal, moneda)}</span>
               </div>
-
-              {/* IVA */}
-              <div className="flex justify-between items-center py-2 text-sm">
-                <span className="text-slate-600">
-                  IVA ({cotizacion.ivaPorcentaje}%)
-                </span>
-                <span className="font-medium text-slate-700">
-                  {formatearMoneda(cotizacion.iva, moneda)}
-                </span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-slate-600">IVA ({cotizacion.ivaPorcentaje}%)</span>
+                <span className="font-medium text-slate-700">{formatearMoneda(cotizacion.iva, moneda)}</span>
               </div>
-
-              {/* Línea separadora antes del total */}
-              <div className="border-t-2 border-blue-600 my-3" />
-
-              {/* TOTAL destacado */}
-              <div className="flex justify-between items-center py-2">
-                <span className="text-base font-bold text-slate-900 uppercase tracking-wide">
-                  Total
-                </span>
-                <span className="text-2xl font-extrabold text-blue-600 print:text-xl">
-                  {formatearMoneda(cotizacion.total, moneda)}
-                </span>
+              <div className="flex justify-between items-center border-t-2 border-blue-600 mt-1 pt-1">
+                <span className="text-xs font-bold text-slate-900 uppercase">Total</span>
+                <span className="text-lg font-extrabold text-blue-600">{formatearMoneda(cotizacion.total, moneda)}</span>
               </div>
-
-              {/* Monto en letras - solo una vez */}
-              <p className="text-xs text-slate-500 text-right mt-2 leading-relaxed">
+              <p className="text-[9px] text-slate-500 text-right mt-0.5 leading-snug">
                 {numeroALetras(cotizacion.total)} {monedaConfig.nombre.toLowerCase()}{' '}
                 {((cotizacion.total % 1) * 100).toFixed(0).padStart(2, '0')}/100{' '}
-                {moneda === 'MXN' ? (
-                  <span className="font-medium text-slate-600">M.N.</span>
-                ) : (
-                  <span className="font-medium text-slate-600">USD</span>
-                )}
+                {moneda === 'MXN' ? 'M.N.' : 'USD'}
               </p>
-
-              {/* Indicación de moneda */}
-              <p className="text-[10px] text-slate-400 text-right mt-1 uppercase tracking-wider">
+              <p className="text-[8px] text-slate-400 text-right uppercase tracking-wider">
                 Moneda: {monedaConfig.nombre} ({moneda})
               </p>
             </div>
           </div>
 
-          {/* ─── CONDICIONES COMERCIALES ─── */}
-          <div className="bg-slate-50 p-6 rounded-lg print:bg-transparent print:border print:border-slate-200 print:p-4 print:rounded-none">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4 print:mb-3">
-              Condiciones Comerciales
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm print:gap-3">
-              {/* Validez */}
-              <div className="flex items-start gap-3">
-                <CalendarDays className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-slate-500 text-xs uppercase tracking-wide">Validez</p>
-                  <p className="font-semibold text-slate-800">
-                    {cotizacion.condiciones.validezDias} días
-                  </p>
-                </div>
+          {/* ─── CONDICIONES COMERCIALES: rejilla compacta ─── */}
+          <div className="border border-slate-200 rounded px-3 py-2 text-[10px]">
+            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Condiciones Comerciales</p>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 leading-snug">
+              <div>
+                <span className="text-slate-500">Validez: </span>
+                <span className="font-semibold text-slate-800">{cotizacion.condiciones.validezDias} días</span>
               </div>
-
-              {/* Tiempo de entrega */}
-              <div className="flex items-start gap-3">
-                <Clock className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-slate-500 text-xs uppercase tracking-wide">Tiempo de entrega</p>
-                  <p className="font-semibold text-slate-800">
-                    {cotizacion.condiciones.tiempoEntregaDias} días hábiles
-                  </p>
-                </div>
+              <div>
+                <span className="text-slate-500">Entrega: </span>
+                <span className="font-semibold text-slate-800">{cotizacion.condiciones.tiempoEntregaDias} días hábiles</span>
               </div>
-
-              {/* Forma de pago */}
-              <div className="flex items-start gap-3">
-                <CreditCard className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-slate-500 text-xs uppercase tracking-wide">Forma de pago</p>
-                  <p className="font-semibold text-slate-800">
-                    {cotizacion.condiciones.formaPago}
-                  </p>
-                </div>
+              <div>
+                <span className="text-slate-500">Anticipo: </span>
+                <span className="font-semibold text-slate-800">{cotizacion.condiciones.anticipoPorcentaje}%</span>
               </div>
-
-              {/* Anticipo */}
-              <div className="flex items-start gap-3">
-                <Percent className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-slate-500 text-xs uppercase tracking-wide">Anticipo</p>
-                  <p className="font-semibold text-slate-800">
-                    {cotizacion.condiciones.anticipoPorcentaje}%
-                  </p>
-                </div>
+              <div className="col-span-2">
+                <span className="text-slate-500">Forma de pago: </span>
+                <span className="font-semibold text-slate-800">{cotizacion.condiciones.formaPago}</span>
               </div>
-
-              {/* Garantía */}
-              <div className="flex items-start gap-3 md:col-span-2">
-                <ShieldCheck className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-slate-500 text-xs uppercase tracking-wide">Garantía</p>
-                  <p className="font-semibold text-slate-800">
-                    {cotizacion.condiciones.garantia}
-                  </p>
-                </div>
+              <div>
+                <span className="text-slate-500">Garantía: </span>
+                <span className="font-semibold text-slate-800">{cotizacion.condiciones.garantia}</span>
               </div>
-
-              {/* Notas adicionales */}
               {cotizacion.condiciones.notasLegales && (
-                <div className="flex items-start gap-3 md:col-span-2">
-                  <StickyNote className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-slate-500 text-xs uppercase tracking-wide">Notas adicionales</p>
-                    <p className="font-medium text-slate-700">
-                      {cotizacion.condiciones.notasLegales}
-                    </p>
-                  </div>
+                <div className="col-span-3">
+                  <span className="text-slate-500">Notas: </span>
+                  <span className="font-medium text-slate-700">{cotizacion.condiciones.notasLegales}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t text-center text-sm text-slate-500 print:mt-6 print:pt-4">
-            <p className="mt-1"></p>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <style>{`
         @media print {
@@ -479,18 +336,18 @@ function renderCostoAdicionalRow(
 
   if (item.incluidoGratis) {
     return (
-      <tr className="border-b border-slate-200 hover:bg-slate-50 print:hover:bg-transparent">
-        <td className="p-2.5 text-slate-500 align-top print:p-2">{num}</td>
-        <td className="p-2.5 align-top print:p-2">
-          <div className="font-semibold text-slate-900">{label}</div>
-          <div className="text-xs text-green-600 font-medium">Incluido gratis</div>
+      <tr className="border-b border-slate-200">
+        <td className="px-1.5 py-1.5 text-slate-500 align-top">{num}</td>
+        <td className="px-1.5 py-1.5 align-top">
+          <div className="font-semibold text-slate-900 leading-tight">{label}</div>
+          <div className="text-[9px] text-green-600 font-medium">Incluido gratis</div>
         </td>
-        <td className="p-2.5 align-top print:p-2">—</td>
-        <td className="p-2.5 text-right align-top print:p-2">1</td>
-        <td className="p-2.5 text-right align-top print:p-2">
+        <td className="px-1.5 py-1.5 align-top">—</td>
+        <td className="px-1.5 py-1.5 text-right align-top">1</td>
+        <td className="px-1.5 py-1.5 text-right align-top">
           <span className="line-through text-slate-400">{formatearMoneda(item.costo, moneda)}</span>
         </td>
-        <td className="p-2.5 text-right align-top print:p-2">
+        <td className="px-1.5 py-1.5 text-right align-top">
           <span className="font-semibold text-green-600">{formatearMoneda(0, moneda)}</span>
         </td>
       </tr>
@@ -498,17 +355,17 @@ function renderCostoAdicionalRow(
   }
 
   return (
-    <tr className="border-b border-slate-200 hover:bg-slate-50 print:hover:bg-transparent">
-      <td className="p-2.5 text-slate-500 align-top print:p-2">{num}</td>
-      <td className="p-2.5 align-top print:p-2">
-        <div className="font-semibold text-slate-900">{label}</div>
+    <tr className="border-b border-slate-200">
+      <td className="px-1.5 py-1.5 text-slate-500 align-top">{num}</td>
+      <td className="px-1.5 py-1.5 align-top">
+        <div className="font-semibold text-slate-900 leading-tight">{label}</div>
       </td>
-      <td className="p-2.5 align-top print:p-2">—</td>
-      <td className="p-2.5 text-right align-top print:p-2">1</td>
-      <td className="p-2.5 text-right align-top print:p-2">
+      <td className="px-1.5 py-1.5 align-top">—</td>
+      <td className="px-1.5 py-1.5 text-right align-top">1</td>
+      <td className="px-1.5 py-1.5 text-right align-top">
         <span className="font-medium">{formatearMoneda(item.costo, moneda)}</span>
       </td>
-      <td className="p-2.5 text-right align-top print:p-2">
+      <td className="px-1.5 py-1.5 text-right align-top">
         <span className="font-semibold text-slate-900">{formatearMoneda(item.costo, moneda)}</span>
       </td>
     </tr>
