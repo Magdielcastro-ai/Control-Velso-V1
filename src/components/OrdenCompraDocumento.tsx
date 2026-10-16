@@ -64,26 +64,11 @@ export function OrdenCompraDocumento({
     setTimeout(() => document.body.classList.remove('imprimiendo-oc'), 500);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* sm:max-w-4xl con variante para ganarle al sm:max-w-lg por defecto */}
-      <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader className="no-print">
-          <DialogTitle className="flex items-center justify-between pr-8">
-            <span className="flex items-center gap-2 text-slate-900">
-              <FileText className="w-5 h-5 text-blue-600" />
-              Orden de Compra {orden.numeroOc}
-            </span>
-            {/* La impresión siempre está disponible; la firma de
-                autorización se muestra cuando finanzas la autorizó */}
-            <Button onClick={handlePrint} variant="outline" size="sm" className="border-slate-300">
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir / PDF
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="area-impresion bg-white text-slate-900 p-6 print:p-0">
+  // El documento se usa DOS veces: vista previa dentro del diálogo y
+  // copia a nivel raíz para impresión limpia (el truco de visibility
+  // dentro del Dialog position:fixed daba pantalla en blanco)
+  const contenido = (
+    <div className="bg-white text-slate-900 p-6 print:p-0">
           {/* ─── ENCABEZADO VELSO ─── */}
           <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4">
             <div>
@@ -232,7 +217,35 @@ export function OrdenCompraDocumento({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+  );
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        {/* sm:max-w-4xl con variante para ganarle al sm:max-w-lg por defecto */}
+        <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader className="no-print">
+            <DialogTitle className="flex items-center justify-between pr-8">
+              <span className="flex items-center gap-2 text-slate-900">
+                <FileText className="w-5 h-5 text-blue-600" />
+                Orden de Compra {orden.numeroOc}
+              </span>
+              {/* La impresión siempre está disponible; la firma de
+                  autorización se muestra cuando finanzas la autorizó */}
+              <Button onClick={handlePrint} variant="outline" size="sm" className="border-slate-300">
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir / PDF
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Vista previa dentro del diálogo */}
+          {contenido}
+        </DialogContent>
+      </Dialog>
+
+      {/* Copia a nivel raíz: es lo ÚNICO que se imprime (1 hoja) */}
+      <div className="area-impresion hidden print:block">{contenido}</div>
+    </>
   );
 }
