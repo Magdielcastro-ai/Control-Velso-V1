@@ -386,6 +386,8 @@ function App() {
   const {
     cotizacion,
     cotizacionesGuardadas,
+    soloLectura,
+    setSoloLectura,
     actualizarDatosTaller,
     actualizarDatosCliente,
     actualizarProyecto,
@@ -403,6 +405,14 @@ function App() {
     actualizarTipoCambio,
     refrescarDesdeSupabase: refrescarCotizaciones,
   } = useCotizacionStore();
+
+  // Estado de la cotización actualmente abierta en el wizard.
+  // En 'cotizacion' u 'orden' es SOLO LECTURA: no se puede modificar nada
+  // (la única vía es regresarla a borrador desde la lista de Cotizaciones).
+  const estadoCotActual = cotizacionesGuardadas.find(c => c.id === cotizacion.id)?.estado;
+  useEffect(() => {
+    setSoloLectura(estadoCotActual === 'cotizacion' || estadoCotActual === 'orden');
+  }, [estadoCotActual, cotizacion.id, setSoloLectura]);
 
   const { catalogo, agregarAlCatalogo, eliminarDelCatalogo, recargarCatalogo } = useCatalogoMateriales();
   const { piezasCatalogo, cargando: cargandoPiezasCatalogo, buscarPiezaPorCodigo, guardarPiezaEnCatalogo } = usePiezasCatalogoStore();
@@ -784,13 +794,18 @@ function App() {
   };
 
   const handleGenerarCotizacion = async () => {
-    // Protección: si esta cotización YA es una Orden (proyecto creado),
-    // no se puede "regenerar" — solo visualizar. Regenerar bajaba el
-    // estado a 'cotizacion' y rompía la liga con el proyecto existente.
+    // Protección: si esta cotización YA fue generada ('cotizacion') o YA es
+    // una Orden (proyecto creado), no se puede "regenerar" — solo visualizar.
+    // Regenerar podría sobrescribir datos o bajar el estado de 'orden' a
+    // 'cotizacion' con el proyecto ya creado.
     const estadoExistente = cotizacionesGuardadas.find(c => c.id === cotizacion.id)?.estado;
-    if (estadoExistente === 'orden') {
+    if (estadoExistente === 'orden' || estadoExistente === 'cotizacion') {
       setVistaActual('cotizacion-final');
-      toast.info('Esta cotización ya está convertida en Orden — solo lectura');
+      toast.info(
+        estadoExistente === 'orden'
+          ? 'Esta cotización ya está convertida en Orden — solo lectura'
+          : 'Esta cotización ya fue generada — solo lectura'
+      );
       return;
     }
 
@@ -1444,10 +1459,12 @@ function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {!soloLectura && (
                     <Button variant="outline" size="sm" onClick={handleGuardar} className="border-slate-300">
                       <Save className="w-4 h-4 mr-2" />
                       Guardar
                     </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={irAHome} className="border-slate-300">
                       Salir
                     </Button>
@@ -1527,7 +1544,7 @@ function App() {
                   />
                 )}
                 {pasoActual === 'proyecto' && (
-                  <ProyectoStep proyecto={cotizacion.proyecto} onChange={actualizarProyecto} />
+                  <ProyectoStep proyecto={cotizacion.proyecto} onChange={actualizarProyecto} readOnly={soloLectura} />
                 )}
                 {pasoActual === 'piezas' && (
                   <PiezasStep
@@ -1567,7 +1584,7 @@ function App() {
                   />
                 )}
                 {pasoActual === 'resumen' && (
-                  <ResumenStep cotizacion={cotizacion} onActualizarPieza={actualizarPieza} />
+                  <ResumenStep cotizacion={cotizacion} onActualizarPieza={soloLectura ? undefined : actualizarPieza} />
                 )}
               </CardContent>
             </Card>
@@ -1580,11 +1597,11 @@ function App() {
               </Button>
 
               {pasoActual === 'resumen' ? (
-                cotizacionesGuardadas.find(c => c.id === cotizacion.id)?.estado === 'orden' ? (
-                  // Ya es Orden: no se regenera, solo se visualiza/imprime
+                estadoCotActual === 'orden' || estadoCotActual === 'cotizacion' ? (
+                  // Ya generada o ya es Orden: no se regenera, solo se visualiza/imprime
                   <Button onClick={() => setVistaActual('cotizacion-final')} className="bg-blue-600 hover:bg-blue-700">
                     <FileCheck className="w-4 h-4 mr-2" />
-                    Ver Cotización (Orden creada)
+                    Ver Cotización{estadoCotActual === 'orden' ? ' (Orden creada)' : ''}
                   </Button>
                 ) : (
                 <Button onClick={handleGenerarCotizacion} className="bg-green-600 hover:bg-green-700">
