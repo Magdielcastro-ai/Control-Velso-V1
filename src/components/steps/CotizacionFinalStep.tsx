@@ -152,10 +152,9 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                 {cotizacion.proyecto.descripcion && (
                   <p className="text-[11px] text-slate-700 whitespace-pre-wrap leading-snug">{cotizacion.proyecto.descripcion}</p>
                 )}
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Cantidad: {cotizacion.proyecto.cantidad} pzas
-                  {cotizacion.proyecto.dibujo && ` · Dibujo: ${cotizacion.proyecto.dibujo}`}
-                </p>
+                {cotizacion.proyecto.dibujo?.trim() && (
+                  <p className="text-[10px] text-slate-500 mt-0.5">Dibujo: {cotizacion.proyecto.dibujo}</p>
+                )}
               </div>
               {/* Imagen del proyecto: solo si las piezas no llevan imagen individual */}
               {cotizacion.proyecto.imagen && !cotizacion.piezas.some((p) => p.imagen) && (

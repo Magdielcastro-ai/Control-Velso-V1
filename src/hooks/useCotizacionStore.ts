@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { 
   Cotizacion, 
@@ -158,6 +158,21 @@ export const useCotizacionStore = () => {
   const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState<CotizacionGuardada[]>([]);
   const [cargado, setCargado] = useState(false);
 
+  // Modo SOLO LECTURA: cuando la cotización abierta está en estado
+  // 'cotizacion' u 'orden' no se puede modificar NADA (solo en borrador).
+  // Se bloquea a nivel store: cualquier mutador se vuelve no-op, así los
+  // inputs controlados simplemente no cambian, sin importar la pantalla.
+  const [soloLectura, setSoloLecturaState] = useState(false);
+  const soloLecturaRef = useRef(false);
+  const setSoloLectura = useCallback((valor: boolean) => {
+    soloLecturaRef.current = valor;
+    setSoloLecturaState(valor);
+  }, []);
+  const setCotizacionEditable: typeof setCotizacion = (valor) => {
+    if (soloLecturaRef.current) return;
+    setCotizacion(valor);
+  };
+
   const refrescarDesdeSupabase = useCallback(async () => {
     try {
       console.log('[useCotizacionStore] Refrescando desde Supabase...');
@@ -240,14 +255,14 @@ export const useCotizacionStore = () => {
     nuevaPieza.nombre = nombre;
     nuevaPieza.cantidad = cantidad;
 
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = [...prev.piezas, nuevaPieza];
       return recalcularTotales({ ...prev, piezas: nuevasPiezas });
     });
   }, []);
 
   const eliminarPieza = useCallback((piezaId: string) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       if (prev.piezas.length <= 1) {
         toast.error('Debe haber al menos una pieza');
         return prev;
@@ -258,7 +273,7 @@ export const useCotizacionStore = () => {
   }, []);
 
   const actualizarPieza = useCallback((piezaId: string, datos: Partial<PiezaCotizacion>) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map(p => 
         p.id === piezaId ? { ...p, ...datos } : p
       );
@@ -275,7 +290,7 @@ export const useCotizacionStore = () => {
       // costoTotal es ingresado por el usuario (costo total del material para TODAS las piezas)
     };
 
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
         return { ...p, material: nuevoMaterial };
@@ -285,7 +300,7 @@ export const useCotizacionStore = () => {
   }, []);
 
   const actualizarMaterialDePieza = useCallback((piezaId: string, material: Partial<Material>) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId || !p.material) return p;
         return { ...p, material: { ...p.material, ...material } };
@@ -295,7 +310,7 @@ export const useCotizacionStore = () => {
   }, []);
 
   const eliminarMaterialDePieza = useCallback((piezaId: string) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
         return { ...p, material: null };
@@ -359,7 +374,7 @@ export const useCotizacionStore = () => {
       tipoManoObraSeleccionada,
     };
 
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
         return { ...p, procesos: [...p.procesos, nuevoProceso] };
@@ -369,7 +384,7 @@ export const useCotizacionStore = () => {
   }, [cotizacion.piezas]);
 
   const eliminarProcesoDePieza = useCallback((piezaId: string, procesoId: string) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
         return { ...p, procesos: p.procesos.filter((pr: Proceso) => pr.id !== procesoId) };
@@ -381,7 +396,7 @@ export const useCotizacionStore = () => {
   // ========== COSTOS ADICIONALES POR PIEZA ==========
 
   const actualizarCostosAdicionalesPieza = useCallback((piezaId: string, datos: Partial<CostosAdicionalesProyecto>) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
         return { ...p, costosAdicionales: { ...p.costosAdicionales, ...datos } };
@@ -393,7 +408,7 @@ export const useCotizacionStore = () => {
   // ========== COSTOS ADICIONALES GENERALES ==========
 
   const actualizarCostosAdicionales = useCallback((datos: Partial<CostosAdicionalesProyecto>) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nueva = {
         ...prev,
         costosAdicionales: { ...prev.costosAdicionales, ...datos } as CostosAdicionalesProyecto,
@@ -403,7 +418,7 @@ export const useCotizacionStore = () => {
   }, []);
 
   const actualizarMargenPieza = useCallback((piezaId: string, margen: number) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nuevasPiezas = prev.piezas.map((p: PiezaCotizacion) => {
         if (p.id !== piezaId) return p;
         return { ...p, margenPieza: margen };
@@ -519,44 +534,44 @@ export const useCotizacionStore = () => {
   // ========== DATOS GENERALES ==========
 
   const actualizarDatosTaller = useCallback((datos: Partial<DatosTaller>) => {
-    setCotizacion(prev => ({ ...prev, datosTaller: { ...prev.datosTaller, ...datos } }));
+    setCotizacionEditable(prev => ({ ...prev, datosTaller: { ...prev.datosTaller, ...datos } }));
   }, []);
 
   const actualizarDatosCliente = useCallback((datos: Partial<DatosCliente>) => {
-    setCotizacion(prev => ({ ...prev, datosCliente: { ...prev.datosCliente, ...datos } }));
+    setCotizacionEditable(prev => ({ ...prev, datosCliente: { ...prev.datosCliente, ...datos } }));
   }, []);
 
   const actualizarProyecto = useCallback((datos: Partial<EspecificacionesProyecto>) => {
-    setCotizacion(prev => ({ ...prev, proyecto: { ...prev.proyecto, ...datos } }));
+    setCotizacionEditable(prev => ({ ...prev, proyecto: { ...prev.proyecto, ...datos } }));
   }, []);
 
   const actualizarCondiciones = useCallback((datos: Partial<CondicionesComerciales>) => {
-    setCotizacion(prev => ({ ...prev, condiciones: { ...prev.condiciones, ...datos } }));
+    setCotizacionEditable(prev => ({ ...prev, condiciones: { ...prev.condiciones, ...datos } }));
   }, []);
 
   const actualizarMoneda = useCallback((moneda: import('@/types/cotizacion').Moneda) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nueva = { ...prev, moneda };
       return recalcularTotales(nueva);
     });
   }, []);
 
   const actualizarTipoCambio = useCallback((tipoCambio: number) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nueva = { ...prev, tipoCambio };
       return recalcularTotales(nueva);
     });
   }, []);
 
   const actualizarMargenUtilidad = useCallback((margen: number) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       const nueva = { ...prev, margenUtilidad: margen };
       return recalcularTotales(nueva);
     });
   }, []);
 
   const cambiarTipoCotizacion = useCallback((tipo: TipoCotizacion) => {
-    setCotizacion(prev => {
+    setCotizacionEditable(prev => {
       if (tipo === 'pieza_unica' && prev.piezas.length > 1) {
         const piezaUnica: PiezaCotizacion = {
           ...piezaVacia(),
@@ -943,6 +958,8 @@ export const useCotizacionStore = () => {
     cotizacion,
     cotizacionesGuardadas,
     cargado,
+    soloLectura,
+    setSoloLectura,
     // Piezas
     agregarPieza,
     eliminarPieza,
