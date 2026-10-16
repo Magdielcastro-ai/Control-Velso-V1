@@ -784,6 +784,16 @@ function App() {
   };
 
   const handleGenerarCotizacion = async () => {
+    // Protección: si esta cotización YA es una Orden (proyecto creado),
+    // no se puede "regenerar" — solo visualizar. Regenerar bajaba el
+    // estado a 'cotizacion' y rompía la liga con el proyecto existente.
+    const estadoExistente = cotizacionesGuardadas.find(c => c.id === cotizacion.id)?.estado;
+    if (estadoExistente === 'orden') {
+      setVistaActual('cotizacion-final');
+      toast.info('Esta cotización ya está convertida en Orden — solo lectura');
+      return;
+    }
+
     if (canManageTalleres() && cotizacion.datosTaller.nombre) {
       guardarTallerDesdeCotizacion(cotizacion.datosTaller);
     }
@@ -1570,10 +1580,18 @@ function App() {
               </Button>
 
               {pasoActual === 'resumen' ? (
+                cotizacionesGuardadas.find(c => c.id === cotizacion.id)?.estado === 'orden' ? (
+                  // Ya es Orden: no se regenera, solo se visualiza/imprime
+                  <Button onClick={() => setVistaActual('cotizacion-final')} className="bg-blue-600 hover:bg-blue-700">
+                    <FileCheck className="w-4 h-4 mr-2" />
+                    Ver Cotización (Orden creada)
+                  </Button>
+                ) : (
                 <Button onClick={handleGenerarCotizacion} className="bg-green-600 hover:bg-green-700">
                   <FileCheck className="w-4 h-4 mr-2" />
                   Generar Cotización
                 </Button>
+                )
               ) : (
                 <Button 
                   onClick={handleSiguiente}
