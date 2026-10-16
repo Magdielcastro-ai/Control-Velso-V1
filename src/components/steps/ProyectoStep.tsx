@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { ImagenUploader } from '@/components/ImagenUploader';
 import type { EspecificacionesProyecto } from '@/types/cotizacion';
 
 interface ProyectoStepProps {
@@ -56,6 +57,20 @@ export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
           onChange={(e) => onChange({ notas: e.target.value })}
           placeholder="Información adicional relevante para la cotización"
           className="min-h-[80px]"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-900 mb-2">
+          Imagen del Proyecto
+        </label>
+        <p className="text-xs text-slate-500 mb-2">
+          Si las piezas no llevan imagen individual, esta imagen se imprime en la cotización.
+        </p>
+        <ImagenUploader
+          imagen={proyecto.imagen}
+          onChange={(imagen) => onChange({ imagen })}
+          etiqueta="Imagen del proyecto"
         />
       </div>
     </div>

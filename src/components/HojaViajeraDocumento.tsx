@@ -92,6 +92,17 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
         </tbody>
       </table>
 
+      {/* Imagen de la pieza (si existe) */}
+      {pieza.imagen && (
+        <div className="mb-3 border border-slate-300 p-2 inline-block bg-white">
+          <img
+            src={pieza.imagen}
+            alt={pieza.nombre}
+            className="max-h-36 object-contain"
+          />
+        </div>
+      )}
+
       {/* Procesos: SIN tiempos cotizados a petición del usuario
           (los operadores no deben ver el tiempo esperado).
           Solo ruta de procesos + fecha/hora/reales para captura en piso */}

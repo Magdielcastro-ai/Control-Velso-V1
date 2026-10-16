@@ -56,6 +56,7 @@ export interface EspecificacionesProyecto {
   cantidad: number;
   dibujo?: string;
   notas?: string;
+  imagen?: string;  // Imagen del proyecto completo (data URL) — se imprime si las piezas no llevan imagen individual
 }
 
 // FORMAS DE MATERIAL - ACTUALIZADAS CON NUEVAS FORMAS
@@ -294,6 +295,7 @@ export interface PiezaCotizacion {
   // Campos para costos por pieza en la pestaña Costos
   margenPieza?: number;        // Margen de utilidad específico por pieza (sobrescribe el global)
   descripcion?: string;        // Descripción/comentario — se muestra en la cotización imprimible
+  imagen?: string;             // Imagen de la pieza (data URL comprimida) — cotización e hoja viajera
   cantidadCotizada?: number;   // En proyectos: cuántas se cotizaron originalmente (la OC puede ser menor)
 }
 

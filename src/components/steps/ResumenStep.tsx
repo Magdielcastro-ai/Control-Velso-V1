@@ -1,13 +1,15 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { ImagenUploader } from '@/components/ImagenUploader';
 import type { Cotizacion, PiezaCotizacion, Proceso } from '@/types/cotizacion';
 
 interface ResumenStepProps {
   cotizacion: Cotizacion;
+  onActualizarPieza?: (piezaId: string, datos: Partial<PiezaCotizacion>) => void;
 }
 
 // Las ventas solo se concretan desde la sección Proyectos
 // (con cotización en estado "Cotización" + número de OC)
-export function ResumenStep({ cotizacion }: ResumenStepProps) {
+export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps) {
   const { piezas, costosAdicionales, margenUtilidad, ivaPorcentaje, datosCliente, proyecto, condiciones } = cotizacion;
 
   const costosGenerales = Object.values(costosAdicionales)
@@ -101,6 +103,18 @@ export function ResumenStep({ cotizacion }: ResumenStepProps) {
                     Cantidad: {pieza.cantidad}
                   </span>
                 </div>
+
+                {/* Imagen de la pieza (se imprime en la cotización y hoja viajera) */}
+                {onActualizarPieza && (
+                  <div className="mb-3">
+                    <p className="text-xs text-slate-500 mb-1">Imagen de la pieza</p>
+                    <ImagenUploader
+                      imagen={pieza.imagen}
+                      onChange={(imagen) => onActualizarPieza(pieza.id, { imagen })}
+                      etiqueta={`Imagen de ${pieza.nombre}`}
+                    />
+                  </div>
+                )}
 
                 {/* Material */}
                 {pieza.material && (

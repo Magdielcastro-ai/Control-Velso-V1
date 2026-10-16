@@ -159,6 +159,17 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
               {/* Detalle de la pieza - expandible */}
               {piezaExpandida === pieza.id && (
                 <div className="px-4 pb-4 border-t border-slate-100">
+                  {/* Imagen de la pieza */}
+                  {pieza.imagen && (
+                    <div className="py-3">
+                      <img
+                        src={pieza.imagen}
+                        alt={pieza.nombre}
+                        className="max-h-40 object-contain rounded border border-slate-200 bg-white"
+                      />
+                    </div>
+                  )}
+
                   {/* Material */}
                   {pieza.material && (
                     <div className="py-3">
