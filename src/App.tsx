@@ -685,7 +685,25 @@ function App() {
     }
   };
 
-  // Handlers para cambio de estado de proyectos
+  // Eliminar proyecto (solo superadmin): cascada completa —
+  // limpia compras en materiales, elimina sus OCs (salvo 007, que no
+  // lleva proyecto) y luego el proyecto con su cotización de vuelta.
+  const handleEliminarProyecto = async (id: string) => {
+    const proyecto = proyectos.find(p => p.id === id);
+    if (!proyecto) return;
+
+    const ocsDelProyecto = ordenesCompra.filter(
+      o => o.proyectoId === id || (proyecto.codigoProyecto && o.codigoProyecto === proyecto.codigoProyecto)
+    );
+    for (const oc of ocsDelProyecto) {
+      // limpia las compras del costo real de materiales y borra la OC
+      await limpiarComprasDeProyecto(id, oc.id);
+      await eliminarOrdenCompra(oc.id);
+    }
+
+    await eliminarProyecto(id);
+  };
+
   const handleMarcarFabricado = (id: string) => {
     if (!canUpdateProyectoEstado('fabricado')) {
       toast.error('No tienes permiso para esta acción');
@@ -819,7 +837,11 @@ function App() {
     const idsProyectos = new Set(proyectosVinculados.map((p) => p.id));
 
     const ocsVinculadas = ordenesCompra.filter(
-      (o) => (o.proyectoId && idsProyectos.has(o.proyectoId)) || o.cotizacionId === cot.id
+      (o) =>
+        (o.proyectoId && idsProyectos.has(o.proyectoId)) ||
+        o.cotizacionId === cot.id ||
+        // Respaldo por código (la FK puede haberse anulado al borrar el proyecto)
+        (o.codigoProyecto && proyectosVinculados.some(p => p.codigoProyecto === o.codigoProyecto))
     );
 
     // Pendientes vinculados al proyecto o a la cotización
@@ -1139,7 +1161,7 @@ function App() {
               proyectos={proyectos}
               cotizaciones={cotizacionesGuardadas}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
-              onEliminarProyecto={canDeleteProyectos() ? eliminarProyecto : undefined}
+              onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
               onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
               onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
@@ -1535,7 +1557,7 @@ function App() {
                   />
                 )}
                 {pasoActual === 'resumen' && (
-                  <ResumenStep cotizacion={cotizacion} />
+                  <ResumenStep cotizacion={cotizacion} onActualizarPieza={actualizarPieza} />
                 )}
               </CardContent>
             </Card>
