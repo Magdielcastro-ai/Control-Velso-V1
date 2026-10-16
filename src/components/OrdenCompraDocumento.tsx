@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -57,18 +58,36 @@ export function OrdenCompraDocumento({
   if (!orden) return null;
 
   const moneda = orden.moneda || 'MXN';
-  // Imprime SOLO el documento de la OC (una sola hoja)
+  const documentoRef = useRef<HTMLDivElement>(null);
+
+  // Imprime SOLO el documento: se clona a <body> y todo lo demás se
+  // oculta con display:none — garantiza exactamente 1 hoja
   const handlePrint = () => {
+    const nodo = documentoRef.current;
+    if (!nodo) return;
+
+    const anterior = document.getElementById('oc-print-root');
+    anterior?.remove();
+
+    const contenedor = document.createElement('div');
+    contenedor.id = 'oc-print-root';
+    contenedor.appendChild(nodo.cloneNode(true));
+    document.body.appendChild(contenedor);
     document.body.classList.add('imprimiendo-oc');
+
     window.print();
-    setTimeout(() => document.body.classList.remove('imprimiendo-oc'), 500);
+
+    setTimeout(() => {
+      contenedor.remove();
+      document.body.classList.remove('imprimiendo-oc');
+    }, 500);
   };
 
   // El documento se usa DOS veces: vista previa dentro del diálogo y
   // copia a nivel raíz para impresión limpia (el truco de visibility
   // dentro del Dialog position:fixed daba pantalla en blanco)
   const contenido = (
-    <div className="bg-white text-slate-900 p-6 print:p-0">
+    <div ref={documentoRef} className="bg-white text-slate-900 p-6 print:p-0">
           {/* ─── ENCABEZADO VELSO ─── */}
           <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-4">
             <div>
@@ -243,9 +262,6 @@ export function OrdenCompraDocumento({
           {contenido}
         </DialogContent>
       </Dialog>
-
-      {/* Copia a nivel raíz: es lo ÚNICO que se imprime (1 hoja) */}
-      <div className="area-impresion hidden print:block">{contenido}</div>
     </>
   );
 }
