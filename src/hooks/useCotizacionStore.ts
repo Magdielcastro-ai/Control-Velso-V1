@@ -589,6 +589,13 @@ export const useCotizacionStore = () => {
   // ========== GUARDAR / CARGAR ==========
 
   const guardarCotizacion = useCallback(async (estado: CotizacionGuardada['estado'] = 'borrador') => {
+    // SOLO LECTURA: una cotización en estado 'cotizacion' u 'orden' no se
+    // guarda NUNCA (ni al navegar entre pestañas). Solo se guarda en
+    // borrador o al generar la cotización desde un borrador.
+    if (soloLecturaRef.current) {
+      return cotizacion.id;
+    }
+
     // Helpers para sanitizar números antes de enviar a Supabase
     const safeNumber = (val: any): number => {
       const num = Number(val);
