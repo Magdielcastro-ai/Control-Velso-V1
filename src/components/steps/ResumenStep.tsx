@@ -24,14 +24,14 @@ export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps)
     if (m.longitud) partes.push(`Long:${m.longitud}${m.unidadMedida || 'mm'}`);
     if (m.ancho) partes.push(`A:${m.ancho}${m.unidadMedida || 'mm'}`);
     if (m.espesor) partes.push(`E:${m.espesor}${m.unidadMedida || 'mm'}`);
-    if (m.diametro) partes.push(`\u00D8:${m.diametro}${m.unidadMedida || 'mm'}`);
+    if (m.diametro) partes.push(`Ø:${m.diametro}${m.unidadMedida || 'mm'}`);
     if (m.lado) partes.push(`${m.lado}${m.unidadMedida || 'mm'}`);
-    if (m.diametro_exterior) partes.push(`\u00D8ext:${m.diametro_exterior}${m.unidadMedida || 'mm'}`);
-    if (m.diametro_interior) partes.push(`\u00D8int:${m.diametro_interior}${m.unidadMedida || 'mm'}`);
+    if (m.diametro_exterior) partes.push(`Øext:${m.diametro_exterior}${m.unidadMedida || 'mm'}`);
+    if (m.diametro_interior) partes.push(`Øint:${m.diametro_interior}${m.unidadMedida || 'mm'}`);
     if (m.lado_a) partes.push(`La:${m.lado_a}${m.unidadMedida || 'mm'}`);
     if (m.lado_b) partes.push(`Lb:${m.lado_b}${m.unidadMedida || 'mm'}`);
     if (m.dimensiones_libre) partes.push(m.dimensiones_libre);
-    return partes.join(' \u00D7 ');
+    return partes.join(' × ');
   };
 
   const formatearTiempo = (minutos: number) => {
@@ -63,7 +63,7 @@ export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps)
     <div className="space-y-6">
       {/* Encabezado */}
       <div className="border-b border-slate-200 pb-4">
-        <h2 className="text-xl font-bold text-slate-900">{proyecto.nombre || 'Cotizaci\u00F3n'}</h2>
+        <h2 className="text-xl font-bold text-slate-900">{proyecto.nombre || 'Cotización'}</h2>
         <p className="text-sm text-slate-600">Cliente: {datosCliente.empresa || 'Sin empresa'}</p>
         {datosCliente.nombre && (
           <p className="text-sm text-slate-500">Contacto: {datosCliente.nombre}</p>
@@ -104,15 +104,26 @@ export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps)
                   </span>
                 </div>
 
-                {/* Imagen de la pieza (se imprime en la cotización y hoja viajera) */}
-                {onActualizarPieza && (
+                {/* Imagen de la pieza (se imprime en la cotización y hoja viajera).
+                    En solo lectura (cotización generada/orden) se muestra sin controles */}
+                {(onActualizarPieza || pieza.imagen) && (
                   <div className="mb-3">
                     <p className="text-xs text-slate-500 mb-1">Imagen de la pieza</p>
-                    <ImagenUploader
-                      imagen={pieza.imagen}
-                      onChange={(imagen) => onActualizarPieza(pieza.id, { imagen })}
-                      etiqueta={`Imagen de ${pieza.nombre}`}
-                    />
+                    {onActualizarPieza ? (
+                      <ImagenUploader
+                        imagen={pieza.imagen}
+                        onChange={(imagen) => onActualizarPieza(pieza.id, { imagen })}
+                        etiqueta={`Imagen de ${pieza.nombre}`}
+                      />
+                    ) : (
+                      pieza.imagen && (
+                        <img
+                          src={pieza.imagen}
+                          alt={pieza.nombre}
+                          className="max-h-32 max-w-[200px] rounded border border-slate-200 object-contain bg-white"
+                        />
+                      )
+                    )}
                   </div>
                 )}
 
@@ -197,8 +208,8 @@ export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps)
           {Object.entries(costosAdicionales).map(([key, item]: [string, any]) => {
             if (item.incluidoGratis || item.costo === 0) return null;
             const labels: Record<string, string> = {
-              envio: 'Env\u00EDo / Entrega',
-              diseno: 'Dise\u00F1o CAD / CAM',
+              envio: 'Envío / Entrega',
+              diseno: 'Diseño CAD / CAM',
               estudioMaterial: 'Estudio de Material',
               pruebaDureza: 'Prueba de Dureza',
             };

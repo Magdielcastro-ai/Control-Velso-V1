@@ -6,9 +6,10 @@ import type { EspecificacionesProyecto } from '@/types/cotizacion';
 interface ProyectoStepProps {
   proyecto: EspecificacionesProyecto;
   onChange: (datos: Partial<EspecificacionesProyecto>) => void;
+  readOnly?: boolean;
 }
 
-export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
+export function ProyectoStep({ proyecto, onChange, readOnly = false }: ProyectoStepProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -20,6 +21,7 @@ export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
           onChange={(e) => onChange({ nombre: e.target.value })}
           placeholder="Ej: Soporte para maquinaria"
           className="h-12"
+          disabled={readOnly}
         />
       </div>
 
@@ -32,6 +34,7 @@ export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
           onChange={(e) => onChange({ descripcion: e.target.value })}
           placeholder="Describe el trabajo que se va a realizar"
           className="min-h-[120px]"
+          disabled={readOnly}
         />
       </div>
 
@@ -44,6 +47,7 @@ export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
             value={proyecto.dibujo || ''}
             onChange={(e) => onChange({ dibujo: e.target.value })}
             placeholder="Número de plano o dibujo"
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -57,6 +61,7 @@ export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
           onChange={(e) => onChange({ notas: e.target.value })}
           placeholder="Información adicional relevante para la cotización"
           className="min-h-[80px]"
+          disabled={readOnly}
         />
       </div>
 
@@ -67,11 +72,21 @@ export function ProyectoStep({ proyecto, onChange }: ProyectoStepProps) {
         <p className="text-xs text-slate-500 mb-2">
           Si las piezas no llevan imagen individual, esta imagen se imprime en la cotización.
         </p>
-        <ImagenUploader
-          imagen={proyecto.imagen}
-          onChange={(imagen) => onChange({ imagen })}
-          etiqueta="Imagen del proyecto"
-        />
+        {readOnly ? (
+          proyecto.imagen && (
+            <img
+              src={proyecto.imagen}
+              alt="Imagen del proyecto"
+              className="max-h-32 max-w-[200px] rounded border border-slate-200 object-contain bg-white"
+            />
+          )
+        ) : (
+          <ImagenUploader
+            imagen={proyecto.imagen}
+            onChange={(imagen) => onChange({ imagen })}
+            etiqueta="Imagen del proyecto"
+          />
+        )}
       </div>
     </div>
   );
