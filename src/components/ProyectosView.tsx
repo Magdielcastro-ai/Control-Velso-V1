@@ -38,6 +38,7 @@ import type { CotizacionGuardada } from '@/types/cotizacion';
 
 import type { OrdenCompra, Proveedor } from '@/types/ordenesCompra';
 import { OrdenCompraDocumento, type DatosTallerOC } from '@/components/OrdenCompraDocumento';
+import { PiezasDirectasEditor } from '@/components/PiezasDirectasEditor';
 
 interface ProyectosViewProps {
   onVolver: () => void;
@@ -73,6 +74,12 @@ interface ProyectosViewProps {
     clienteNombre?: string;
   }) => Promise<string | null> | void;
   clientes?: { id: string; nombreEmpresa: string }[];
+  // Editor de piezas manual (solo proyectos directos, sin cotización)
+  onActualizarPiezasProyecto?: (id: string, piezas: any[]) => Promise<boolean> | void;
+  // Generar cotización desde proyecto directo (precargada con datos reales)
+  onGenerarCotizacionDesdeProyecto?: (proyecto: ProyectoVenta) => void;
+  // Registrar la PO del cliente cuando llega (proyectos directos)
+  onRegistrarPo?: (id: string, numeroPo: string) => Promise<boolean> | void;
 }
 
 interface Vendedor {
@@ -135,7 +142,10 @@ export function ProyectosView({
   datosTallerOC,
   onEliminarOC,
   onCrearProyectoDirecto,
-  clientes = []
+  clientes = [],
+  onActualizarPiezasProyecto,
+  onGenerarCotizacionDesdeProyecto,
+  onRegistrarPo
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
@@ -160,6 +170,11 @@ export function ProyectosView({
   const [directoNombre, setDirectoNombre] = useState('');
   const [directoClienteId, setDirectoClienteId] = useState('');
   const [creandoDirecto, setCreandoDirecto] = useState(false);
+  // Registrar PO en proyecto directo
+  const [dialogoPo, setDialogoPo] = useState(false);
+  const [poInput, setPoInput] = useState('');
+  const [proyectoPoId, setProyectoPoId] = useState<string | null>(null);
+  const [registrandoPo, setRegistrandoPo] = useState(false);
   
   // Estado para la sección expandible de Órdenes de Compra (solo lectura)
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
@@ -798,6 +813,38 @@ export function ProyectosView({
 
                     {/* Acciones */}
                     <div className="flex items-center gap-2 flex-wrap">
+                      {/* Proyecto directo: generar cotización con datos reales
+                          (editable — en urgencia se cotiza más caro que lo real) */}
+                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' &&
+                       !proyecto.cotizacionId && onGenerarCotizacionDesdeProyecto && (
+                        <Button
+                          size="sm"
+                          onClick={() => onGenerarCotizacionDesdeProyecto(proyecto)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <FileText className="w-4 h-4 mr-1" />
+                          Generar Cotización
+                        </Button>
+                      )}
+
+                      {/* Proyecto directo sin PO: registrar cuando llega la del cliente */}
+                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' &&
+                       !proyecto.ordenCompra && onRegistrarPo && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setProyectoPoId(proyecto.id);
+                            setPoInput('');
+                            setDialogoPo(true);
+                          }}
+                          className="border-blue-400 text-blue-700 hover:bg-blue-50"
+                        >
+                          <ClipboardList className="w-4 h-4 mr-1" />
+                          Registrar PO
+                        </Button>
+                      )}
+
                       {/* Botón expandir/colapsar OC */}
                       <Button
                         variant="outline"
@@ -897,6 +944,14 @@ export function ProyectosView({
                   {/* Sección Órdenes de Compra (expandible) */}
                   {expandido && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
+                      {/* Editor de piezas manual: solo proyectos directos
+                          (urgencia/stock) — no tienen cotización de origen */}
+                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' && onActualizarPiezasProyecto && (
+                        <PiezasDirectasEditor
+                          piezas={proyecto.piezas || []}
+                          onGuardar={(piezas) => onActualizarPiezasProyecto(proyecto.id, piezas)}
+                        />
+                      )}
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
                           <ShoppingCart className="w-4 h-4" />
@@ -1016,6 +1071,44 @@ export function ProyectosView({
             >
               <Receipt className="w-4 h-4 mr-2" />
               Facturar Proyecto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: registrar PO del cliente en proyecto directo */}
+      <Dialog open={dialogoPo} onOpenChange={setDialogoPo}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Orden de Compra del Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-slate-600">
+              Al registrar la PO el proyecto queda formalizado: a partir de aquí
+              impacta en las métricas de vendido y se habilita la facturación.
+            </p>
+            <div className="space-y-2">
+              <Label>Número de PO del cliente *</Label>
+              <Input
+                value={poInput}
+                onChange={(e) => setPoInput(e.target.value)}
+                placeholder="Ej: PO-4500123"
+              />
+            </div>
+            <Button
+              onClick={async () => {
+                if (!poInput.trim() || !proyectoPoId || !onRegistrarPo) return;
+                setRegistrandoPo(true);
+                await onRegistrarPo(proyectoPoId, poInput.trim());
+                setRegistrandoPo(false);
+                setDialogoPo(false);
+                setPoInput('');
+                setProyectoPoId(null);
+              }}
+              disabled={!poInput.trim() || registrandoPo}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              {registrandoPo ? 'Registrando…' : 'Registrar PO'}
             </Button>
           </div>
         </DialogContent>

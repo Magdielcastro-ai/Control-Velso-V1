@@ -401,6 +401,7 @@ function App() {
     guardarCotizacion,
     cargarCotizacion,
     nuevaCotizacion,
+    iniciarCotizacionDesdeProyecto,
     actualizarMoneda,
     actualizarTipoCambio,
     refrescarDesdeSupabase: refrescarCotizaciones,
@@ -432,6 +433,9 @@ function App() {
     proyectos, 
     convertirAVenta, 
     crearProyectoDirecto,
+    actualizarPiezasProyecto,
+    vincularCotizacionAProyectoDirecto,
+    registrarPoEnProyecto,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,
@@ -696,6 +700,17 @@ function App() {
     }
   };
 
+  // Generar cotización DESDE un proyecto directo (urgencia/stock):
+  // abre el wizard con un borrador precargado de los datos reales.
+  // El usuario ajusta tiempos/precios al alza y genera — NO se crea otro
+  // proyecto, solo se actualiza el existente al generar.
+  const handleGenerarCotizacionDesdeProyecto = (proyecto: ProyectoVenta) => {
+    iniciarCotizacionDesdeProyecto(proyecto);
+    setPasoActual('taller');
+    setVistaActual('cotizacion');
+    toast.info(`Cotización precargada con los datos reales de ${proyecto.codigoProyecto} — ajústala y genérala`);
+  };
+
   // Eliminar proyecto (solo superadmin): cascada completa —
   // limpia compras en materiales, elimina sus OCs (salvo 007, que no
   // lleva proyecto) y luego el proyecto con su cotización de vuelta.
@@ -833,6 +848,29 @@ function App() {
     }
 
     await guardarCotizacion('cotizacion');
+
+    // Si la cotización nació de un proyecto directo (urgencia/stock),
+    // vincularla al proyecto existente: liga + snapshot de lo cotizado
+    // (los datos reales del proyecto no se tocan). NO se crea otro proyecto.
+    if (cotizacion.proyectoOrigenId) {
+      await vincularCotizacionAProyectoDirecto(cotizacion.proyectoOrigenId, {
+        cotizacionId: cotizacion.id,
+        numeroCotizacion: cotizacion.numero,
+        totalCotizado: cotizacion.total || 0,
+        margenUtilidad: cotizacion.margenUtilidad || 30,
+        ivaPorcentaje: cotizacion.ivaPorcentaje || 16,
+        snapshot: {
+          piezas: cotizacion.piezas,
+          costosAdicionales: cotizacion.costosAdicionales,
+          subtotal: cotizacion.subtotal,
+          iva: cotizacion.iva,
+          total: cotizacion.total,
+          margenUtilidad: cotizacion.margenUtilidad,
+          fecha: new Date().toISOString(),
+        },
+      });
+    }
+
     setVistaActual('cotizacion-final');
     toast.success('¡Cotización generada exitosamente!');
   };
@@ -858,7 +896,12 @@ function App() {
     if (!saleDeConvertida) return;
 
     const proyectosVinculados = proyectos.filter(
-      (p) => (p.cotizacionId && p.cotizacionId === cot.id) || p.numeroCotizacion === cot.numero
+      (p) =>
+        // Proyectos DIRECTOS (urgencia/stock) NUNCA se eliminan por cambio
+        // de estado de su cotización — el proyecto existía primero; la
+        // cotización solo es un documento generado desde él
+        (!p.tipoOrigen || p.tipoOrigen === 'cotizacion') &&
+        ((p.cotizacionId && p.cotizacionId === cot.id) || p.numeroCotizacion === cot.numero)
     );
     const idsProyectos = new Set(proyectosVinculados.map((p) => p.id));
 
@@ -1188,6 +1231,9 @@ function App() {
               cotizaciones={cotizacionesGuardadas}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
               onCrearProyectoDirecto={canConvertirAVenta() ? crearProyectoDirecto : undefined}
+              onActualizarPiezasProyecto={canConvertirAVenta() ? actualizarPiezasProyecto : undefined}
+              onGenerarCotizacionDesdeProyecto={canConvertirAVenta() ? handleGenerarCotizacionDesdeProyecto : undefined}
+              onRegistrarPo={canConvertirAVenta() ? registrarPoEnProyecto : undefined}
               clientes={clientes}
               onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
               onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
