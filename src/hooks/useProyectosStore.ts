@@ -57,6 +57,8 @@ export const useProyectosStore = () => {
           id: p.id,
           codigoProyecto: p.codigo_proyecto || '',
           tipoProyecto: p.tipo_proyecto || 'maquinado',
+          tipoOrigen: p.tipo_origen || 'cotizacion',
+          stockVendido: p.stock_vendido || [],
           numeroCotizacion: p.numero_cotizacion || '',
           cotizacionId: p.cotizacion_id || '',
           ordenCompra: p.orden_compra || '',
@@ -386,6 +388,138 @@ export const useProyectosStore = () => {
     }
   }, []);
 
+  // ========== PROYECTO DIRECTO (URGENCIA / STOCK) ==========
+  // Crea un proyecto SIN cotización y SIN orden de compra:
+  // - urgencia: trabajo urgente; la cotización se genera después con datos
+  //   reales y la venta impacta al registrar la PO del cliente
+  // - stock: fabricación para almacén; gastos impactan al hacerse, la
+  //   utilidad solo al facturar
+  const crearProyectoDirecto = useCallback(async (datos: {
+    tipoOrigen: 'urgencia' | 'stock';
+    tipoProyecto: 'suministro' | 'maquinado';
+    proyectoNombre: string;
+    clienteId?: string;
+    clienteNombre?: string;
+    piezas?: any[];
+  }): Promise<string | null> => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        toast.error('Error: No estás autenticado');
+        return null;
+      }
+
+      // Código consecutivo MAQ/SUM igual que el flujo normal
+      const { data: codigoData, error: codigoError } = await supabase
+        .rpc('generar_codigo_proyecto_v2', { tipo: datos.tipoProyecto });
+      if (codigoError) {
+        toast.error('Error generando código de proyecto: ' + codigoError.message);
+        return null;
+      }
+      const codigoProyecto = codigoData || '';
+
+      const proyectoData: any = {
+        usuario_id: userData.user.id,
+        codigo_proyecto: codigoProyecto,
+        tipo_proyecto: datos.tipoProyecto,
+        tipo_origen: datos.tipoOrigen,
+        numero_cotizacion: '',
+        orden_compra: '',
+        cliente_nombre: datos.clienteNombre || (datos.tipoOrigen === 'stock' ? 'Stock / Almacén' : ''),
+        proyecto_nombre: datos.proyectoNombre,
+        total_cotizado: 0,
+        margen_utilidad: 30,
+        iva_porcentaje: 16,
+        estado: 'en_fabricacion',
+        fecha_venta: new Date().toISOString(),
+        piezas: datos.piezas || [],
+        materiales: [],
+        procesos: [],
+        costos_adicionales: { disenoCAD: 0, programacionCNC: 0, setup: 0, transporte: 0, otro: 0 },
+      };
+      if (datos.clienteId) proyectoData.cliente_id = datos.clienteId;
+
+      const { data, error } = await supabase
+        .from('proyectos')
+        .insert([proyectoData])
+        .select()
+        .single();
+
+      if (error) {
+        toast.error('Error creando proyecto directo: ' + error.message);
+        return null;
+      }
+
+      const nuevoProyecto: ProyectoVenta = {
+        id: data.id,
+        codigoProyecto: data.codigo_proyecto || '',
+        tipoProyecto: data.tipo_proyecto || 'maquinado',
+        tipoOrigen: data.tipo_origen || datos.tipoOrigen,
+        stockVendido: [],
+        numeroCotizacion: '',
+        ordenCompra: '',
+        clienteId: data.cliente_id || '',
+        clienteNombre: data.cliente_nombre || '',
+        proyectoNombre: data.proyecto_nombre || '',
+        totalCotizado: 0,
+        margenUtilidad: 30,
+        ivaPorcentaje: 16,
+        estado: 'en_fabricacion',
+        fechaVenta: data.fecha_venta || new Date().toISOString(),
+        piezas: data.piezas || [],
+        materiales: [],
+        procesos: [],
+        costosAdicionales: proyectoData.costos_adicionales,
+        usuarioId: data.usuario_id,
+      };
+      setProyectos(prev => [nuevoProyecto, ...prev]);
+      toast.success(`Proyecto ${codigoProyecto} creado (${datos.tipoOrigen === 'stock' ? 'Stock' : 'Urgencia'})`);
+      return data.id;
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + e.message);
+      return null;
+    }
+  }, []);
+
+  // Actualizar las piezas de un proyecto directo (captura manual, sin
+  // cotización de origen). También guarda en piezas_proyecto para que
+  // Producción y la hoja viajera lean lo mismo.
+  const actualizarPiezasProyecto = useCallback(async (id: string, piezas: any[]) => {
+    const proyecto = proyectos.find(p => p.id === id);
+    const exitoso = await updateProyectoSeguro(
+      id,
+      { piezas },
+      { piezas },
+      'Actualizar piezas del proyecto'
+    );
+    if (exitoso && proyecto) {
+      // Resincronizar piezas_proyecto (borrar y reinsertar)
+      await supabase.from('piezas_proyecto').delete().eq('proyecto_id', id);
+      if (piezas.length > 0) {
+        const { data: userData } = await supabase.auth.getUser();
+        const filas = piezas.map((pz: any) => ({
+          proyecto_id: id,
+          codigo_proyecto: proyecto.codigoProyecto,
+          pieza_id: pz.id,
+          codigo_pieza: pz.codigo || '',
+          nombre: pz.nombre || 'Pieza',
+          cantidad: Number(pz.cantidad) || 1,
+          material: pz.material || {},
+          procesos: pz.procesos || [],
+          horas_cotizadas: (pz.procesos || []).reduce(
+            (s: number, pr: any) => s + (Number(pr.tiempoMinutos) || 0), 0
+          ) / 60,
+          usuario_id: userData.user?.id,
+        }));
+        const { error } = await supabase.from('piezas_proyecto').insert(filas);
+        if (error) {
+          toast.error('Piezas guardadas en el proyecto, pero falló piezas_proyecto: ' + error.message);
+        }
+      }
+    }
+    return exitoso;
+  }, [proyectos, updateProyectoSeguro]);
+
   const marcarFabricado = useCallback(async (id: string) => {
     const fechaHoy = new Date().toISOString().split('T')[0];
     const exitoso = await updateProyectoSeguro(
@@ -518,6 +652,8 @@ export const useProyectosStore = () => {
     cargando,
     error,
     convertirAVenta,
+    crearProyectoDirecto,
+    actualizarPiezasProyecto,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,

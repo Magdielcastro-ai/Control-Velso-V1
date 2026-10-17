@@ -7,6 +7,22 @@ export type EstadoProyecto =
   | 'entregado' 
   | 'facturado';
 
+// Origen del proyecto:
+// - cotizacion: flujo normal (cotización → PO → proyecto)
+// - urgencia: proyecto directo sin PO; la cotización se genera después con
+//   datos reales; la venta impacta al registrar la PO del cliente
+// - stock: fabricación para almacén; gastos impactan al hacerse, la
+//   utilidad solo al facturar. Soporta venta parcial (stockVendido)
+export type TipoOrigenProyecto = 'cotizacion' | 'urgencia' | 'stock';
+
+// Registro de venta parcial de un proyecto de stock
+export interface VentaStockParcial {
+  proyectoDestinoId: string;      // proyecto nuevo (código por factura)
+  codigoDestino: string;
+  fecha: string;
+  piezas: { piezaId: string; cantidad: number }[];
+}
+
 // Contacto de cliente
 export interface UsuarioCliente {
   id: string;
@@ -71,6 +87,8 @@ export interface ProyectoVenta {
   id: string;
   codigoProyecto: string;
   tipoProyecto: 'suministro' | 'maquinado';
+  tipoOrigen?: TipoOrigenProyecto;  // default 'cotizacion'
+  stockVendido?: VentaStockParcial[]; // ventas parciales apartadas (solo stock)
   numeroCotizacion: string;
   cotizacionId?: string;
   ordenCompra: string;

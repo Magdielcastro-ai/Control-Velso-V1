@@ -64,6 +64,15 @@ interface ProyectosViewProps {
   proveedores?: Proveedor[];
   datosTallerOC?: DatosTallerOC;
   onEliminarOC?: (id: string) => void;
+  // Proyecto directo: urgencia (sin PO) o stock (almacén)
+  onCrearProyectoDirecto?: (datos: {
+    tipoOrigen: 'urgencia' | 'stock';
+    tipoProyecto: 'suministro' | 'maquinado';
+    proyectoNombre: string;
+    clienteId?: string;
+    clienteNombre?: string;
+  }) => Promise<string | null> | void;
+  clientes?: { id: string; nombreEmpresa: string }[];
 }
 
 interface Vendedor {
@@ -124,7 +133,9 @@ export function ProyectosView({
   ordenesCompra = [],
   proveedores = [],
   datosTallerOC,
-  onEliminarOC
+  onEliminarOC,
+  onCrearProyectoDirecto,
+  clientes = []
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
@@ -142,6 +153,13 @@ export function ProyectosView({
   const [piezasCompra, setPiezasCompra] = useState<Record<string, { incluir: boolean; cantidad: number }>>({});
   const [numeroFactura, setNumeroFactura] = useState('');
   const [montoFactura, setMontoFactura] = useState('');
+  // Proyecto directo (urgencia / stock)
+  const [dialogoDirecto, setDialogoDirecto] = useState(false);
+  const [directoOrigen, setDirectoOrigen] = useState<'urgencia' | 'stock'>('urgencia');
+  const [directoTipo, setDirectoTipo] = useState<'suministro' | 'maquinado'>('maquinado');
+  const [directoNombre, setDirectoNombre] = useState('');
+  const [directoClienteId, setDirectoClienteId] = useState('');
+  const [creandoDirecto, setCreandoDirecto] = useState(false);
   
   // Estado para la sección expandible de Órdenes de Compra (solo lectura)
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
@@ -246,6 +264,26 @@ export function ProyectosView({
     setDialogoConvertir(false);
   };
 
+  // Crear proyecto directo: urgencia (sin PO) o stock (almacén)
+  const handleCrearDirecto = async () => {
+    if (!onCrearProyectoDirecto || !directoNombre.trim()) return;
+    setCreandoDirecto(true);
+    const cliente = clientes.find(c => c.id === directoClienteId);
+    await onCrearProyectoDirecto({
+      tipoOrigen: directoOrigen,
+      tipoProyecto: directoTipo,
+      proyectoNombre: directoNombre.trim(),
+      clienteId: cliente?.id,
+      clienteNombre: cliente?.nombreEmpresa,
+    });
+    setCreandoDirecto(false);
+    setDialogoDirecto(false);
+    setDirectoNombre('');
+    setDirectoClienteId('');
+    setDirectoOrigen('urgencia');
+    setDirectoTipo('maquinado');
+  };
+
   const handleMarcarFabricadoClick = (id: string) => {
     if (onMarcarFabricado) {
       onMarcarFabricado(id);
@@ -315,6 +353,104 @@ export function ProyectosView({
           </p>
         </div>
         
+        {/* Botón Proyecto Directo (urgencia / stock) - solo admin y vendedor */}
+        {(isAdmin || isVendedor) && onCrearProyectoDirecto && (
+          <Dialog open={dialogoDirecto} onOpenChange={setDialogoDirecto}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-amber-400 text-amber-700 hover:bg-amber-50">
+                <Factory className="w-4 h-4 mr-2" />
+                Proyecto Directo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nuevo Proyecto Directo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Tipo de proyecto</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDirectoOrigen('urgencia')}
+                      className={`p-3 rounded-lg border text-left transition-colors ${
+                        directoOrigen === 'urgencia'
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">Urgencia</p>
+                      <p className="text-xs text-slate-500">Sin PO del cliente. Se cotiza después con datos reales.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDirectoOrigen('stock')}
+                      className={`p-3 rounded-lg border text-left transition-colors ${
+                        directoOrigen === 'stock'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">Stock</p>
+                      <p className="text-xs text-slate-500">Fabricar para almacén. Utilidad solo al facturar.</p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Código (prefijo)</Label>
+                  <Select value={directoTipo} onValueChange={(v) => setDirectoTipo(v as 'suministro' | 'maquinado')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="maquinado">Maquinado (MAQ)</SelectItem>
+                      <SelectItem value="suministro">Suministro (SUM)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Nombre del proyecto *</Label>
+                  <Input
+                    value={directoNombre}
+                    onChange={(e) => setDirectoNombre(e.target.value)}
+                    placeholder={directoOrigen === 'stock' ? 'Ej: Bujes de bronce para stock' : 'Ej: Reparación urgente prensa'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Cliente {directoOrigen === 'stock' ? '(opcional)' : ''}</Label>
+                  <Select value={directoClienteId || 'sin-cliente'} onValueChange={(v) => setDirectoClienteId(v === 'sin-cliente' ? '' : v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sin-cliente">
+                        {directoOrigen === 'stock' ? 'Stock / Almacén' : 'Sin cliente asignado'}
+                      </SelectItem>
+                      {clientes.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.nombreEmpresa}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  onClick={handleCrearDirecto}
+                  disabled={!directoNombre.trim() || creandoDirecto}
+                  className="w-full bg-amber-600 hover:bg-amber-700"
+                >
+                  {creandoDirecto ? 'Creando…' : 'Crear Proyecto'}
+                </Button>
+                <p className="text-xs text-slate-500 text-center">
+                  Se crea sin cotización ni orden de compra. Las piezas se capturan después dentro del proyecto.
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
         {/* Botón Convertir Cotización - solo admin y vendedor */}
         {(isAdmin || isVendedor) && onConvertirAVenta && (
           <Dialog open={dialogoConvertir} onOpenChange={setDialogoConvertir}>
@@ -602,6 +738,16 @@ export function ProyectosView({
                           <Badge variant="outline" className={`${estadoConfig[proyecto.estado].color} border-current`}>
                             {estadoConfig[proyecto.estado].label}
                           </Badge>
+                          {proyecto.tipoOrigen === 'urgencia' && (
+                            <Badge variant="outline" className="text-amber-700 border-amber-400 bg-amber-50">
+                              URGENCIA
+                            </Badge>
+                          )}
+                          {proyecto.tipoOrigen === 'stock' && (
+                            <Badge variant="outline" className="text-purple-700 border-purple-400 bg-purple-50">
+                              STOCK
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
                           <span className="flex items-center gap-1">
@@ -614,7 +760,7 @@ export function ProyectosView({
                           </span>
                           <span className="flex items-center gap-1">
                             <FileText className="w-3 h-3" />
-                            OC: {proyecto.ordenCompra}
+                            OC: {proyecto.ordenCompra || 'pendiente'}
                           </span>
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
