@@ -431,6 +431,7 @@ function App() {
   const { 
     proyectos, 
     convertirAVenta, 
+    crearProyectoDirecto,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,
@@ -1186,6 +1187,8 @@ function App() {
               proyectos={proyectos}
               cotizaciones={cotizacionesGuardadas}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
+              onCrearProyectoDirecto={canConvertirAVenta() ? crearProyectoDirecto : undefined}
+              clientes={clientes}
               onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
               onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
@@ -1302,7 +1305,7 @@ function App() {
             />
             <CatalogoPiezasView
               onVolver={irAHome}
-              piezas={piezasCatalogo}
+              piezasCatalogo={piezasCatalogo}
               onEliminar={canManagePiezasCatalogo() ? (_id) => {
                 // TODO: implementar eliminación en usePiezasCatalogoStore
                 toast.info('Eliminación de piezas desde catálogo próximamente');
