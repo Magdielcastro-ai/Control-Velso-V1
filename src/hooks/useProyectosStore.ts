@@ -59,6 +59,7 @@ export const useProyectosStore = () => {
           tipoProyecto: p.tipo_proyecto || 'maquinado',
           tipoOrigen: p.tipo_origen || 'cotizacion',
           stockVendido: p.stock_vendido || [],
+          cotizadoSnapshot: p.cotizado_snapshot || undefined,
           numeroCotizacion: p.numero_cotizacion || '',
           cotizacionId: p.cotizacion_id || '',
           ordenCompra: p.orden_compra || '',
@@ -520,6 +521,66 @@ export const useProyectosStore = () => {
     return exitoso;
   }, [proyectos, updateProyectoSeguro]);
 
+  // Vincular la cotización generada DESDE un proyecto directo: guarda la
+  // liga y el snapshot de lo cotizado (baseline para Control de Códigos).
+  // Los datos reales (piezas, procesosReales, etc.) NO se tocan.
+  const vincularCotizacionAProyectoDirecto = useCallback(async (
+    proyectoId: string,
+    datos: {
+      cotizacionId: string;
+      numeroCotizacion: string;
+      totalCotizado: number;
+      margenUtilidad: number;
+      ivaPorcentaje: number;
+      snapshot: any;
+    }
+  ) => {
+    const updatesDb = {
+      cotizacion_id: datos.cotizacionId,
+      numero_cotizacion: datos.numeroCotizacion,
+      total_cotizado: datos.totalCotizado,
+      margen_utilidad: datos.margenUtilidad,
+      iva_porcentaje: datos.ivaPorcentaje,
+      cotizado_snapshot: datos.snapshot,
+    };
+    const exitoso = await updateProyectoSeguro(
+      proyectoId,
+      updatesDb,
+      { cotizacion_id: datos.cotizacionId, numero_cotizacion: datos.numeroCotizacion },
+      'Vincular cotización al proyecto'
+    );
+    if (exitoso) {
+      setProyectos(prev => prev.map(p => p.id === proyectoId ? {
+        ...p,
+        cotizacionId: datos.cotizacionId,
+        numeroCotizacion: datos.numeroCotizacion,
+        totalCotizado: datos.totalCotizado,
+        margenUtilidad: datos.margenUtilidad,
+        ivaPorcentaje: datos.ivaPorcentaje,
+        cotizadoSnapshot: datos.snapshot,
+      } as ProyectoVenta : p));
+      toast.success('Proyecto actualizado con los datos de la cotización');
+    }
+    return exitoso;
+  }, [updateProyectoSeguro]);
+
+  // Registrar la PO del cliente en un proyecto directo (urgencia/stock):
+  // formaliza la venta — a partir de aquí impacta en las métricas de vendido
+  const registrarPoEnProyecto = useCallback(async (id: string, numeroPo: string) => {
+    const fechaHoy = new Date().toISOString();
+    const exitoso = await updateProyectoSeguro(
+      id,
+      { orden_compra: numeroPo, fecha_venta: fechaHoy },
+      { orden_compra: numeroPo },
+      'Registrar PO'
+    );
+    if (exitoso) {
+      setProyectos(prev => prev.map(p => p.id === id ? { ...p, ordenCompra: numeroPo, fechaVenta: fechaHoy } : p));
+      toast.success(`PO ${numeroPo} registrada en el proyecto`);
+    }
+    return exitoso;
+  }, [updateProyectoSeguro]);
+
   const marcarFabricado = useCallback(async (id: string) => {
     const fechaHoy = new Date().toISOString().split('T')[0];
     const exitoso = await updateProyectoSeguro(
@@ -616,8 +677,10 @@ export const useProyectosStore = () => {
       setProyectos(prev => prev.filter(p => p.id !== id));
 
       // Al eliminar el proyecto, su cotización vuelve a 'Cotización'
-      // (queda lista para convertirse de nuevo si se requiere)
-      if (proyecto) {
+      // (queda lista para convertirse de nuevo si se requiere).
+      // Proyectos DIRECTOS (urgencia/stock): la cotización se generó DESDE
+      // el proyecto — no se toca su estado.
+      if (proyecto && (!proyecto.tipoOrigen || proyecto.tipoOrigen === 'cotizacion')) {
         let query = supabase
           .from('cotizaciones')
           .update({ estado: 'cotizacion', updated_at: new Date().toISOString() });
@@ -654,6 +717,8 @@ export const useProyectosStore = () => {
     convertirAVenta,
     crearProyectoDirecto,
     actualizarPiezasProyecto,
+    vincularCotizacionAProyectoDirecto,
+    registrarPoEnProyecto,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,

@@ -320,6 +320,9 @@ export interface Cotizacion {
   numero: string;
   fecha: string;
   tipo: TipoCotizacion;
+  // Liga inversa: cotización generada DESDE un proyecto directo
+  // (urgencia/stock). El proyecto ya existía; no se crea otro al convertir.
+  proyectoOrigenId?: string;
   datosTaller: DatosTaller;
   datosCliente: DatosCliente;
   proyecto: EspecificacionesProyecto;
@@ -369,6 +372,7 @@ export interface CotizacionGuardada {
   estado: 'borrador' | 'cotizacion' | 'orden' | 'eliminada';
   usuarioId?: string;
   cantidadPiezas?: number;
+  proyectoOrigenId?: string;  // si nació de un proyecto directo (urgencia/stock)
   // Campos adicionales para conversión a proyecto
   margenUtilidad?: number;
   ivaPorcentaje?: number;

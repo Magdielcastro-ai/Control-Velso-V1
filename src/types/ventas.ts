@@ -89,6 +89,7 @@ export interface ProyectoVenta {
   tipoProyecto: 'suministro' | 'maquinado';
   tipoOrigen?: TipoOrigenProyecto;  // default 'cotizacion'
   stockVendido?: VentaStockParcial[]; // ventas parciales apartadas (solo stock)
+  cotizadoSnapshot?: any;           // baseline cotizado (proyectos directos, al generar su cotización)
   numeroCotizacion: string;
   cotizacionId?: string;
   ordenCompra: string;

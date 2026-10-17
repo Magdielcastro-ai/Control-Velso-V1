@@ -178,7 +178,7 @@ export const useCotizacionStore = () => {
       console.log('[useCotizacionStore] Refrescando desde Supabase...');
       const { data, error } = await supabase
         .from('cotizaciones')
-        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, moneda, tipo_cambio, total, total_mxn, estado, usuario_id, piezas, materiales, procesos, costos_adicionales, cliente_id, margen_utilidad, iva_porcentaje')
+        .select('id, numero, created_at, tipo, cliente_nombre, proyecto_nombre, moneda, tipo_cambio, total, total_mxn, estado, usuario_id, piezas, materiales, procesos, costos_adicionales, cliente_id, margen_utilidad, iva_porcentaje, proyecto_origen_id')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -210,6 +210,7 @@ export const useCotizacionStore = () => {
             estado: c.estado || 'borrador',
             usuarioId: c.usuario_id,
             cantidadPiezas: piezasParsed.length || 1,
+            proyectoOrigenId: c.proyecto_origen_id || undefined,
             margenUtilidad: Number(c.margen_utilidad) || 30,
             ivaPorcentaje: Number(c.iva_porcentaje) || 16,
             piezas: piezasParsed,
@@ -647,6 +648,7 @@ export const useCotizacionStore = () => {
       clienteId: nuevaCotizacion.datosCliente.clienteId || undefined,
       margenUtilidad: nuevaCotizacion.margenUtilidad,
       ivaPorcentaje: nuevaCotizacion.ivaPorcentaje,
+      proyectoOrigenId: nuevaCotizacion.proyectoOrigenId || undefined,
     };
 
     setCotizacionesGuardadas(prev => {
@@ -681,6 +683,7 @@ export const useCotizacionStore = () => {
           iva_porcentaje: safeInteger(nuevaCotizacion.ivaPorcentaje),
           moneda: nuevaCotizacion.moneda,
           tipo_cambio: safeNumber(nuevaCotizacion.tipoCambio),
+          proyecto_origen_id: nuevaCotizacion.proyectoOrigenId || null,
           subtotal: safeNumber(nuevaCotizacion.subtotal),
           subtotal_mxn: safeNumber(nuevaCotizacion.subtotalMXN),
           iva_mxn: safeNumber(nuevaCotizacion.ivaMXN),
@@ -865,6 +868,7 @@ export const useCotizacionStore = () => {
           numero: data.numero,
           fecha: data.fecha || new Date().toISOString().split('T')[0],
           tipo: data.tipo || 'pieza_unica',
+          proyectoOrigenId: data.proyecto_origen_id || undefined,
           datosTaller: data.datos_taller || cotizacionVacia().datosTaller,
           datosCliente: datosCliente,
           proyecto: data.proyecto || {
@@ -961,6 +965,42 @@ export const useCotizacionStore = () => {
     return recalculada;
   }, []);
 
+  // ========== COTIZACIÓN DESDE PROYECTO DIRECTO (URGENCIA / STOCK) ==========
+  // Precarga un borrador con los datos reales del proyecto (piezas,
+  // procesos y tiempos capturados). Todo queda EDITABLE: en urgencia se
+  // cotiza más caro que lo real (ej. 60 min reales → 120 cotizados).
+  // La cotización queda ligada al proyecto (proyectoOrigenId) y al
+  // generarse NO crea otro proyecto — solo actualiza el existente.
+  const iniciarCotizacionDesdeProyecto = useCallback((proyecto: any) => {
+    const base = cotizacionVacia('proyecto');
+    const piezas = (proyecto.piezas || []).map((pz: any) => ({
+      ...pz,
+      // Se conservan los mismos ids de pieza/proceso para que el proyecto
+      // pueda cruzar cotizado vs real después
+    }));
+    const clienteStock = proyecto.clienteNombre === 'Stock / Almacén';
+
+    const c: Cotizacion = recalcularTotales({
+      ...base,
+      proyectoOrigenId: proyecto.id,
+      datosCliente: {
+        ...base.datosCliente,
+        empresa: clienteStock ? '' : proyecto.clienteNombre || '',
+        clienteId: proyecto.clienteId || undefined,
+      },
+      proyecto: {
+        ...base.proyecto,
+        nombre: proyecto.proyectoNombre,
+        descripcion: `Trabajo realizado bajo el código ${proyecto.codigoProyecto}`,
+        cantidad: piezas.reduce((s: number, p: any) => s + (Number(p.cantidad) || 0), 0) || 1,
+      },
+      piezas,
+    });
+    setCotizacion(c);
+    setSoloLectura(false);
+    return c;
+  }, [recalcularTotales, setSoloLectura]);
+
   return {
     cotizacion,
     cotizacionesGuardadas,
@@ -996,6 +1036,7 @@ export const useCotizacionStore = () => {
     eliminarCotizacionGuardada,
     nuevaCotizacion,
     clonarCotizacion,
+    iniciarCotizacionDesdeProyecto,
     refrescarDesdeSupabase,
   };
 };
