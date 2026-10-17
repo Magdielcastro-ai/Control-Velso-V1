@@ -436,6 +436,7 @@ function App() {
     actualizarPiezasProyecto,
     vincularCotizacionAProyectoDirecto,
     registrarPoEnProyecto,
+    venderStockParcial,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,
@@ -1234,6 +1235,7 @@ function App() {
               onActualizarPiezasProyecto={canConvertirAVenta() ? actualizarPiezasProyecto : undefined}
               onGenerarCotizacionDesdeProyecto={canConvertirAVenta() ? handleGenerarCotizacionDesdeProyecto : undefined}
               onRegistrarPo={canConvertirAVenta() ? registrarPoEnProyecto : undefined}
+              onVenderStock={canConvertirAVenta() ? venderStockParcial : undefined}
               clientes={clientes}
               onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
               onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}

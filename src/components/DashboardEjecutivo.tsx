@@ -72,6 +72,24 @@ const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+// ═══ REGLAS DE VENTA POR ORIGEN DE PROYECTO ═══
+// - cotizacion: vende al convertirse en proyecto (comportamiento original)
+// - urgencia: vende cuando se registra la PO del cliente (fecha_venta se
+//   actualiza a la fecha de la PO al registrarla)
+// - stock: fabricar NO es vender — los gastos impactan al hacerse, pero la
+//   venta/utilidad solo cuentan al FACTURAR (mes de la factura)
+const cuentaComoVendido = (p: ProyectoVenta): boolean => {
+  const origen = p.tipoOrigen || 'cotizacion';
+  if (origen === 'urgencia') return !!p.ordenCompra;
+  if (origen === 'stock') return p.estado === 'facturado';
+  return true;
+};
+
+const fechaVentaEfectiva = (p: ProyectoVenta): Date =>
+  (p.tipoOrigen === 'stock' && p.fechaFacturado)
+    ? new Date(p.fechaFacturado)
+    : new Date(p.fechaVenta);
+
 export function DashboardEjecutivo({
   onVolver,
   pendientesHoy,
@@ -113,13 +131,26 @@ export function DashboardEjecutivo({
     });
   }, [proyectos, mesSeleccionado, anioSeleccionado]);
 
+  // Proyectos que YA cuentan como venta en el período (con su fecha
+  // efectiva: PO para urgencia, factura para stock). El dinero y la
+  // utilidad del dashboard salen de ESTA lista, no de proyectosFiltrados.
+  const proyectosVendidosFiltrados = useMemo(() => {
+    return proyectos.filter(p => {
+      if (!cuentaComoVendido(p)) return false;
+      if (mesSeleccionado === null) return true;
+      const f = fechaVentaEfectiva(p);
+      return f.getMonth() === mesSeleccionado && f.getFullYear() === anioSeleccionado;
+    });
+  }, [proyectos, mesSeleccionado, anioSeleccionado]);
+
   // ============================================
   // CÁLCULOS DE MÉTRICAS (usando proyectosFiltrados)
   // ============================================
   const metricas = useMemo(() => {
-    const totalVendido = proyectosFiltrados.reduce((sum, p) => sum + (p.totalCotizado || 0), 0);
-    const totalFacturado = proyectosFiltrados.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
-    const totalUtilidad = proyectosFiltrados.reduce((sum, p) => sum + (p.utilidadReal || 0), 0);
+    // Dinero/utilidad: solo proyectos que YA cuentan como venta
+    const totalVendido = proyectosVendidosFiltrados.reduce((sum, p) => sum + (p.totalCotizado || 0), 0);
+    const totalFacturado = proyectosVendidosFiltrados.reduce((sum, p) => sum + (p.totalFacturado || 0), 0);
+    const totalUtilidad = proyectosVendidosFiltrados.reduce((sum, p) => sum + (p.utilidadReal || 0), 0);
 
     const proyectosFabricacion = proyectosFiltrados.filter(p => p.estado === 'en_fabricacion').length;
     const proyectosFabricados = proyectosFiltrados.filter(p => p.estado === 'fabricado').length;
@@ -135,7 +166,7 @@ export function DashboardEjecutivo({
       proyectosEntregados,
       proyectosFacturados,
     };
-  }, [proyectosFiltrados]);
+  }, [proyectosFiltrados, proyectosVendidosFiltrados]);
 
   // ============================================
   // PIPELINE (usando proyectosFiltrados)
@@ -193,7 +224,9 @@ export function DashboardEjecutivo({
 
     const cotizacionesMes = cotizaciones.filter(c => enPeriodo(new Date(c.fecha)));
 
-    const proyectosMes = proyectos.filter(p => enPeriodo(new Date(p.fechaVenta)));
+    // Solo proyectos que ya cuentan como venta, con su fecha efectiva
+    // (urgencia: mes de la PO · stock: mes de la factura)
+    const proyectosMes = proyectos.filter(p => cuentaComoVendido(p) && enPeriodo(fechaVentaEfectiva(p)));
 
     const proyectosFacturadosMes = proyectos.filter(p => {
       if (!p.fechaFacturado) return false;
@@ -270,7 +303,8 @@ export function DashboardEjecutivo({
     );
     const proyectosPendientes = proyectosFiltrados.filter(p => p.estado === 'en_fabricacion');
 
-    const totalVendido = proyectosFiltrados.reduce((sum, p) => sum + p.totalCotizado, 0);
+    // Dinero "vendido" en producción: solo lo que ya cuenta como venta
+    const totalVendido = proyectosFiltrados.filter(cuentaComoVendido).reduce((sum, p) => sum + p.totalCotizado, 0);
     const totalFabricado = proyectosFabricadosMes.reduce((sum, p) => sum + p.totalCotizado, 0);
     const totalPendiente = proyectosPendientes.reduce((sum, p) => sum + p.totalCotizado, 0);
 
