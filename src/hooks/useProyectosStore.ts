@@ -581,6 +581,150 @@ export const useProyectosStore = () => {
     return exitoso;
   }, [updateProyectoSeguro]);
 
+  // ========== VENTA PARCIAL DE STOCK ==========
+  // Vende N piezas de un proyecto de stock: crea un proyecto NUEVO (código
+  // consecutivo propio — un código por factura) con las cantidades vendidas
+  // y sus costos/tiempos proporcionales. El proyecto padre conserva el
+  // remanente y registra la venta en stock_vendido.
+  const venderStockParcial = useCallback(async (
+    proyectoId: string,
+    ventas: { piezaId: string; cantidad: number }[],
+    clienteId?: string,
+    clienteNombre?: string
+  ): Promise<string | null> => {
+    const padre = proyectos.find(p => p.id === proyectoId);
+    if (!padre || (padre.tipoOrigen || 'cotizacion') !== 'stock') {
+      toast.error('Solo se puede vender parcial desde un proyecto de stock');
+      return null;
+    }
+
+    // Escala una pieza a una cantidad distinta (proporcional por pieza)
+    const escalarPieza = (pz: any, cantidad: number) => ({
+      ...pz,
+      cantidad,
+      procesos: (pz.procesos || []).map((pr: any) => ({
+        ...pr,
+        tiempoMinutos: (Number(pr.tiempoMinutosPorPieza) || 0) * cantidad,
+        costoManoObra: ((Number(pr.costoManoObra) || 0) / (pz.cantidad || 1)) * cantidad,
+        costoTotal: ((Number(pr.costoTotal) || 0) / (pz.cantidad || 1)) * cantidad,
+      })),
+    });
+
+    const piezasVendidas: any[] = [];
+    const piezasRemanentes: any[] = [];
+    for (const pz of padre.piezas || []) {
+      const v = ventas.find(x => x.piezaId === pz.id);
+      const vendida = Math.min(Math.max(0, Math.floor(v?.cantidad || 0)), pz.cantidad);
+      if (vendida > 0) piezasVendidas.push(escalarPieza(pz, vendida));
+      const resta = pz.cantidad - vendida;
+      if (resta > 0) piezasRemanentes.push(escalarPieza(pz, resta));
+    }
+    if (piezasVendidas.length === 0) {
+      toast.error('Indica cuántas piezas se venden');
+      return null;
+    }
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        toast.error('Error: No estás autenticado');
+        return null;
+      }
+
+      // Código nuevo consecutivo (un código por factura)
+      const { data: codigoData, error: codigoError } = await supabase
+        .rpc('generar_codigo_proyecto_v2', { tipo: padre.tipoProyecto });
+      if (codigoError) {
+        toast.error('Error generando código: ' + codigoError.message);
+        return null;
+      }
+      const codigoHijo = codigoData || '';
+
+      const hijoData: any = {
+        usuario_id: userData.user.id,
+        codigo_proyecto: codigoHijo,
+        tipo_proyecto: padre.tipoProyecto,
+        tipo_origen: 'stock',
+        numero_cotizacion: '',
+        orden_compra: '',
+        cliente_nombre: clienteNombre || padre.clienteNombre || '',
+        proyecto_nombre: `${padre.proyectoNombre} (venta de stock)`,
+        total_cotizado: 0,
+        margen_utilidad: padre.margenUtilidad || 30,
+        iva_porcentaje: padre.ivaPorcentaje || 16,
+        estado: 'en_fabricacion',
+        fecha_venta: new Date().toISOString(),
+        piezas: piezasVendidas,
+        materiales: [],
+        procesos: [],
+        costos_adicionales: { disenoCAD: 0, programacionCNC: 0, setup: 0, transporte: 0, otro: 0 },
+      };
+      if (clienteId || padre.clienteId) hijoData.cliente_id = clienteId || padre.clienteId;
+
+      const { data: hijo, error: errorHijo } = await supabase
+        .from('proyectos')
+        .insert([hijoData])
+        .select()
+        .single();
+      if (errorHijo) {
+        toast.error('Error creando proyecto de venta: ' + errorHijo.message);
+        return null;
+      }
+
+      // Actualizar padre: remanente + registro de la venta
+      const registroVenta = {
+        proyectoDestinoId: hijo.id,
+        codigoDestino: codigoHijo,
+        fecha: new Date().toISOString(),
+        piezas: piezasVendidas.map(p => ({ piezaId: p.id, cantidad: p.cantidad, nombre: p.nombre })),
+      };
+      const nuevoStockVendido = [...(padre.stockVendido || []), registroVenta];
+      const exitoso = await updateProyectoSeguro(
+        proyectoId,
+        { piezas: piezasRemanentes, stock_vendido: nuevoStockVendido },
+        { stock_vendido: nuevoStockVendido },
+        'Actualizar remanente de stock'
+      );
+      if (!exitoso) {
+        toast.error('Venta creada, pero no se actualizó el remanente del stock');
+      }
+
+      setProyectos(prev => [
+        {
+          id: hijo.id,
+          codigoProyecto: codigoHijo,
+          tipoProyecto: padre.tipoProyecto,
+          tipoOrigen: 'stock',
+          stockVendido: [],
+          numeroCotizacion: '',
+          ordenCompra: '',
+          clienteId: hijo.cliente_id || '',
+          clienteNombre: hijo.cliente_nombre || '',
+          proyectoNombre: hijo.proyecto_nombre,
+          totalCotizado: 0,
+          margenUtilidad: padre.margenUtilidad || 30,
+          ivaPorcentaje: padre.ivaPorcentaje || 16,
+          estado: 'en_fabricacion',
+          fechaVenta: hijo.fecha_venta,
+          piezas: piezasVendidas,
+          materiales: [],
+          procesos: [],
+          costosAdicionales: hijoData.costos_adicionales,
+          usuarioId: hijo.usuario_id,
+        } as ProyectoVenta,
+        ...prev.map(p => p.id === proyectoId
+          ? { ...p, piezas: piezasRemanentes, stockVendido: nuevoStockVendido }
+          : p),
+      ]);
+
+      toast.success(`Venta registrada: ${codigoHijo} (remanente actualizado en ${padre.codigoProyecto})`);
+      return hijo.id;
+    } catch (e: any) {
+      toast.error('Error inesperado: ' + e.message);
+      return null;
+    }
+  }, [proyectos, updateProyectoSeguro]);
+
   const marcarFabricado = useCallback(async (id: string) => {
     const fechaHoy = new Date().toISOString().split('T')[0];
     const exitoso = await updateProyectoSeguro(
@@ -719,6 +863,7 @@ export const useProyectosStore = () => {
     actualizarPiezasProyecto,
     vincularCotizacionAProyectoDirecto,
     registrarPoEnProyecto,
+    venderStockParcial,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,

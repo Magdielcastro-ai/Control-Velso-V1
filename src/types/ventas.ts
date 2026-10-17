@@ -20,7 +20,7 @@ export interface VentaStockParcial {
   proyectoDestinoId: string;      // proyecto nuevo (código por factura)
   codigoDestino: string;
   fecha: string;
-  piezas: { piezaId: string; cantidad: number }[];
+  piezas: { piezaId: string; cantidad: number; nombre?: string }[];
 }
 
 // Contacto de cliente

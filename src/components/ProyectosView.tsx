@@ -80,6 +80,13 @@ interface ProyectosViewProps {
   onGenerarCotizacionDesdeProyecto?: (proyecto: ProyectoVenta) => void;
   // Registrar la PO del cliente cuando llega (proyectos directos)
   onRegistrarPo?: (id: string, numeroPo: string) => Promise<boolean> | void;
+  // Venta parcial de stock: crea proyecto hijo con código propio por factura
+  onVenderStock?: (
+    proyectoId: string,
+    ventas: { piezaId: string; cantidad: number }[],
+    clienteId?: string,
+    clienteNombre?: string
+  ) => Promise<string | null> | void;
 }
 
 interface Vendedor {
@@ -145,7 +152,8 @@ export function ProyectosView({
   clientes = [],
   onActualizarPiezasProyecto,
   onGenerarCotizacionDesdeProyecto,
-  onRegistrarPo
+  onRegistrarPo,
+  onVenderStock
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
@@ -175,6 +183,12 @@ export function ProyectosView({
   const [poInput, setPoInput] = useState('');
   const [proyectoPoId, setProyectoPoId] = useState<string | null>(null);
   const [registrandoPo, setRegistrandoPo] = useState(false);
+  // Venta parcial de stock
+  const [dialogoStock, setDialogoStock] = useState(false);
+  const [stockProyectoSel, setStockProyectoSel] = useState<ProyectoVenta | null>(null);
+  const [stockVentas, setStockVentas] = useState<Record<string, string>>({});
+  const [stockClienteId, setStockClienteId] = useState('');
+  const [vendiendoStock, setVendiendoStock] = useState(false);
   
   // Estado para la sección expandible de Órdenes de Compra (solo lectura)
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
@@ -827,6 +841,24 @@ export function ProyectosView({
                         </Button>
                       )}
 
+                      {/* Stock: venta parcial con split a código nuevo por factura */}
+                      {proyecto.tipoOrigen === 'stock' && (proyecto.piezas?.length || 0) > 0 && onVenderStock && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setStockProyectoSel(proyecto);
+                            setStockVentas({});
+                            setStockClienteId(proyecto.clienteId || '');
+                            setDialogoStock(true);
+                          }}
+                          className="border-purple-400 text-purple-700 hover:bg-purple-50"
+                        >
+                          <Package className="w-4 h-4 mr-1" />
+                          Vender de Stock
+                        </Button>
+                      )}
+
                       {/* Proyecto directo sin PO: registrar cuando llega la del cliente */}
                       {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' &&
                        !proyecto.ordenCompra && onRegistrarPo && (
@@ -971,6 +1003,26 @@ export function ProyectosView({
                           onGuardar={(piezas) => onActualizarPiezasProyecto(proyecto.id, piezas)}
                         />
                       )}
+
+                      {/* Historial de ventas parciales (proyectos de stock) */}
+                      {proyecto.tipoOrigen === 'stock' && (proyecto.stockVendido?.length || 0) > 0 && (
+                        <div className="mb-4 pb-4 border-b border-slate-200">
+                          <h4 className="font-semibold text-sm text-slate-700 mb-2">Ventas realizadas de este stock</h4>
+                          <div className="space-y-1">
+                            {proyecto.stockVendido!.map((v, i) => (
+                              <div key={i} className="flex flex-wrap items-center gap-3 text-sm bg-purple-50 border border-purple-100 rounded px-3 py-1.5">
+                                <span className="font-medium text-purple-800">{v.codigoDestino}</span>
+                                <span className="text-xs text-slate-500">
+                                  {new Date(v.fecha).toLocaleDateString('es-MX')}
+                                </span>
+                                <span className="text-xs text-slate-600">
+                                  {v.piezas.map((pv: any) => `${pv.cantidad}× ${pv.nombre || 'pieza'}`).join(', ')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
                           <ShoppingCart className="w-4 h-4" />
@@ -1090,6 +1142,80 @@ export function ProyectosView({
             >
               <Receipt className="w-4 h-4 mr-2" />
               Facturar Proyecto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: venta parcial de stock (split a código nuevo por factura) */}
+      <Dialog open={dialogoStock} onOpenChange={setDialogoStock}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vender de Stock — {stockProyectoSel?.codigoProyecto}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-slate-600">
+              Se crea un proyecto nuevo con código propio (un código por factura)
+              con las cantidades vendidas. El remanente queda en {stockProyectoSel?.codigoProyecto}.
+            </p>
+
+            <div className="space-y-2">
+              <Label>Cliente (opcional)</Label>
+              <Select value={stockClienteId || 'sin-cliente'} onValueChange={(v) => setStockClienteId(v === 'sin-cliente' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sin-cliente">Sin cliente asignado</SelectItem>
+                  {clientes.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.nombreEmpresa}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cantidades a vender</Label>
+              <div className="border rounded-lg divide-y max-h-56 overflow-y-auto">
+                {(stockProyectoSel?.piezas || []).map((pz: any) => (
+                  <div key={pz.id} className="flex items-center gap-3 p-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{pz.nombre}</p>
+                      <p className="text-xs text-slate-500">Disponible: {pz.cantidad}</p>
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={pz.cantidad}
+                      value={stockVentas[pz.id] ?? ''}
+                      onChange={(e) => setStockVentas(prev => ({ ...prev, [pz.id]: e.target.value }))}
+                      placeholder="0"
+                      className="w-20 h-8 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              onClick={async () => {
+                if (!stockProyectoSel || !onVenderStock) return;
+                const ventas = Object.entries(stockVentas)
+                  .map(([piezaId, cantidad]) => ({ piezaId, cantidad: Math.floor(Number(cantidad) || 0) }))
+                  .filter(v => v.cantidad > 0);
+                if (ventas.length === 0) return;
+                setVendiendoStock(true);
+                const cliente = clientes.find(c => c.id === stockClienteId);
+                await onVenderStock(stockProyectoSel.id, ventas, cliente?.id, cliente?.nombreEmpresa);
+                setVendiendoStock(false);
+                setDialogoStock(false);
+                setStockProyectoSel(null);
+                setStockVentas({});
+              }}
+              disabled={vendiendoStock || !Object.values(stockVentas).some(v => Number(v) > 0)}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
+              {vendiendoStock ? 'Registrando…' : 'Registrar Venta de Stock'}
             </Button>
           </div>
         </DialogContent>
