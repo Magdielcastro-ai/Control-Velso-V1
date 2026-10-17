@@ -845,6 +845,25 @@ export function ProyectosView({
                         </Button>
                       )}
 
+                      {/* Proyecto directo: captura manual de piezas/procesos
+                          (este botón abre la misma sección expandida) */}
+                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' && onActualizarPiezasProyecto && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleExpandirProyecto(proyecto.id)}
+                          className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                        >
+                          <Package className="w-4 h-4 mr-1" />
+                          Piezas ({proyecto.piezas?.length || 0})
+                          {expandido ? (
+                            <ChevronUp className="w-3 h-3 ml-1" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3 ml-1" />
+                          )}
+                        </Button>
+                      )}
+
                       {/* Botón expandir/colapsar OC */}
                       <Button
                         variant="outline"
