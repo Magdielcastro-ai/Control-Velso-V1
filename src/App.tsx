@@ -1305,7 +1305,7 @@ function App() {
             />
             <CatalogoPiezasView
               onVolver={irAHome}
-              piezasCatalogo={piezasCatalogo}
+              piezas={piezasCatalogo}
               onEliminar={canManagePiezasCatalogo() ? (_id) => {
                 // TODO: implementar eliminación en usePiezasCatalogoStore
                 toast.info('Eliminación de piezas desde catálogo próximamente');
