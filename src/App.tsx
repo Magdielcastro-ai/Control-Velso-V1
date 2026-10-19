@@ -54,6 +54,7 @@ import { HomeVelso } from '@/components/HomeVelso';
 import { ClientesView } from '@/components/ClientesView';
 import { ProyectosView } from '@/components/ProyectosView';
 import { ProyectoDetalleView } from '@/components/ProyectoDetalleView';
+import { ProduccionProyectoView } from '@/components/ProduccionProyectoView';
 import { MaterialesCatalogoView } from '@/components/MaterialesCatalogoView';
 import { CatalogoProcesosView } from '@/components/CatalogoProcesosView';
 import { CotizacionesView } from '@/components/CotizacionesView';
@@ -94,7 +95,7 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
 type VistaPrincipal = 'home' | 'dashboard' | 'clientes' | 'proyectos' | 'proyecto-detalle' | 'materiales' |
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
-                      'pendientes' | 'cobranza' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra' |
+                      'pendientes' | 'cobranza' | 'produccion' | 'produccion-detalle' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra' |
                       'proveedores';
 
 const HORAS_DEFAULT: Record<string, number> = {
@@ -438,6 +439,7 @@ function App() {
     vincularCotizacionAProyectoDirecto,
     registrarPoEnProyecto,
     venderStockParcial,
+    regresarAFabricacion,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,
@@ -780,6 +782,62 @@ function App() {
   const handleVerProyecto = (proyecto: ProyectoVenta) => {
     setProyectoSeleccionado(proyecto);
     setVistaActual('proyecto-detalle');
+  };
+
+  // Abrir la vista dedicada del proyecto en Producción
+  const handleVerProyectoProduccion = (proyecto: ProyectoVenta) => {
+    setProyectoSeleccionado(proyecto);
+    setVistaActual('produccion-detalle');
+  };
+
+  // Guardado de horas reales desde Producción (vista dedicada):
+  // 1) JSON proyectos.procesos_reales (dashboard y control de códigos)
+  // 2) tabla registros_produccion (una fila por proceso; corregir = upsert)
+  const handleGuardarHorasProduccion = async (proyecto: ProyectoVenta, procesosReales: any[]) => {
+    await guardarDatosReales(proyecto.id, { procesosReales });
+    // Dedup de seguridad por proceso_id (nunca dos filas con la misma llave)
+    const vistos = new Set<string>();
+    const filas = procesosReales
+      .filter((p: any) => {
+        if (vistos.has(p.id)) return false;
+        vistos.add(p.id);
+        return true;
+      })
+      .map((p: any) => ({
+        proyecto_id: proyecto.id,
+        codigo_proyecto: proyecto.codigoProyecto,
+        pieza_id: p.piezaId || '',
+        pieza_nombre: p.piezaNombre || null,
+        proceso_id: p.id,
+        proceso_nombre: p.nombre,
+        minutos_cotizados: p.tiempoMinutosCotizado || 0,
+        minutos_reales: p.tiempoMinutosReal,
+        operador: p.operadorNombre || null,
+        lineas: p.lineas || null,
+        piezas_real: p.piezasReal || 0,
+        usuario_id: user?.id,
+        updated_at: new Date().toISOString(),
+      }));
+    const { error } = await supabase
+      .from('registros_produccion')
+      .upsert(filas, { onConflict: 'proyecto_id,proceso_id' });
+    // Sincronizar eliminaciones (extras quitados en la app)
+    const idsVigentes = procesosReales.map((p: any) => p.id);
+    let errorBorrado = null;
+    if (idsVigentes.length > 0) {
+      const res = await supabase
+        .from('registros_produccion')
+        .delete()
+        .eq('proyecto_id', proyecto.id)
+        .not('proceso_id', 'in', `(${idsVigentes.map((i: string) => `"${i}"`).join(',')})`);
+      errorBorrado = res.error;
+    }
+    if (error || errorBorrado) {
+      console.error('[App] Error registros_produccion:', error?.message || errorBorrado?.message);
+      toast.error('Las horas se guardaron, pero falló el registro detallado: ' + (error?.message || errorBorrado?.message));
+    } else {
+      toast.success(`Horas reales guardadas en ${proyecto.codigoProyecto}`);
+    }
   };
 
   // Volver de hoja viajera / control de códigos: al detalle del proyecto
@@ -1150,58 +1208,38 @@ function App() {
             <ProduccionView
               onVolver={irAHome}
               proyectos={proyectos}
-              onActualizarPiezasProyecto={actualizarPiezasProyecto}
-              onGuardarHorasReales={async (proyecto, procesosReales) => {
-                // 1. JSON en proyectos.procesos_reales (alimenta dashboard y control de códigos)
-                await guardarDatosReales(proyecto.id, { procesosReales });
-                // 2. Tabla registros_produccion (una fila por proceso; corregir = upsert)
-                // Dedup de seguridad por proceso_id (nunca dos filas con la misma llave)
-                const vistos = new Set<string>();
-                const filas = procesosReales
-                  .filter((p: any) => {
-                    if (vistos.has(p.id)) return false;
-                    vistos.add(p.id);
-                    return true;
-                  })
-                  .map((p: any) => ({
-                  proyecto_id: proyecto.id,
-                  codigo_proyecto: proyecto.codigoProyecto,
-                  pieza_id: p.piezaId || '',
-                  pieza_nombre: p.piezaNombre || null,
-                  proceso_id: p.id,
-                  proceso_nombre: p.nombre,
-                  minutos_cotizados: p.tiempoMinutosCotizado || 0,
-                  minutos_reales: p.tiempoMinutosReal,
-                  operador: p.operadorNombre || null,
-                  lineas: p.lineas || null,
-                  piezas_real: p.piezasReal || 0,
-                  usuario_id: user.id,
-                  updated_at: new Date().toISOString(),
-                }));
-                const { error } = await supabase
-                  .from('registros_produccion')
-                  .upsert(filas, { onConflict: 'proyecto_id,proceso_id' });
-                // Sincronizar eliminaciones (extras quitados en la app)
-                const idsVigentes = procesosReales.map((p: any) => p.id);
-                let errorBorrado = null;
-                if (idsVigentes.length > 0) {
-                  const res = await supabase
-                    .from('registros_produccion')
-                    .delete()
-                    .eq('proyecto_id', proyecto.id)
-                    .not('proceso_id', 'in', `(${idsVigentes.map((i: string) => `"${i}"`).join(',')})`);
-                  errorBorrado = res.error;
-                }
-                if (error || errorBorrado) {
-                  console.error('[App] Error registros_produccion:', error?.message || errorBorrado?.message);
-                  toast.error('Las horas se guardaron, pero falló el registro detallado: ' + (error?.message || errorBorrado?.message));
-                } else {
-                  toast.success(`Horas reales guardadas en ${proyecto.codigoProyecto}`);
-                }
-              }}
+              onVerProyecto={handleVerProyectoProduccion}
             />
           </>
         );
+
+      case 'produccion-detalle': {
+        // Re-derivar el proyecto desde la lista fresca (nuevas piezas u
+        // horas guardadas se reflejan sin recargar)
+        const proyectoProd = proyectos.find(p => p.id === proyectoSeleccionado?.id) || proyectoSeleccionado;
+        if (!proyectoProd) {
+          setVistaActual('produccion');
+          return null;
+        }
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <ProduccionProyectoView
+              proyecto={proyectoProd}
+              onVolver={() => { setProyectoSeleccionado(null); setVistaActual('produccion'); }}
+              onGuardarHorasReales={handleGuardarHorasProduccion}
+              onActualizarPiezasProyecto={actualizarPiezasProyecto}
+              catalogoMateriales={catalogo}
+              onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
+            />
+          </>
+        );
+      }
 
       case 'clientes':
         return (
@@ -1283,7 +1321,7 @@ function App() {
                     }
                   : { nombre: 'Soluciones Integrales Velso' }
               }
-              onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
+              onRegresarAFabricacion={(user.rol === 'admin' || user.rol === 'superadmin') ? regresarAFabricacion : undefined}
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
               onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
               onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
