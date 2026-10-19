@@ -13,37 +13,27 @@ import {
   FileText,
   Calendar,
   Building2,
-  Trash2,
   Search,
   CheckCircle,
-  TrendingUp,
   Factory,
-  Truck,
-  Receipt,
   Package,
   Clock,
   DollarSign,
   User,
-  Hash,
-  ShoppingCart,
-  ChevronDown,
-  ChevronUp,
-  ClipboardList,
-  Eye
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { ProyectoVenta, EstadoProyecto } from '@/types/ventas';
 import { procesosAplanados, minutosCotizados } from '@/utils/proyectoDatos';
 import type { CotizacionGuardada } from '@/types/cotizacion';
 
-import type { OrdenCompra, Proveedor } from '@/types/ordenesCompra';
-import { OrdenCompraDocumento, type DatosTallerOC } from '@/components/OrdenCompraDocumento';
-import { PiezasDirectasEditor } from '@/components/PiezasDirectasEditor';
-
 interface ProyectosViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
   cotizaciones: CotizacionGuardada[];
+  // Abrir la vista de detalle del código (OCs, hoja viajera, control de
+  // códigos, estados, etc. se operan DENTRO del proyecto)
+  onVerProyecto: (proyecto: ProyectoVenta) => void;
   onConvertirAVenta?: (
     cotizacion: CotizacionGuardada,
     ordenCompra: string,
@@ -51,20 +41,8 @@ interface ProyectosViewProps {
     codigoManual?: string,
     piezasCompradas?: { piezaId: string; cantidad: number }[]
   ) => void;
-  onEliminarProyecto?: (id: string) => void;
-  onMarcarFabricado?: (id: string) => void;
-  onMarcarEntregado?: (id: string) => void;
-  onMarcarFacturado?: (id: string, numeroFactura: string, totalFacturado: number) => void;
-  onVerControlCodigos?: (proyecto: ProyectoVenta) => void;
-  onVerHojaViajera?: (proyecto: ProyectoVenta) => void;
   userRol?: string;
   userId?: string;
-  // Órdenes de Compra (solo lectura: la creación es en Órdenes de Compra
-  // y la autorización la firma finanzas en esa sección)
-  ordenesCompra?: OrdenCompra[];
-  proveedores?: Proveedor[];
-  datosTallerOC?: DatosTallerOC;
-  onEliminarOC?: (id: string) => void;
   // Proyecto directo: urgencia (sin PO) o stock (almacén)
   onCrearProyectoDirecto?: (datos: {
     tipoOrigen: 'urgencia' | 'stock';
@@ -74,19 +52,6 @@ interface ProyectosViewProps {
     clienteNombre?: string;
   }) => Promise<string | null> | void;
   clientes?: { id: string; nombreEmpresa: string }[];
-  // Editor de piezas manual (solo proyectos directos, sin cotización)
-  onActualizarPiezasProyecto?: (id: string, piezas: any[]) => Promise<boolean> | void;
-  // Generar cotización desde proyecto directo (precargada con datos reales)
-  onGenerarCotizacionDesdeProyecto?: (proyecto: ProyectoVenta) => void;
-  // Registrar la PO del cliente cuando llega (proyectos directos)
-  onRegistrarPo?: (id: string, numeroPo: string) => Promise<boolean> | void;
-  // Venta parcial de stock: crea proyecto hijo con código propio por factura
-  onVenderStock?: (
-    proyectoId: string,
-    ventas: { piezaId: string; cantidad: number }[],
-    clienteId?: string,
-    clienteNombre?: string
-  ) => Promise<string | null> | void;
 }
 
 interface Vendedor {
@@ -96,81 +61,57 @@ interface Vendedor {
 
 // Configuración de estados
 const estadoConfig: Record<EstadoProyecto, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
-  en_fabricacion: { 
-    label: 'EN FABRICACIÓN', 
-    color: 'text-blue-600', 
+  en_fabricacion: {
+    label: 'EN FABRICACIÓN',
+    color: 'text-blue-600',
     bgColor: 'bg-blue-100',
-    icon: Factory 
+    icon: Factory
   },
-  fabricado: { 
-    label: 'FABRICADO', 
-    color: 'text-amber-600', 
+  fabricado: {
+    label: 'FABRICADO',
+    color: 'text-amber-600',
     bgColor: 'bg-amber-100',
-    icon: Package 
+    icon: Package
   },
-  entregado: { 
-    label: 'ENTREGADO', 
-    color: 'text-cyan-600', 
+  entregado: {
+    label: 'ENTREGADO',
+    color: 'text-cyan-600',
     bgColor: 'bg-cyan-100',
-    icon: Truck 
+    icon: CheckCircle
   },
-  facturado: { 
-    label: 'FACTURADO', 
-    color: 'text-purple-600', 
+  facturado: {
+    label: 'FACTURADO',
+    color: 'text-purple-600',
     bgColor: 'bg-purple-100',
-    icon: Receipt 
+    icon: DollarSign
   },
 };
 
-// Configuración de estados de OC
-const estadoOCConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  pendiente: { label: 'Pendiente', color: 'text-amber-600', bgColor: 'bg-amber-100' },
-  autorizada: { label: 'Autorizada', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  pagada: { label: 'Pagada', color: 'text-indigo-600', bgColor: 'bg-indigo-100' },
-  recibida: { label: 'Recibida', color: 'text-green-600', bgColor: 'bg-green-100' },
-  cancelada: { label: 'Cancelada', color: 'text-red-600', bgColor: 'bg-red-100' },
-};
-
-export function ProyectosView({ 
-  onVolver, 
-  proyectos, 
+// LISTA de proyectos: solo códigos y datos clave. Al seleccionar un código
+// se abre ProyectoDetalleView con todas sus opciones — evita confusiones
+// al tener todos los proyectos desplegados juntos.
+export function ProyectosView({
+  onVolver,
+  proyectos,
   cotizaciones,
+  onVerProyecto,
   onConvertirAVenta,
-  onEliminarProyecto,
-  onMarcarFabricado,
-  onMarcarEntregado,
-  onMarcarFacturado,
-  onVerControlCodigos,
-  onVerHojaViajera,
   userRol = 'vendedor',
   userId,
-  ordenesCompra = [],
-  proveedores = [],
-  datosTallerOC,
-  onEliminarOC,
   onCrearProyectoDirecto,
-  clientes = [],
-  onActualizarPiezasProyecto,
-  onGenerarCotizacionDesdeProyecto,
-  onRegistrarPo,
-  onVenderStock
+  clientes = []
 }: ProyectosViewProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoProyecto | 'todos'>('todos');
-  const [ocDocumento, setOcDocumento] = useState<OrdenCompra | null>(null);
   const [vendedorFiltro, setVendedorFiltro] = useState<string>('todos');
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [dialogoConvertir, setDialogoConvertir] = useState(false);
-  const [dialogoFacturar, setDialogoFacturar] = useState(false);
-  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<ProyectoVenta | null>(null);
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState<CotizacionGuardada | null>(null);
   const [ordenCompra, setOrdenCompra] = useState('');
   const [tipoProyecto, setTipoProyecto] = useState<'suministro' | 'maquinado'>('maquinado');
   const [codigoManual, setCodigoManual] = useState('');
   // Piezas compradas: por defecto todo lo cotizado; se puede bajar a 0 o desmarcar
   const [piezasCompra, setPiezasCompra] = useState<Record<string, { incluir: boolean; cantidad: number }>>({});
-  const [numeroFactura, setNumeroFactura] = useState('');
-  const [montoFactura, setMontoFactura] = useState('');
   // Proyecto directo (urgencia / stock)
   const [dialogoDirecto, setDialogoDirecto] = useState(false);
   const [directoOrigen, setDirectoOrigen] = useState<'urgencia' | 'stock'>('urgencia');
@@ -178,20 +119,6 @@ export function ProyectosView({
   const [directoNombre, setDirectoNombre] = useState('');
   const [directoClienteId, setDirectoClienteId] = useState('');
   const [creandoDirecto, setCreandoDirecto] = useState(false);
-  // Registrar PO en proyecto directo
-  const [dialogoPo, setDialogoPo] = useState(false);
-  const [poInput, setPoInput] = useState('');
-  const [proyectoPoId, setProyectoPoId] = useState<string | null>(null);
-  const [registrandoPo, setRegistrandoPo] = useState(false);
-  // Venta parcial de stock
-  const [dialogoStock, setDialogoStock] = useState(false);
-  const [stockProyectoSel, setStockProyectoSel] = useState<ProyectoVenta | null>(null);
-  const [stockVentas, setStockVentas] = useState<Record<string, string>>({});
-  const [stockClienteId, setStockClienteId] = useState('');
-  const [vendiendoStock, setVendiendoStock] = useState(false);
-  
-  // Estado para la sección expandible de Órdenes de Compra (solo lectura)
-  const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
 
   const isAdmin = userRol === 'admin' || userRol === 'superadmin';
   const isVendedor = userRol === 'vendedor';
@@ -220,22 +147,22 @@ export function ProyectosView({
   };
 
   // Filtrar proyectos según rol
-  const proyectosFiltradosPorRol = isAdmin 
-    ? proyectos 
+  const proyectosFiltradosPorRol = isAdmin
+    ? proyectos
     : proyectos.filter(p => p.usuarioId === userId);
 
   // Filtrar proyectos por búsqueda, estado y vendedor
   const proyectosFiltrados = proyectosFiltradosPorRol.filter(p => {
-    const coincideBusqueda = 
+    const coincideBusqueda =
       (p.proyectoNombre?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
       (p.clienteNombre?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
       (p.ordenCompra?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
       (p.numeroFactura?.toLowerCase() || '').includes(busqueda.toLowerCase()) ||
       (p.codigoProyecto?.toLowerCase() || '').includes(busqueda.toLowerCase());
-    
+
     const coincideEstado = filtroEstado === 'todos' || p.estado === filtroEstado;
     const coincideVendedor = vendedorFiltro === 'todos' || p.usuarioId === vendedorFiltro;
-    
+
     return coincideBusqueda && coincideEstado && coincideVendedor;
   });
 
@@ -313,56 +240,10 @@ export function ProyectosView({
     setDirectoTipo('maquinado');
   };
 
-  const handleMarcarFabricadoClick = (id: string) => {
-    if (onMarcarFabricado) {
-      onMarcarFabricado(id);
-    }
-  };
-
-  const handleMarcarEntregadoClick = (id: string) => {
-    if (onMarcarEntregado) {
-      onMarcarEntregado(id);
-    }
-  };
-
-  const handleAbrirFacturar = (proyecto: ProyectoVenta) => {
-    setProyectoSeleccionado(proyecto);
-    setMontoFactura(proyecto.totalCotizado.toString());
-    setDialogoFacturar(true);
-  };
-
-  const handleFacturar = () => {
-    if (!proyectoSeleccionado || !numeroFactura || !montoFactura || !onMarcarFacturado) return;
-    
-    onMarcarFacturado(proyectoSeleccionado.id, numeroFactura, parseFloat(montoFactura));
-
-    setNumeroFactura('');
-    setMontoFactura('');
-    setProyectoSeleccionado(null);
-    setDialogoFacturar(false);
-  };
-
   // Calcular horas totales de un proyecto (los procesos viven en las piezas)
   const calcularHorasTotales = (proyecto: ProyectoVenta) => {
     const minutos = procesosAplanados(proyecto).reduce((sum, p) => sum + minutosCotizados(p), 0);
     return (minutos / 60).toFixed(1);
-  };
-
-  // Calcular piezas totales de un proyecto
-  const calcularPiezasTotales = (proyecto: ProyectoVenta) => {
-    return proyecto.piezas?.length || 0;
-  };
-
-  // Funciones para Órdenes de Compra
-  const toggleExpandirProyecto = (proyectoId: string) => {
-    setProyectoExpandido(prev => prev === proyectoId ? null : proyectoId);
-  };
-
-  const getOCsByProyecto = (proyectoId: string) => {
-    // Siempre de la más nueva a la más antigua
-    return ordenesCompra
-      .filter(oc => oc.proyectoId === proyectoId)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   };
 
   return (
@@ -381,7 +262,7 @@ export function ProyectosView({
             {!isAdmin && <span className="text-blue-600 ml-2">(Vista Personal)</span>}
           </p>
         </div>
-        
+
         {/* Botón Proyecto Directo (urgencia / stock) - solo admin y vendedor */}
         {(isAdmin || isVendedor) && onCrearProyectoDirecto && (
           <Dialog open={dialogoDirecto} onOpenChange={setDialogoDirecto}>
@@ -473,7 +354,7 @@ export function ProyectosView({
                   {creandoDirecto ? 'Creando…' : 'Crear Proyecto'}
                 </Button>
                 <p className="text-xs text-slate-500 text-center">
-                  Se crea sin cotización ni orden de compra. Las piezas se capturan después dentro del proyecto.
+                  Se crea sin cotización ni orden de compra. Las piezas y tiempos se capturan en la sección de Producción.
                 </p>
               </div>
             </DialogContent>
@@ -737,8 +618,8 @@ export function ProyectosView({
         </Card>
       </div>
 
-      {/* Lista de proyectos */}
-      <div className="space-y-4">
+      {/* Lista de códigos: solo lo esencial; al elegir uno se abre su detalle */}
+      <div className="space-y-3">
         {proyectosFiltrados.length === 0 ? (
           <Card className="border-slate-200">
             <CardContent className="p-8 text-center text-slate-500">
@@ -750,20 +631,21 @@ export function ProyectosView({
         ) : (
           proyectosFiltrados.map((proyecto) => {
             const EstadoIcon = estadoConfig[proyecto.estado].icon;
-            const expandido = proyectoExpandido === proyecto.id;
-            const ocs = getOCsByProyecto(proyecto.id);
             return (
-              <Card key={proyecto.id} className="border-slate-200">
+              <Card
+                key={proyecto.id}
+                className="border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+                onClick={() => onVerProyecto(proyecto)}
+              >
                 <CardContent className="p-4">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    {/* Info del proyecto */}
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 ${estadoConfig[proyecto.estado].bgColor} rounded-lg flex items-center justify-center`}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 ${estadoConfig[proyecto.estado].bgColor} rounded-lg flex items-center justify-center shrink-0`}>
                         <EstadoIcon className={`w-5 h-5 ${estadoConfig[proyecto.estado].color}`} />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold">{proyecto.proyectoNombre}</h3>
+                          <span className="font-bold text-slate-900">{proyecto.codigoProyecto || 'Sin código'}</span>
                           <Badge variant="outline" className={`${estadoConfig[proyecto.estado].color} border-current`}>
                             {estadoConfig[proyecto.estado].label}
                           </Badge>
@@ -778,11 +660,8 @@ export function ProyectosView({
                             </Badge>
                           )}
                         </div>
-                        <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            {proyecto.codigoProyecto || 'Sin código'}
-                          </span>
+                        <p className="font-medium text-slate-700 truncate mt-0.5">{proyecto.proyectoNombre}</p>
+                        <div className="flex flex-wrap gap-3 mt-1 text-xs text-slate-500">
                           <span className="flex items-center gap-1">
                             <Building2 className="w-3 h-3" />
                             {proyecto.clienteNombre}
@@ -795,26 +674,23 @@ export function ProyectosView({
                             <Calendar className="w-3 h-3" />
                             {new Date(proyecto.fechaVenta).toLocaleDateString('es-MX')}
                           </span>
-                          {proyecto.numeroFactura && (
-                            <span className="flex items-center gap-1 text-purple-600">
-                              <Receipt className="w-3 h-3" />
-                              Fact: {proyecto.numeroFactura}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
                           <span className="flex items-center gap-1">
                             <Package className="w-3 h-3" />
-                            {calcularPiezasTotales(proyecto)} piezas
+                            {proyecto.piezas?.length || 0} piezas
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {calcularHorasTotales(proyecto)}h cotizadas
+                            {calcularHorasTotales(proyecto)}h
                           </span>
                           <span className="flex items-center gap-1">
                             <DollarSign className="w-3 h-3" />
                             ${proyecto.totalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                           </span>
+                          {proyecto.numeroFactura && (
+                            <span className="flex items-center gap-1 text-purple-600">
+                              Fact: {proyecto.numeroFactura}
+                            </span>
+                          )}
                           {isAdmin && (
                             <span className="flex items-center gap-1 text-blue-600">
                               <User className="w-3 h-3" />
@@ -824,449 +700,17 @@ export function ProyectosView({
                         </div>
                       </div>
                     </div>
-
-                    {/* Acciones */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Proyecto directo: generar cotización con datos reales
-                          (editable — en urgencia se cotiza más caro que lo real) */}
-                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' &&
-                       !proyecto.cotizacionId && onGenerarCotizacionDesdeProyecto && (
-                        <Button
-                          size="sm"
-                          onClick={() => onGenerarCotizacionDesdeProyecto(proyecto)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <FileText className="w-4 h-4 mr-1" />
-                          Generar Cotización
-                        </Button>
-                      )}
-
-                      {/* Stock: venta parcial con split a código nuevo por factura */}
-                      {proyecto.tipoOrigen === 'stock' && (proyecto.piezas?.length || 0) > 0 && onVenderStock && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setStockProyectoSel(proyecto);
-                            setStockVentas({});
-                            setStockClienteId(proyecto.clienteId || '');
-                            setDialogoStock(true);
-                          }}
-                          className="border-purple-400 text-purple-700 hover:bg-purple-50"
-                        >
-                          <Package className="w-4 h-4 mr-1" />
-                          Vender de Stock
-                        </Button>
-                      )}
-
-                      {/* Proyecto directo sin PO: registrar cuando llega la del cliente */}
-                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' &&
-                       !proyecto.ordenCompra && onRegistrarPo && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setProyectoPoId(proyecto.id);
-                            setPoInput('');
-                            setDialogoPo(true);
-                          }}
-                          className="border-blue-400 text-blue-700 hover:bg-blue-50"
-                        >
-                          <ClipboardList className="w-4 h-4 mr-1" />
-                          Registrar PO
-                        </Button>
-                      )}
-
-                      {/* Proyecto directo: captura manual de piezas/procesos
-                          (este botón abre la misma sección expandida) */}
-                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' && onActualizarPiezasProyecto && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleExpandirProyecto(proyecto.id)}
-                          className="border-amber-400 text-amber-700 hover:bg-amber-50"
-                        >
-                          <Package className="w-4 h-4 mr-1" />
-                          Piezas ({proyecto.piezas?.length || 0})
-                          {expandido ? (
-                            <ChevronUp className="w-3 h-3 ml-1" />
-                          ) : (
-                            <ChevronDown className="w-3 h-3 ml-1" />
-                          )}
-                        </Button>
-                      )}
-
-                      {/* Botón expandir/colapsar OC */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleExpandirProyecto(proyecto.id)}
-                        className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-1" />
-                        Órdenes de Compra
-                        {ocs.length > 0 && (
-                          <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
-                            {ocs.length}
-                          </Badge>
-                        )}
-                        {expandido ? (
-                          <ChevronUp className="w-3 h-3 ml-1" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3 ml-1" />
-                        )}
-                      </Button>
-
-                      {/* Botón Hoja Viajera */}
-                      {onVerHojaViajera && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onVerHojaViajera(proyecto)}
-                          title="Hoja viajera"
-                          className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                        >
-                          <ClipboardList className="w-4 h-4 mr-1" />
-                          Hoja Viajera
-                        </Button>
-                      )}
-
-                      {/* Botón Control de Códigos - solo admin, superadmin y producción */}
-                      {onVerControlCodigos && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onVerControlCodigos(proyecto)}
-                          className="border-amber-300 text-amber-700 hover:bg-amber-50"
-                        >
-                          <TrendingUp className="w-4 h-4 mr-1" />
-                          Control de Códigos
-                        </Button>
-                      )}
-
-                      {/* Botones de cambio de estado */}
-                      {proyecto.estado === 'en_fabricacion' && onMarcarFabricado && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleMarcarFabricadoClick(proyecto.id)}
-                          className="bg-amber-600 hover:bg-amber-700"
-                        >
-                          <Package className="w-4 h-4 mr-1" />
-                          Marcar Fabricado
-                        </Button>
-                      )}
-
-                      {proyecto.estado === 'fabricado' && onMarcarEntregado && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleMarcarEntregadoClick(proyecto.id)}
-                          className="bg-cyan-600 hover:bg-cyan-700"
-                        >
-                          <Truck className="w-4 h-4 mr-1" />
-                          Marcar Entregado
-                        </Button>
-                      )}
-
-                      {proyecto.estado === 'entregado' && onMarcarFacturado && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleAbrirFacturar(proyecto)}
-                          className="bg-purple-600 hover:bg-purple-700"
-                        >
-                          <Receipt className="w-4 h-4 mr-1" />
-                          Facturar
-                        </Button>
-                      )}
-
-                      {/* Botón eliminar - solo admin y superadmin */}
-                      {onEliminarProyecto && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEliminarProyecto(proyecto.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                    <div className="flex items-center gap-1 text-blue-600 shrink-0">
+                      <span className="text-sm font-medium hidden sm:inline">Ver proyecto</span>
+                      <ChevronRight className="w-5 h-5" />
                     </div>
                   </div>
-
-                  {/* Sección Órdenes de Compra (expandible) */}
-                  {expandido && (
-                    <div className="mt-4 pt-4 border-t border-slate-200">
-                      {/* Editor de piezas manual: solo proyectos directos
-                          (urgencia/stock) — no tienen cotización de origen */}
-                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' && onActualizarPiezasProyecto && (
-                        <PiezasDirectasEditor
-                          piezas={proyecto.piezas || []}
-                          onGuardar={(piezas) => onActualizarPiezasProyecto(proyecto.id, piezas)}
-                        />
-                      )}
-
-                      {/* Historial de ventas parciales (proyectos de stock) */}
-                      {proyecto.tipoOrigen === 'stock' && (proyecto.stockVendido?.length || 0) > 0 && (
-                        <div className="mb-4 pb-4 border-b border-slate-200">
-                          <h4 className="font-semibold text-sm text-slate-700 mb-2">Ventas realizadas de este stock</h4>
-                          <div className="space-y-1">
-                            {proyecto.stockVendido!.map((v, i) => (
-                              <div key={i} className="flex flex-wrap items-center gap-3 text-sm bg-purple-50 border border-purple-100 rounded px-3 py-1.5">
-                                <span className="font-medium text-purple-800">{v.codigoDestino}</span>
-                                <span className="text-xs text-slate-500">
-                                  {new Date(v.fecha).toLocaleDateString('es-MX')}
-                                </span>
-                                <span className="text-xs text-slate-600">
-                                  {v.piezas.map((pv: any) => `${pv.cantidad}× ${pv.nombre || 'pieza'}`).join(', ')}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
-                          <ShoppingCart className="w-4 h-4" />
-                          Órdenes de Compra
-                        </h4>
-                      </div>
-
-                      {ocs.length === 0 ? (
-                        <p className="text-sm text-slate-500 py-2">No hay órdenes de compra para este proyecto</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {ocs.map((oc) => {
-                            const ocEstado = estadoOCConfig[oc.estado] || estadoOCConfig.pendiente;
-                            return (
-                              <div
-                                key={oc.id}
-                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200"
-                              >
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <span className="font-medium text-sm">{oc.numeroOc}</span>
-                                  <Badge variant="outline" className={`${ocEstado.color} border-current text-xs`}>
-                                    {ocEstado.label}
-                                  </Badge>
-                                  <span className="text-sm text-slate-600">
-                                    {oc.proveedor || 'Sin proveedor'}
-                                  </span>
-                                  {oc.concepto && (
-                                    <span className="text-xs text-slate-400">
-                                      {oc.concepto}
-                                    </span>
-                                  )}
-                                  <span className="text-sm font-medium text-slate-700">
-                                    ${oc.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {/* Ver la OC (documento imprimible) — el cambio de
-                                      estado es exclusivo de la sección Órdenes de Compra */}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setOcDocumento(oc)}
-                                    className="text-xs h-7"
-                                  >
-                                    <Eye className="w-3 h-3 mr-1" />
-                                    Ver orden
-                                  </Button>
-                                  {onEliminarOC && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => onEliminarOC(oc.id)}
-                                      className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
           })
         )}
       </div>
-
-      {/* Diálogo de Facturación */}
-      <Dialog open={dialogoFacturar} onOpenChange={setDialogoFacturar}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Facturar Proyecto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label>Proyecto</Label>
-              <p className="text-sm text-slate-600">{proyectoSeleccionado?.proyectoNombre}</p>
-              {isAdmin && proyectoSeleccionado && (
-                <p className="text-xs text-blue-600">
-                  <User className="w-3 h-3 inline mr-1" />
-                  Vendedor: {getNombreVendedor(proyectoSeleccionado.usuarioId)}
-                </p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Número de Factura *</Label>
-              <Input
-                value={numeroFactura}
-                onChange={(e) => setNumeroFactura(e.target.value)}
-                placeholder="Ej: FAC-2024-001"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Total Facturado *</Label>
-              <Input
-                type="number"
-                value={montoFactura}
-                onChange={(e) => setMontoFactura(e.target.value)}
-                placeholder="0.00"
-              />
-              <p className="text-xs text-slate-500">
-                Total cotizado: ${proyectoSeleccionado?.totalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <Button 
-              onClick={handleFacturar}
-              disabled={!numeroFactura || !montoFactura}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-            >
-              <Receipt className="w-4 h-4 mr-2" />
-              Facturar Proyecto
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: venta parcial de stock (split a código nuevo por factura) */}
-      <Dialog open={dialogoStock} onOpenChange={setDialogoStock}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Vender de Stock — {stockProyectoSel?.codigoProyecto}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <p className="text-sm text-slate-600">
-              Se crea un proyecto nuevo con código propio (un código por factura)
-              con las cantidades vendidas. El remanente queda en {stockProyectoSel?.codigoProyecto}.
-            </p>
-
-            <div className="space-y-2">
-              <Label>Cliente (opcional)</Label>
-              <Select value={stockClienteId || 'sin-cliente'} onValueChange={(v) => setStockClienteId(v === 'sin-cliente' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sin-cliente">Sin cliente asignado</SelectItem>
-                  {clientes.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nombreEmpresa}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Cantidades a vender</Label>
-              <div className="border rounded-lg divide-y max-h-56 overflow-y-auto">
-                {(stockProyectoSel?.piezas || []).map((pz: any) => (
-                  <div key={pz.id} className="flex items-center gap-3 p-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{pz.nombre}</p>
-                      <p className="text-xs text-slate-500">Disponible: {pz.cantidad}</p>
-                    </div>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={pz.cantidad}
-                      value={stockVentas[pz.id] ?? ''}
-                      onChange={(e) => setStockVentas(prev => ({ ...prev, [pz.id]: e.target.value }))}
-                      placeholder="0"
-                      className="w-20 h-8 text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              onClick={async () => {
-                if (!stockProyectoSel || !onVenderStock) return;
-                const ventas = Object.entries(stockVentas)
-                  .map(([piezaId, cantidad]) => ({ piezaId, cantidad: Math.floor(Number(cantidad) || 0) }))
-                  .filter(v => v.cantidad > 0);
-                if (ventas.length === 0) return;
-                setVendiendoStock(true);
-                const cliente = clientes.find(c => c.id === stockClienteId);
-                await onVenderStock(stockProyectoSel.id, ventas, cliente?.id, cliente?.nombreEmpresa);
-                setVendiendoStock(false);
-                setDialogoStock(false);
-                setStockProyectoSel(null);
-                setStockVentas({});
-              }}
-              disabled={vendiendoStock || !Object.values(stockVentas).some(v => Number(v) > 0)}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-            >
-              {vendiendoStock ? 'Registrando…' : 'Registrar Venta de Stock'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: registrar PO del cliente en proyecto directo */}
-      <Dialog open={dialogoPo} onOpenChange={setDialogoPo}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Registrar Orden de Compra del Cliente</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <p className="text-sm text-slate-600">
-              Al registrar la PO el proyecto queda formalizado: a partir de aquí
-              impacta en las métricas de vendido y se habilita la facturación.
-            </p>
-            <div className="space-y-2">
-              <Label>Número de PO del cliente *</Label>
-              <Input
-                value={poInput}
-                onChange={(e) => setPoInput(e.target.value)}
-                placeholder="Ej: PO-4500123"
-              />
-            </div>
-            <Button
-              onClick={async () => {
-                if (!poInput.trim() || !proyectoPoId || !onRegistrarPo) return;
-                setRegistrandoPo(true);
-                await onRegistrarPo(proyectoPoId, poInput.trim());
-                setRegistrandoPo(false);
-                setDialogoPo(false);
-                setPoInput('');
-                setProyectoPoId(null);
-              }}
-              disabled={!poInput.trim() || registrandoPo}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
-              {registrandoPo ? 'Registrando…' : 'Registrar PO'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Documento imprimible de la OC (botón "Ver orden" del segmento) */}
-      <OrdenCompraDocumento
-        open={ocDocumento !== null}
-        onOpenChange={(open) => { if (!open) setOcDocumento(null); }}
-        orden={ocDocumento}
-        proveedor={ocDocumento?.proveedorId ? proveedores.find(p => p.id === ocDocumento.proveedorId) : undefined}
-        datosTaller={datosTallerOC || { nombre: 'Soluciones Integrales Velso' }}
-      />
     </div>
   );
 }

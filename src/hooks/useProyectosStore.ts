@@ -493,6 +493,12 @@ export const useProyectosStore = () => {
       { piezas },
       'Actualizar piezas del proyecto'
     );
+    if (exitoso) {
+      // Reflejar de inmediato en el estado local — antes solo se actualizaba
+      // Supabase y la lista esperaba a la próxima recarga (la pieza "no
+      // aparecía" hasta minutos después)
+      setProyectos(prev => prev.map(p => p.id === id ? { ...p, piezas } : p));
+    }
     if (exitoso && proyecto) {
       // Resincronizar piezas_proyecto (borrar y reinsertar)
       await supabase.from('piezas_proyecto').delete().eq('proyecto_id', id);
