@@ -16,6 +16,7 @@ import type {
   TipoCotizacion
 } from '@/types/cotizacion';
 import { CATALOGO_PROCESOS_VELSO, COSTOS_MANO_OBRA } from '@/types/cotizacion';
+import { buscarReal } from '@/utils/proyectoDatos';
 import { toast } from 'sonner';
 
 const generarNumeroCotizacion = () => {
@@ -976,7 +977,23 @@ export const useCotizacionStore = () => {
     const piezas = (proyecto.piezas || []).map((pz: any) => ({
       ...pz,
       // Se conservan los mismos ids de pieza/proceso para que el proyecto
-      // pueda cruzar cotizado vs real después
+      // pueda cruzar cotizado vs real después. Si la hoja viajera ya tiene
+      // tiempo REAL capturado, se precarga como punto de partida (el
+      // usuario lo ajusta al alza por urgencia: 60 reales → 120 cotizados)
+      procesos: (pz.procesos || []).map((pr: any) => {
+        const real = buscarReal(proyecto.procesosReales, {
+          captureId: `${pz.id}:${pr.id}`,
+          piezaId: pz.id,
+          id: pr.id,
+        });
+        if (!real || !real.tiempoMinutosReal) return pr;
+        const cant = Number(pz.cantidad) || 1;
+        return {
+          ...pr,
+          tiempoMinutosPorPieza: Math.round((real.tiempoMinutosReal / cant) * 100) / 100,
+          tiempoMinutos: real.tiempoMinutosReal,
+        };
+      }),
     }));
     const clienteStock = proyecto.clienteNombre === 'Stock / Almacén';
 

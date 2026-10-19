@@ -1042,7 +1042,7 @@ function PiezaCard({
                       <span className="font-semibold">${pieza.subtotalPieza.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm mt-1">
-                      <span className="text-green-600 font-medium">Utilidad (30%):</span>
+                      <span className="text-green-600 font-medium">Utilidad ({pieza.margenPieza ?? 30}%):</span>
                       <span className="font-semibold text-green-700">${pieza.utilidadPieza.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-base mt-2 pt-2 border-t border-slate-300">

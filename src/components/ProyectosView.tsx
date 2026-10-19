@@ -166,6 +166,15 @@ export function ProyectosView({
     return coincideBusqueda && coincideEstado && coincideVendedor;
   });
 
+  // Siempre del más nuevo al más antiguo: por fecha y, en empate (mismo
+  // día), por código de proyecto que es consecutivo (MAQ-26-0018 > 0017)
+  proyectosFiltrados.sort((a, b) => {
+    const fa = new Date(a.fechaVenta).getTime();
+    const fb = new Date(b.fechaVenta).getTime();
+    if (fb !== fa) return fb - fa;
+    return (b.codigoProyecto || '').localeCompare(a.codigoProyecto || '');
+  });
+
   // Cotizaciones convertibles: SOLO estado 'cotizacion' (terminada y enviada)
   // y que aún no tengan proyecto asociado. Borradores y órdenes no aplican.
   const cotizacionesPendientes = isAdmin
