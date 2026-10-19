@@ -53,6 +53,7 @@ import { PiezasStep } from '@/components/steps/PiezasStep';
 import { HomeVelso } from '@/components/HomeVelso';
 import { ClientesView } from '@/components/ClientesView';
 import { ProyectosView } from '@/components/ProyectosView';
+import { ProyectoDetalleView } from '@/components/ProyectoDetalleView';
 import { MaterialesCatalogoView } from '@/components/MaterialesCatalogoView';
 import { CatalogoProcesosView } from '@/components/CatalogoProcesosView';
 import { CotizacionesView } from '@/components/CotizacionesView';
@@ -90,7 +91,7 @@ const pasos: { id: PasoCotizacion; label: string; icon: React.ElementType }[] = 
   { id: 'resumen', label: 'Resumen', icon: CheckCircle },
 ];
 
-type VistaPrincipal = 'home' | 'dashboard' | 'clientes' | 'proyectos' | 'materiales' |
+type VistaPrincipal = 'home' | 'dashboard' | 'clientes' | 'proyectos' | 'proyecto-detalle' | 'materiales' |
                       'procesos' | 'cotizaciones' | 'cotizacion' | 'cotizacion-final' |
                       'control-codigos' | 'admin-usuarios' | 'diagnostico' |
                       'pendientes' | 'cobranza' | 'produccion' | 'piezas-catalogo' | 'hoja-viajera' | 'ordenes-compra' |
@@ -774,16 +775,22 @@ function App() {
     setVistaActual('hoja-viajera');
   };
 
-  // Volver de hoja viajera
+  // Abrir el detalle de un código de proyecto (vista separada — la lista
+  // solo muestra códigos; todo lo operativo se hace dentro del proyecto)
+  const handleVerProyecto = (proyecto: ProyectoVenta) => {
+    setProyectoSeleccionado(proyecto);
+    setVistaActual('proyecto-detalle');
+  };
+
+  // Volver de hoja viajera / control de códigos: al detalle del proyecto
+  // si venimos de ahí, si no a la lista
   const handleVolverDeHojaViajera = () => {
-    setProyectoSeleccionado(null);
-    setVistaActual('proyectos');
+    setVistaActual(proyectoSeleccionado ? 'proyecto-detalle' : 'proyectos');
   };
 
   // Volver de control de códigos
   const handleVolverDeControlCodigos = () => {
-    setProyectoSeleccionado(null);
-    setVistaActual('proyectos');
+    setVistaActual(proyectoSeleccionado ? 'proyecto-detalle' : 'proyectos');
   };
 
   // Cotización
@@ -1143,6 +1150,7 @@ function App() {
             <ProduccionView
               onVolver={irAHome}
               proyectos={proyectos}
+              onActualizarPiezasProyecto={actualizarPiezasProyecto}
               onGuardarHorasReales={async (proyecto, procesosReales) => {
                 // 1. JSON en proyectos.procesos_reales (alimenta dashboard y control de códigos)
                 await guardarDatosReales(proyecto.id, { procesosReales });
@@ -1230,24 +1238,40 @@ function App() {
               onVolver={irAHome}
               proyectos={proyectos}
               cotizaciones={cotizacionesGuardadas}
+              onVerProyecto={handleVerProyecto}
               onConvertirAVenta={canConvertirAVenta() ? handleConvertirCotizacionAVenta : undefined}
               onCrearProyectoDirecto={canConvertirAVenta() ? crearProyectoDirecto : undefined}
-              onActualizarPiezasProyecto={canConvertirAVenta() ? actualizarPiezasProyecto : undefined}
-              onGenerarCotizacionDesdeProyecto={canConvertirAVenta() ? handleGenerarCotizacionDesdeProyecto : undefined}
-              onRegistrarPo={canConvertirAVenta() ? registrarPoEnProyecto : undefined}
-              onVenderStock={canConvertirAVenta() ? venderStockParcial : undefined}
               clientes={clientes}
-              onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
-              onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
-              onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
-              onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
-              onVerControlCodigos={canViewControlCodigos() ? handleVerControlCodigos : undefined}
-              onVerHojaViajera={handleVerHojaViajera}
               userRol={user.rol}
               userId={user.id}
+            />
+          </>
+
+        );
+
+      case 'proyecto-detalle': {
+        // Re-derivar el proyecto desde la lista fresca (refleja cambios
+        // de estado, PO, piezas, etc. sin recargar)
+        const proyectoDetalle = proyectos.find(p => p.id === proyectoSeleccionado?.id) || proyectoSeleccionado;
+        if (!proyectoDetalle) {
+          setVistaActual('proyectos');
+          return null;
+        }
+        return (
+          <>
+            <UserHeader 
+              user={user} 
+              onLogout={handleLogout}
+              alertasCount={alertasCount}
+              pendientesCount={pendientesCount}
+            />
+            <ProyectoDetalleView
+              proyecto={proyectoDetalle}
+              onVolver={() => { setProyectoSeleccionado(null); setVistaActual('proyectos'); }}
+              userRol={user.rol}
               ordenesCompra={ordenesCompra}
-              onEliminarOC={canEliminarOrdenesCompra() ? handleEliminarOrdenCompra : undefined}
               proveedores={proveedores}
+              clientes={clientes}
               datosTallerOC={
                 talleres[0]
                   ? {
@@ -1259,9 +1283,20 @@ function App() {
                     }
                   : { nombre: 'Soluciones Integrales Velso' }
               }
+              onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
+              onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
+              onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
+              onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
+              onEliminarOC={canEliminarOrdenesCompra() ? handleEliminarOrdenCompra : undefined}
+              onVerControlCodigos={canViewControlCodigos() ? handleVerControlCodigos : undefined}
+              onVerHojaViajera={handleVerHojaViajera}
+              onGenerarCotizacionDesdeProyecto={canConvertirAVenta() ? handleGenerarCotizacionDesdeProyecto : undefined}
+              onRegistrarPo={canConvertirAVenta() ? registrarPoEnProyecto : undefined}
+              onVenderStock={canConvertirAVenta() ? venderStockParcial : undefined}
             />
           </>
         );
+      }
 
       case 'hoja-viajera':
         return (

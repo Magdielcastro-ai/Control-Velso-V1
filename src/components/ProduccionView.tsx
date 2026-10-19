@@ -20,17 +20,22 @@ import { toast } from 'sonner';
 import type { ProyectoVenta } from '@/types/ventas';
 import { procesosAplanados, materialesAplanados, minutosCotizados, buscarReal } from '@/utils/proyectoDatos';
 import { HojaViajeraDocumento } from '@/components/HojaViajeraDocumento';
+import { PiezasDirectasEditor } from '@/components/PiezasDirectasEditor';
 
 interface ProduccionViewProps {
   onVolver: () => void;
   proyectos: ProyectoVenta[];
   onGuardarHorasReales?: (proyecto: ProyectoVenta, procesosReales: any[]) => Promise<void> | void;
+  // Captura de piezas/procesos para proyectos DIRECTOS (urgencia/stock) —
+  // no tienen cotización de origen, las piezas nacen aquí en Producción
+  onActualizarPiezasProyecto?: (id: string, piezas: any[]) => Promise<boolean> | void;
 }
 
 export function ProduccionView({
   onVolver,
   proyectos,
   onGuardarHorasReales,
+  onActualizarPiezasProyecto,
 }: ProduccionViewProps) {
   const [proyectoExpandido, setProyectoExpandido] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -434,6 +439,15 @@ export function ProduccionView({
                   {/* Detalle expandido: piezas con material y procesos de la cotización */}
                   {expandido && (
                     <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
+                      {/* Proyecto directo (urgencia/stock): las piezas y
+                          procesos se capturan AQUÍ en Producción, conforme
+                          se va trabajando — no hay cotización de origen */}
+                      {proyecto.tipoOrigen && proyecto.tipoOrigen !== 'cotizacion' && onActualizarPiezasProyecto && (
+                        <PiezasDirectasEditor
+                          piezas={proyecto.piezas || []}
+                          onGuardar={(piezas) => onActualizarPiezasProyecto(proyecto.id, piezas)}
+                        />
+                      )}
                       {piezas.length === 0 ? (
                         <p className="text-sm text-slate-400">
                           Este proyecto no tiene piezas detalladas.
