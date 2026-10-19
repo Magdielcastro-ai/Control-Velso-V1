@@ -13,6 +13,7 @@ import {
   Building2,
   Trash2,
   TrendingUp,
+  Factory,
   Truck,
   Receipt,
   Package,
@@ -38,8 +39,9 @@ interface ProyectoDetalleViewProps {
   proveedores?: Proveedor[];
   datosTallerOC?: DatosTallerOC;
   clientes?: { id: string; nombreEmpresa: string }[];
-  onMarcarFabricado?: (id: string) => void;
   onMarcarEntregado?: (id: string) => void;
+  // Regresar a fabricación — SOLO admin/superadmin (App lo limita)
+  onRegresarAFabricacion?: (id: string) => Promise<boolean> | void;
   onMarcarFacturado?: (id: string, numeroFactura: string, totalFacturado: number) => void;
   onEliminarProyecto?: (id: string) => void;
   onEliminarOC?: (id: string) => void;
@@ -81,7 +83,7 @@ export function ProyectoDetalleView({
   proveedores = [],
   datosTallerOC,
   clientes = [],
-  onMarcarFabricado,
+  onRegresarAFabricacion,
   onMarcarEntregado,
   onMarcarFacturado,
   onEliminarProyecto,
@@ -276,10 +278,22 @@ export function ProyectoDetalleView({
               </Button>
             )}
 
-            {proyecto.estado === 'en_fabricacion' && onMarcarFabricado && (
-              <Button size="sm" onClick={() => onMarcarFabricado(proyecto.id)} className="bg-amber-600 hover:bg-amber-700">
-                <Package className="w-4 h-4 mr-1" />
-                Marcar Fabricado
+            {/* Marcar TERMINADO se hace desde Producción — no aquí */}
+
+            {/* Regresar a fabricación: SOLO admin/superadmin */}
+            {proyecto.estado === 'fabricado' && onRegresarAFabricacion && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (confirm('¿Regresar este proyecto a EN FABRICACIÓN?\n\nLos tiempos podrán corregirse de nuevo en Producción.')) {
+                    onRegresarAFabricacion(proyecto.id);
+                  }
+                }}
+                className="border-blue-400 text-blue-700 hover:bg-blue-50"
+              >
+                <Factory className="w-4 h-4 mr-1" />
+                Regresar a Fabricación
               </Button>
             )}
 

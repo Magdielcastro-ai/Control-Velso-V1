@@ -731,6 +731,22 @@ export const useProyectosStore = () => {
     }
   }, [proyectos, updateProyectoSeguro]);
 
+  // Regresar un proyecto terminado a "en fabricación" — SOLO admin /
+  // superadmin desde Proyectos (el marcar terminado se hace en Producción)
+  const regresarAFabricacion = useCallback(async (id: string) => {
+    const exitoso = await updateProyectoSeguro(
+      id,
+      { estado: 'en_fabricacion', fecha_fabricado: null },
+      { estado: 'en_fabricacion' },
+      'Regresar a fabricación'
+    );
+    if (exitoso) {
+      setProyectos(prev => prev.map(p => p.id === id ? { ...p, estado: 'en_fabricacion', fechaFabricado: undefined } : p));
+      toast.success('Proyecto regresado a fabricación — los tiempos se pueden corregir');
+    }
+    return exitoso;
+  }, [updateProyectoSeguro]);
+
   const marcarFabricado = useCallback(async (id: string) => {
     const fechaHoy = new Date().toISOString().split('T')[0];
     const exitoso = await updateProyectoSeguro(
@@ -870,6 +886,7 @@ export const useProyectosStore = () => {
     vincularCotizacionAProyectoDirecto,
     registrarPoEnProyecto,
     venderStockParcial,
+    regresarAFabricacion,
     eliminarProyecto,
     marcarFabricado,
     marcarEntregado,
