@@ -94,7 +94,7 @@ export function ProyectoDetalleView({
   onRegistrarPo,
   onVenderStock,
 }: ProyectoDetalleViewProps) {
-  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin' || userRol === 'finanzas';
   const esDirecto = proyecto.tipoOrigen === 'urgencia' || proyecto.tipoOrigen === 'stock';
 
   // Diálogos

@@ -120,7 +120,7 @@ export function ProyectosView({
   const [directoClienteId, setDirectoClienteId] = useState('');
   const [creandoDirecto, setCreandoDirecto] = useState(false);
 
-  const isAdmin = userRol === 'admin' || userRol === 'superadmin';
+  const isAdmin = userRol === 'admin' || userRol === 'superadmin' || userRol === 'finanzas';
   const isVendedor = userRol === 'vendedor';
 
   // Cargar lista de vendedores (solo para admin)
