@@ -214,6 +214,7 @@ function App() {
     canEliminarOrdenesCompra,
     canViewPiezasCatalogo,
     canManagePiezasCatalogo,
+    canViewControlCodigosCostos,
   } = useAuth();
 
   // NUEVOS STORES VELSO OS v2
@@ -1371,7 +1372,7 @@ function App() {
                 ordenesCompra={ordenesCompra}
                 onVolver={handleVolverDeControlCodigos}
                 onGuardarDatosReales={guardarDatosReales}
-                soloTiempos={user.rol === 'produccion'}
+                soloTiempos={!canViewControlCodigosCostos()}
               />
             ) : null}
           </>
