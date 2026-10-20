@@ -18,6 +18,8 @@ import { procesosAplanados, materialesAplanados, minutosCotizados, costoCotizado
 interface ControlDeCodigosViewProps {
   proyecto: ProyectoVenta;
   onVolver: () => void;
+  // Rol producción: SOLO tiempos — sin costos ni utilidad
+  soloTiempos?: boolean;
   ordenesCompra?: { proyectoId?: string; iva: number; total: number; numeroOc: string }[];
   onGuardarDatosReales: (id: string, datos: {
     materialesReales?: MaterialProyecto[];
@@ -32,6 +34,7 @@ interface ControlDeCodigosViewProps {
 export function ControlDeCodigosView({ 
   proyecto, 
   onVolver,
+  soloTiempos = false,
   ordenesCompra = [],
   onGuardarDatosReales 
 }: ControlDeCodigosViewProps) {
@@ -222,6 +225,76 @@ export function ControlDeCodigosView({
     }
     onVolver();
   };
+
+  // ═══ ROL PRODUCCIÓN: vista SOLO TIEMPOS (sin costos ni utilidad) ═══
+  if (soloTiempos) {
+    const formatearMin = (min: number) => {
+      const h = Math.floor(min / 60);
+      const m = Math.round(min % 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <Button variant="outline" onClick={onVolver} className="border-slate-300 w-fit">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver a Proyectos
+          </Button>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-900">Control de Tiempos</h2>
+            <p className="text-slate-500">{proyecto.codigoProyecto} · {proyecto.proyectoNombre}</p>
+          </div>
+        </div>
+
+        <Card className="border-slate-200">
+          <CardContent className="p-4">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Tiempos por pieza y proceso (cotizado vs real)
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="text-left p-2 font-semibold text-slate-700 border-b-2 border-slate-300">Pieza</th>
+                    <th className="text-left p-2 font-semibold text-slate-700 border-b-2 border-slate-300">Proceso</th>
+                    <th className="text-right p-2 font-semibold text-slate-700 border-b-2 border-slate-300">Cotizado</th>
+                    <th className="text-right p-2 font-semibold text-slate-700 border-b-2 border-slate-300">Real</th>
+                    <th className="text-right p-2 font-semibold text-slate-700 border-b-2 border-slate-300">Diferencia</th>
+                    <th className="text-left p-2 font-semibold text-slate-700 border-b-2 border-slate-300">Operador</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {procesosCot.map((proc) => {
+                    const real = buscarReal(proyecto.procesosReales, proc);
+                    const minReal = real?.tiempoMinutosReal != null ? Number(real.tiempoMinutosReal) : null;
+                    const dif = minReal != null ? minReal - proc.tiempoMinutosCotizado : null;
+                    return (
+                      <tr key={proc.captureId || proc.id} className="border-b border-slate-200">
+                        <td className="p-2 text-slate-600">{proc.piezaNombre || 'General'}</td>
+                        <td className="p-2 font-medium text-slate-800">{proc.nombre}</td>
+                        <td className="p-2 text-right">{formatearMin(proc.tiempoMinutosCotizado)}</td>
+                        <td className="p-2 text-right font-medium">
+                          {minReal != null ? formatearMin(minReal) : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className={`p-2 text-right font-medium ${dif == null ? 'text-slate-400' : dif > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {dif != null ? `${dif > 0 ? '+' : ''}${formatearMin(Math.abs(dif))}` : '—'}
+                        </td>
+                        <td className="p-2 text-slate-600">{real?.operadorNombre || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {procesosCot.length === 0 && (
+              <p className="text-sm text-slate-500 py-4 text-center">Este proyecto no tiene procesos registrados.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

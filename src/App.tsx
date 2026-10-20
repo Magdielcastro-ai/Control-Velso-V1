@@ -123,6 +123,7 @@ function UserHeader({ user, onLogout, alertasCount, pendientesCount }: {
       case 'admin': return 'bg-purple-600';
       case 'vendedor': return 'bg-blue-600';
       case 'produccion': return 'bg-green-600';
+      case 'finanzas': return 'bg-yellow-600';
       default: return 'bg-slate-600';
     }
   };
@@ -132,6 +133,7 @@ function UserHeader({ user, onLogout, alertasCount, pendientesCount }: {
       case 'superadmin': return 'Super Admin';
       case 'admin': return 'Administrador';
       case 'vendedor': return 'Vendedor';
+      case 'finanzas': return 'Finanzas';
       case 'produccion': return 'Producción';
       default: return rol;
     }
@@ -1321,7 +1323,7 @@ function App() {
                     }
                   : { nombre: 'Soluciones Integrales Velso' }
               }
-              onRegresarAFabricacion={(user.rol === 'admin' || user.rol === 'superadmin') ? regresarAFabricacion : undefined}
+              onRegresarAFabricacion={['admin', 'superadmin', 'finanzas'].includes(user.rol) ? regresarAFabricacion : undefined}
               onMarcarEntregado={canUpdateProyectoEstado('entregado') ? handleMarcarEntregado : undefined}
               onMarcarFacturado={canUpdateProyectoEstado('facturado') ? handleMarcarFacturado : undefined}
               onEliminarProyecto={canDeleteProyectos() ? handleEliminarProyecto : undefined}
@@ -1369,6 +1371,7 @@ function App() {
                 ordenesCompra={ordenesCompra}
                 onVolver={handleVolverDeControlCodigos}
                 onGuardarDatosReales={guardarDatosReales}
+                soloTiempos={user.rol === 'produccion'}
               />
             ) : null}
           </>

@@ -203,7 +203,7 @@ export function useAuth() {
   }, [loadUserProfile, user]);
 
   const isAdmin = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const isSuperAdmin = useCallback(() => {
@@ -228,12 +228,12 @@ export function useAuth() {
 
   const canCreateCotizacion = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+    return ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol);
   }, [user]);
 
   const canEditCotizacion = useCallback((cotizacionUserId?: string) => {
     if (!user) return false;
-    if (user.rol === 'admin' || user.rol === 'superadmin') return true;
+    if (['admin', 'superadmin', 'finanzas'].includes(user.rol)) return true;
     if (user.rol === 'vendedor') {
       return !cotizacionUserId || cotizacionUserId === user.id;
     }
@@ -245,7 +245,7 @@ export function useAuth() {
   }, [user]);
 
   const canViewAllProyectos = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const canViewOwnProyectos = useCallback(() => {
@@ -254,12 +254,12 @@ export function useAuth() {
 
   const canConvertirAVenta = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+    return ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol);
   }, [user]);
 
   const canUpdateProyectoEstado = useCallback((nuevoEstado?: string) => {
     if (!user) return false;
-    if (user.rol === 'admin' || user.rol === 'superadmin') return true;
+    if (['admin', 'superadmin', 'finanzas'].includes(user.rol)) return true;
     if (user.rol === 'produccion') {
       return nuevoEstado === 'fabricado';
     }
@@ -271,31 +271,31 @@ export function useAuth() {
 
   // Dashboard consolidado: SOLO admin y superadmin
   const canViewDashboard = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   // Mantenido por compatibilidad: el dashboard de producción se fusionó
   // en el dashboard consolidado (solo admin)
   const canViewProduccionDashboard = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const canViewControlCodigos = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'produccion'].includes(user.rol);
+    return ['admin', 'superadmin', 'produccion', 'finanzas'].includes(user.rol);
   }, [user]);
 
   const canManageClientes = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor'].includes(user.rol);
+    return ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol);
   }, [user]);
 
   const canDeleteClientes = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const canManageTalleres = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const canViewTalleres = useCallback(() => {
@@ -304,7 +304,7 @@ export function useAuth() {
   }, [user]);
 
   const canManageMateriales = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const canViewMateriales = useCallback(() => {
@@ -313,7 +313,7 @@ export function useAuth() {
   }, [user]);
 
   const canManageProcesos = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   const canViewProcesos = useCallback(() => {
@@ -328,7 +328,7 @@ export function useAuth() {
 
   // Órdenes de compra: crear solo admin/superadmin; autorizar solo finanzas/superadmin
   const canCrearOrdenesCompra = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   // Eliminar OCs: solo superadmin o finanzas (la cascada limpia el proyecto)
@@ -347,7 +347,7 @@ export function useAuth() {
   }, [user]);
 
   const canManagePiezasCatalogo = useCallback(() => {
-    return user?.rol === 'admin' || user?.rol === 'superadmin';
+    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
   }, [user]);
 
   return {
