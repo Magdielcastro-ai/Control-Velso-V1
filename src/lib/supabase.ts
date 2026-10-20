@@ -31,6 +31,8 @@ export interface PerfilUsuario {
   rol: UserRole;
   activo: boolean;
   created_at: string;
+  // Overrides de permisos por usuario (checkboxes del superadmin)
+  permisos?: Record<string, boolean>;
 }
 
 export interface CotizacionDB {
@@ -370,6 +372,17 @@ export async function updateUserRol(userId: string, rol: UserRole) {
   const { error } = await supabase
     .from('perfiles')
     .update({ rol })
+    .eq('id', userId);
+
+  if (error) throw error;
+  perfilCache.delete(userId);
+}
+
+// Guardar los overrides de permisos de un usuario (checkboxes del superadmin)
+export async function updateUserPermisos(userId: string, permisos: Record<string, boolean>) {
+  const { error } = await supabase
+    .from('perfiles')
+    .update({ permisos })
     .eq('id', userId);
 
   if (error) throw error;

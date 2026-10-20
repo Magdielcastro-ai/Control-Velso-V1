@@ -9,6 +9,9 @@ export interface AuthUser {
   nombre: string;
   rol: UserRole;
   activo: boolean;
+  // Overrides de permisos por usuario (checkboxes del superadmin).
+  // true/false explícito gana sobre el default del rol; ausente = default.
+  permisos?: Record<string, boolean>;
 }
 
 export function useAuth() {
@@ -46,6 +49,7 @@ export function useAuth() {
           nombre: perfil.nombre,
           rol: perfil.rol as UserRole,
           activo: perfil.activo,
+          permisos: perfil.permisos || {},
         };
         lastUserId.current = userId;
         return authUser;
@@ -218,21 +222,37 @@ export function useAuth() {
     return user?.rol === 'produccion';
   }, [user]);
 
-  const canManageUsers = useCallback(() => {
-    return user?.rol === 'superadmin' || user?.rol === 'admin';
+  // ═══ RESOLVER DE PERMISOS ═══
+  // Permiso efectivo = override por usuario (perfiles.permisos, checkbox del
+  // superadmin) si existe; si no, el default del rol.
+  const tienePermiso = useCallback((clave: string, defaultRol: boolean): boolean => {
+    if (!user) return false;
+    const overrides = user.permisos || {};
+    if (overrides[clave] !== undefined) return overrides[clave];
+    return defaultRol;
   }, [user]);
+
+  const esAdminLike = () => ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
+
+  const canManageUsers = useCallback(() => {
+    return tienePermiso('adminUsuarios', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canCreateUsers = useCallback(() => {
     return user?.rol === 'superadmin';
   }, [user]);
 
+  // Cotizaciones: override 'cotizaciones' gana; default admin/finanzas/
+  // superadmin, y vendedor solo las suyas
   const canCreateCotizacion = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol);
-  }, [user]);
+    return tienePermiso('cotizaciones', ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol));
+  }, [user, tienePermiso]);
 
   const canEditCotizacion = useCallback((cotizacionUserId?: string) => {
     if (!user) return false;
+    const overrides = user.permisos || {};
+    if (overrides['cotizaciones'] !== undefined) return overrides['cotizaciones'];
     if (['admin', 'superadmin', 'finanzas'].includes(user.rol)) return true;
     if (user.rol === 'vendedor') {
       return !cotizacionUserId || cotizacionUserId === user.id;
@@ -245,8 +265,8 @@ export function useAuth() {
   }, [user]);
 
   const canViewAllProyectos = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('proyectosTodos', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canViewOwnProyectos = useCallback(() => {
     return user?.rol === 'vendedor';
@@ -254,12 +274,12 @@ export function useAuth() {
 
   const canConvertirAVenta = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol);
-  }, [user]);
+    return tienePermiso('convertirProyecto', ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol));
+  }, [user, tienePermiso]);
 
   const canUpdateProyectoEstado = useCallback((nuevoEstado?: string) => {
     if (!user) return false;
-    if (['admin', 'superadmin', 'finanzas'].includes(user.rol)) return true;
+    if (esAdminLike()) return true;
     if (user.rol === 'produccion') {
       return nuevoEstado === 'fabricado';
     }
@@ -269,34 +289,40 @@ export function useAuth() {
     return false;
   }, [user]);
 
-  // Dashboard consolidado: SOLO admin y superadmin
+  // Dashboard consolidado: admin, superadmin y finanzas (o checkbox)
   const canViewDashboard = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('dashboard', esAdminLike());
+  }, [user, tienePermiso]);
 
   // Mantenido por compatibilidad: el dashboard de producción se fusionó
   // en el dashboard consolidado (solo admin)
   const canViewProduccionDashboard = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('dashboard', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canViewControlCodigos = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'produccion', 'finanzas'].includes(user.rol);
-  }, [user]);
+    return tienePermiso('controlCodigos', ['admin', 'superadmin', 'produccion', 'finanzas'].includes(user.rol));
+  }, [user, tienePermiso]);
+
+  // Ver COSTOS y utilidad en Control de Códigos: producción por default
+  // solo ve tiempos; el superadmin puede activarle este permiso
+  const canViewControlCodigosCostos = useCallback(() => {
+    return tienePermiso('controlCodigosCostos', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canManageClientes = useCallback(() => {
     if (!user) return false;
-    return ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol);
-  }, [user]);
+    return tienePermiso('clientes', ['admin', 'superadmin', 'vendedor', 'finanzas'].includes(user.rol));
+  }, [user, tienePermiso]);
 
   const canDeleteClientes = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('eliminarClientes', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canManageTalleres = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('talleres', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canViewTalleres = useCallback(() => {
     if (!user) return false;
@@ -304,8 +330,8 @@ export function useAuth() {
   }, [user]);
 
   const canManageMateriales = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('catalogos', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canViewMateriales = useCallback(() => {
     if (!user) return false;
@@ -313,8 +339,8 @@ export function useAuth() {
   }, [user]);
 
   const canManageProcesos = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('catalogos', esAdminLike());
+  }, [user, tienePermiso]);
 
   const canViewProcesos = useCallback(() => {
     if (!user) return false;
@@ -322,24 +348,22 @@ export function useAuth() {
   }, [user]);
 
   const canDeleteProyectos = useCallback(() => {
-    // Eliminar proyectos es solo para superadmin
-    return user?.rol === 'superadmin';
-  }, [user]);
+    // Eliminar proyectos: solo superadmin por default (checkbox puede darlo)
+    return tienePermiso('eliminarProyectos', user?.rol === 'superadmin');
+  }, [user, tienePermiso]);
 
-  // Órdenes de compra: crear solo admin/superadmin; autorizar solo finanzas/superadmin
+  // Órdenes de compra: crear (admin+); autorizar/eliminar (finanzas, superadmin)
   const canCrearOrdenesCompra = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('crearOC', esAdminLike());
+  }, [user, tienePermiso]);
 
-  // Eliminar OCs: solo superadmin o finanzas (la cascada limpia el proyecto)
   const canAutorizarOrdenesCompra = useCallback(() => {
-    return user?.rol === 'finanzas' || user?.rol === 'superadmin';
-  }, [user]);
+    return tienePermiso('autorizarOC', user?.rol === 'finanzas' || user?.rol === 'superadmin');
+  }, [user, tienePermiso]);
 
-  // Eliminar OCs: solo superadmin o finanzas (la cascada limpia el proyecto)
   const canEliminarOrdenesCompra = useCallback(() => {
-    return user?.rol === 'superadmin' || user?.rol === 'finanzas';
-  }, [user]);
+    return tienePermiso('eliminarOC', user?.rol === 'superadmin' || user?.rol === 'finanzas');
+  }, [user, tienePermiso]);
 
   const canViewPiezasCatalogo = useCallback(() => {
     if (!user) return false;
@@ -347,8 +371,8 @@ export function useAuth() {
   }, [user]);
 
   const canManagePiezasCatalogo = useCallback(() => {
-    return ['admin', 'superadmin', 'finanzas'].includes(user?.rol || '');
-  }, [user]);
+    return tienePermiso('catalogos', esAdminLike());
+  }, [user, tienePermiso]);
 
   return {
     user,
@@ -388,5 +412,7 @@ export function useAuth() {
     canEliminarOrdenesCompra,
     canViewPiezasCatalogo,
     canManagePiezasCatalogo,
+    canViewControlCodigosCostos,
+    tienePermiso,
   };
 }

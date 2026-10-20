@@ -21,7 +21,7 @@ import {
   Crown,
   DollarSign
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, updateUserPermisos } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface UsuarioConEmail {
@@ -31,12 +31,43 @@ interface UsuarioConEmail {
   rol: 'superadmin' | 'admin' | 'vendedor' | 'produccion' | 'finanzas';
   activo: boolean;
   created_at: string;
+  permisos?: Record<string, boolean>;
 }
 
 interface AdminUsuariosViewProps {
   onVolver: () => void;
   userRol?: string;
 }
+
+// Catálogo de permisos configurables por usuario (checkboxes del superadmin).
+// Cada checkbox marcado/desmarcado es un OVERRIDE explícito del default del rol.
+const PERMISOS_CATALOGO: { key: string; label: string; descripcion: string }[] = [
+  { key: 'dashboard', label: 'Ver Dashboard', descripcion: 'Métricas y números del mes' },
+  { key: 'cotizaciones', label: 'Crear y editar cotizaciones', descripcion: 'Wizard de cotización completo' },
+  { key: 'convertirProyecto', label: 'Convertir a proyecto', descripcion: 'Crear proyectos desde cotización o directos (urgencia/stock)' },
+  { key: 'proyectosTodos', label: 'Ver todos los proyectos', descripcion: 'Si no, solo ve los proyectos que creó' },
+  { key: 'eliminarProyectos', label: 'Eliminar proyectos', descripcion: 'Cascada completa (OCs, piezas, registros)' },
+  { key: 'controlCodigos', label: 'Ver Control de Códigos', descripcion: 'Comparativa cotizado vs real' },
+  { key: 'controlCodigosCostos', label: 'Ver costos y utilidad', descripcion: 'En Control de Códigos; sin esto solo ve tiempos' },
+  { key: 'clientes', label: 'Gestionar clientes', descripcion: 'Agregar y editar clientes' },
+  { key: 'eliminarClientes', label: 'Eliminar clientes', descripcion: 'Borrar clientes del catálogo' },
+  { key: 'catalogos', label: 'Gestionar catálogos', descripcion: 'Materiales, procesos y piezas' },
+  { key: 'talleres', label: 'Gestionar talleres', descripcion: 'Datos del taller para documentos' },
+  { key: 'crearOC', label: 'Crear órdenes de compra', descripcion: 'Nuevas OCs a proveedores' },
+  { key: 'autorizarOC', label: 'Autorizar órdenes de compra', descripcion: 'Firma de finanzas para enviar al proveedor' },
+  { key: 'eliminarOC', label: 'Eliminar órdenes de compra', descripcion: 'Cascada: también se quita del proyecto' },
+  { key: 'adminUsuarios', label: 'Administrar usuarios', descripcion: 'Ver y editar usuarios (crear es solo superadmin)' },
+];
+
+// Defaults por rol (deben coincidir con useAuth)
+const DEFAULT_TRUE = ['dashboard', 'cotizaciones', 'convertirProyecto', 'proyectosTodos', 'controlCodigos', 'controlCodigosCostos', 'clientes', 'eliminarClientes', 'catalogos', 'talleres', 'crearOC', 'adminUsuarios'];
+const DEFAULTS_POR_ROL: Record<string, Record<string, boolean>> = {
+  superadmin: Object.fromEntries(PERMISOS_CATALOGO.map(p => [p.key, true])),
+  admin: Object.fromEntries(PERMISOS_CATALOGO.map(p => [p.key, DEFAULT_TRUE.includes(p.key)])),
+  finanzas: Object.fromEntries(PERMISOS_CATALOGO.map(p => [p.key, DEFAULT_TRUE.includes(p.key) || ['autorizarOC', 'eliminarOC'].includes(p.key)])),
+  vendedor: Object.fromEntries(PERMISOS_CATALOGO.map(p => [p.key, ['cotizaciones', 'convertirProyecto', 'clientes'].includes(p.key)])),
+  produccion: Object.fromEntries(PERMISOS_CATALOGO.map(p => [p.key, ['controlCodigos'].includes(p.key)])),
+};
 
 const ROLES = [
   { value: 'superadmin' as const, label: 'Super Admin', icon: Crown, color: 'bg-red-600' },
@@ -57,6 +88,10 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rol, setRol] = useState<'superadmin' | 'admin' | 'vendedor' | 'produccion' | 'finanzas'>('vendedor');
+  // Permisos por usuario (checkboxes — solo superadmin)
+  const [permisosUsuario, setPermisosUsuario] = useState<UsuarioConEmail | null>(null);
+  const [permisosDraft, setPermisosDraft] = useState<Record<string, boolean>>({});
+  const [guardandoPermisos, setGuardandoPermisos] = useState(false);
 
   // Determinar permisos basados en el rol
   const isSuperAdmin = userRol === 'superadmin';
@@ -95,6 +130,7 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
         rol: perfil.rol,
         activo: perfil.activo,
         created_at: perfil.created_at,
+        permisos: perfil.permisos || {},
       }));
 
       console.log('[cargarUsuarios] Usuarios:', usuariosConEmail);
@@ -249,6 +285,42 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
     return ROLES.find(r => r.value === rolValue) || ROLES[2];
   };
 
+  // ═══ PERMISOS POR USUARIO (solo superadmin) ═══
+  const abrirPermisos = (u: UsuarioConEmail) => {
+    setPermisosUsuario(u);
+    setPermisosDraft({ ...(u.permisos || {}) });
+  };
+
+  const permisoEfectivo = (key: string): boolean => {
+    if (!permisosUsuario) return false;
+    return permisosDraft[key] ?? DEFAULTS_POR_ROL[permisosUsuario.rol]?.[key] ?? false;
+  };
+
+  const togglePermiso = (key: string) => {
+    const efectivo = permisoEfectivo(key);
+    setPermisosDraft(prev => ({ ...prev, [key]: !efectivo }));
+  };
+
+  const handleGuardarPermisos = async () => {
+    if (!permisosUsuario) return;
+    setGuardandoPermisos(true);
+    try {
+      await updateUserPermisos(permisosUsuario.id, permisosDraft);
+      toast.success(`Permisos de ${permisosUsuario.nombre} actualizados — aplican en su próximo inicio de sesión`);
+      setPermisosUsuario(null);
+      await cargarUsuarios();
+    } catch (e: any) {
+      toast.error('Error guardando permisos: ' + e.message);
+    } finally {
+      setGuardandoPermisos(false);
+    }
+  };
+
+  const handleRestablecerPermisos = () => {
+    // Vaciar overrides = vuelve a los defaults del rol
+    setPermisosDraft({});
+  };
+
   // Filtrar roles disponibles según el rol del usuario actual
   const rolesDisponibles = isSuperAdmin 
     ? ROLES 
@@ -401,6 +473,20 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Botón permisos - SOLO Superadmin */}
+                      {isSuperAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => abrirPermisos(usuario)}
+                          className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                          title="Permisos individuales"
+                        >
+                          <UserCog className="w-4 h-4 mr-1" />
+                          Permisos
+                        </Button>
+                      )}
+
                       {/* Select de rol - solo Superadmin puede cambiar */}
                       <Select
                         value={usuario.rol}
@@ -493,6 +579,70 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
           </div>
         </CardContent>
       </Card>
+
+      {/* Diálogo: permisos individuales del usuario (solo superadmin) */}
+      <Dialog open={permisosUsuario !== null} onOpenChange={(open) => { if (!open) setPermisosUsuario(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Permisos de {permisosUsuario?.nombre}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-xs text-slate-500">
+              Rol base: <span className="font-semibold">{getRolConfig(permisosUsuario?.rol || '').label}</span>.
+              Marca o desmarca para dar permisos extra o quitar los del rol.
+            </p>
+            <div className="space-y-1 border rounded-lg divide-y">
+              {PERMISOS_CATALOGO.map((permiso) => {
+                const efectivo = permisoEfectivo(permiso.key);
+                const esOverride = permisosDraft[permiso.key] !== undefined;
+                return (
+                  <label
+                    key={permiso.key}
+                    className="flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={efectivo}
+                      onChange={() => togglePermiso(permiso.key)}
+                      className="mt-0.5 rounded border-slate-300"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800">
+                        {permiso.label}
+                        {esOverride && (
+                          <span className="ml-2 text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                            personalizado
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-slate-400">{permiso.descripcion}</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRestablecerPermisos}
+                className="border-slate-300"
+                title="Quita todos los ajustes personalizados y vuelve a los permisos del rol"
+              >
+                Restablecer al rol
+              </Button>
+              <Button
+                onClick={handleGuardarPermisos}
+                disabled={guardandoPermisos}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                {guardandoPermisos ? 'Guardando…' : 'Guardar permisos'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
