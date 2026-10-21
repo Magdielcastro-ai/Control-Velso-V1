@@ -83,28 +83,47 @@ export const useProveedoresStore = () => {
         return null;
       }
 
-      // Número consecutivo simple: PROV-001, PROV-002...
-      const siguiente = proveedores.length + 1;
-      const numero = `PROV-${String(siguiente).padStart(3, '0')}`;
+      // Número consecutivo desde el MÁXIMO en la base (no por conteo local:
+      // con lista desactualizada o borrados, el conteo colisionaba — 409)
+      const { data: existentes } = await supabase.from('proveedores').select('numero');
+      const maxNum = (existentes || []).reduce((max: number, r: any) => {
+        const n = parseInt(String(r.numero || '').replace(/\D/g, ''), 10);
+        return isNaN(n) ? max : Math.max(max, n);
+      }, 0);
 
-      const insertData = {
-        usuario_id: userData.user.id,
-        numero,
-        nombre: datos.nombre.trim(),
-        tipo: datos.tipo?.trim() || null,
-        domicilio: datos.domicilio?.trim() || null,
-        telefono: datos.telefono?.trim() || null,
-        email: datos.email?.trim() || null,
-        contacto: datos.contacto?.trim() || null,
-        dias_credito: Number(datos.diasCredito) || 0,
-        moneda: datos.moneda || 'MXN',
-      };
+      let intentos = 0;
+      let data: any = null;
+      let error: any = null;
+      while (intentos < 3 && !data) {
+        const numero = `PROV-${String(maxNum + 1 + intentos).padStart(3, '0')}`;
+        const insertData = {
+          usuario_id: userData.user.id,
+          numero,
+          nombre: datos.nombre.trim(),
+          tipo: datos.tipo?.trim() || null,
+          domicilio: datos.domicilio?.trim() || null,
+          telefono: datos.telefono?.trim() || null,
+          email: datos.email?.trim() || null,
+          contacto: datos.contacto?.trim() || null,
+          dias_credito: Number(datos.diasCredito) || 0,
+          moneda: datos.moneda || 'MXN',
+        };
 
-      const { data, error } = await supabase
-        .from('proveedores')
-        .insert([insertData])
-        .select()
-        .single();
+        const res = await supabase
+          .from('proveedores')
+          .insert([insertData])
+          .select()
+          .single();
+        data = res.data;
+        error = res.error;
+        // 409 / duplicate key → probar el siguiente consecutivo
+        if (error && (error.code === '23505' || error.message?.includes('duplicate'))) {
+          data = null;
+          intentos++;
+        } else {
+          break;
+        }
+      }
 
       if (error) {
         console.error('[useProveedoresStore] ERROR INSERT:', error);
