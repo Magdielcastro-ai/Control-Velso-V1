@@ -378,6 +378,11 @@ export async function updateUserRol(userId: string, rol: UserRole) {
   perfilCache.delete(userId);
 }
 
+// Invalidar el caché de perfil (tras cambios directos de rol/activo/permisos)
+export function invalidarPerfilCache(userId: string) {
+  perfilCache.delete(userId);
+}
+
 // Guardar los overrides de permisos de un usuario (checkboxes del superadmin)
 export async function updateUserPermisos(userId: string, permisos: Record<string, boolean>) {
   const { error } = await supabase

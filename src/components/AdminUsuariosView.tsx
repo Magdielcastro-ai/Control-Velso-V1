@@ -21,7 +21,7 @@ import {
   Crown,
   DollarSign
 } from 'lucide-react';
-import { supabase, updateUserPermisos } from '@/lib/supabase';
+import { supabase, updateUserPermisos, invalidarPerfilCache } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface UsuarioConEmail {
@@ -242,6 +242,13 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
         throw error;
       }
 
+      // RLS puede bloquear en silencio (0 filas, sin error) — verificar
+      if (!data || data.length === 0) {
+        toast.error('No se pudo cambiar el rol: sin permiso en la base de datos');
+        return;
+      }
+
+      invalidarPerfilCache(userId);
       console.log('[handleCambiarRol] Éxito:', data);
       toast.success('Rol actualizado correctamente');
       await cargarUsuarios();
@@ -272,6 +279,12 @@ export function AdminUsuariosView({ onVolver, userRol }: AdminUsuariosViewProps)
         throw error;
       }
 
+      if (!data || data.length === 0) {
+        toast.error('No se pudo cambiar el estado: sin permiso en la base de datos');
+        return;
+      }
+
+      invalidarPerfilCache(userId);
       console.log('[handleActivarDesactivar] Éxito:', data);
       toast.success(activo ? 'Usuario desactivado' : 'Usuario activado');
       await cargarUsuarios();
