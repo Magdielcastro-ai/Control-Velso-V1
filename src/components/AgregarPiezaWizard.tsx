@@ -13,6 +13,9 @@ interface AgregarPiezaWizardProps {
   onOpenChange: (open: boolean) => void;
   catalogoMateriales: CatalogoMaterial[];
   onGuardar: (pieza: any) => Promise<void> | void;
+  // Si se captura un material nuevo (nombre + costo), se guarda también al
+  // catálogo para que se autoalimente y aparezca en próximas piezas
+  onAgregarMaterialACatalogo?: (material: any) => Promise<any> | void;
 }
 
 interface ProcesoDraft {
@@ -25,15 +28,20 @@ interface ProcesoDraft {
 }
 
 // Wizard "Agregar Pieza" para proyectos directos en Producción:
-// 1) nombre + cantidad · 2) material del catálogo · 3) procesos internos
-// y externos con sus tiempos. Al guardar, la pieza entra al proyecto con
-// procesos y tiempos incluidos (los tiempos se pueden corregir después,
-// antes de marcar el proyecto como fabricado).
-export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onGuardar }: AgregarPiezaWizardProps) {
+// 1) nombre + cantidad · 2) material del catálogo O nuevo con su costo ·
+// 3) procesos internos y externos con sus tiempos.
+// Se puede guardar SIN procesos: la hoja viajera sale en blanco para
+// llenarla a mano en piso y cargar los datos después.
+export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onGuardar, onAgregarMaterialACatalogo }: AgregarPiezaWizardProps) {
   const [paso, setPaso] = useState(1);
   const [nombre, setNombre] = useState('');
   const [cantidad, setCantidad] = useState(1);
   const [materialId, setMaterialId] = useState('');
+  // Material nuevo capturado a mano (nombre + costo)
+  const [materialNuevo, setMaterialNuevo] = useState(false);
+  const [nuevoMatNombre, setNuevoMatNombre] = useState('');
+  const [nuevoMatTipo, setNuevoMatTipo] = useState('');
+  const [nuevoMatCosto, setNuevoMatCosto] = useState('');
   const [procesos, setProcesos] = useState<ProcesoDraft[]>([]);
   const [externoNombre, setExternoNombre] = useState('');
   const [externoMinutos, setExternoMinutos] = useState('');
@@ -45,6 +53,10 @@ export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onG
     setNombre('');
     setCantidad(1);
     setMaterialId('');
+    setMaterialNuevo(false);
+    setNuevoMatNombre('');
+    setNuevoMatTipo('');
+    setNuevoMatCosto('');
     setProcesos([]);
     setExternoNombre('');
     setExternoMinutos('');
@@ -72,8 +84,52 @@ export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onG
   };
 
   const handleGuardar = async () => {
-    const materialCat = catalogoMateriales.find(m => m.id === materialId);
     const cant = Math.max(1, cantidad);
+
+    // Material: del catálogo o capturado nuevo con su costo
+    let material: any = null;
+    if (materialNuevo && nuevoMatNombre.trim()) {
+      const costoUnitario = Number(nuevoMatCosto) || 0;
+      material = {
+        id: crypto.randomUUID(),
+        nombre: nuevoMatNombre.trim(),
+        tipo: nuevoMatTipo.trim() || 'Otro',
+        forma: 'otro',
+        unidadMedida: 'mm',
+        cantidad: 1,
+        unidad: 'pieza',
+        costoUnitario,
+        margenPorcentaje: 30,
+        costoTotal: costoUnitario,
+      };
+      // Autoalimentar el catálogo con el material nuevo
+      if (onAgregarMaterialACatalogo) {
+        try {
+          await onAgregarMaterialACatalogo({
+            nombre: material.nombre,
+            tipo: material.tipo,
+            forma: material.forma,
+            unidadMedida: material.unidadMedida,
+            costoUnitario,
+            unidadCosto: 'pieza',
+          });
+        } catch (e) {
+          console.warn('[Wizard] No se pudo guardar el material al catálogo:', e);
+        }
+      }
+    } else {
+      const materialCat = catalogoMateriales.find(m => m.id === materialId);
+      if (materialCat) {
+        material = {
+          ...materialCat,
+          id: crypto.randomUUID(),
+          cantidad: 1,
+          unidad: materialCat.unidadCosto,
+          margenPorcentaje: 30,
+          costoTotal: materialCat.costoUnitario,
+        };
+      }
+    }
 
     const procesosFinales = procesos.map(p => {
       if (p.tipo === 'externo') {
@@ -118,14 +174,7 @@ export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onG
       id: crypto.randomUUID(),
       nombre: nombre.trim(),
       cantidad: cant,
-      material: materialCat ? {
-        ...materialCat,
-        id: crypto.randomUUID(),
-        cantidad: 1,
-        unidad: materialCat.unidadCosto,
-        margenPorcentaje: 30,
-        costoTotal: materialCat.costoUnitario,
-      } : null,
+      material,
       procesos: procesosFinales,
       costosAdicionales: {},
       subtotalPieza: 0,
@@ -186,25 +235,83 @@ export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onG
 
         {paso === 2 && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Material (opcional, del catálogo)</Label>
-              <Select value={materialId || 'sin-material'} onValueChange={(v) => setMaterialId(v === 'sin-material' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sin-material">Sin material / se define después</SelectItem>
-                  {catalogoMateriales.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.nombre} — {m.tipo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-slate-400">
-                El material de la compra real se registra después con la orden de compra.
-              </p>
+            {/* Alternar: del catálogo o capturar material nuevo con su costo */}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={!materialNuevo ? 'default' : 'outline'}
+                onClick={() => setMaterialNuevo(false)}
+                className={!materialNuevo ? 'bg-blue-600' : 'border-slate-300'}
+              >
+                Del catálogo
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={materialNuevo ? 'default' : 'outline'}
+                onClick={() => setMaterialNuevo(true)}
+                className={materialNuevo ? 'bg-blue-600' : 'border-slate-300'}
+              >
+                Material nuevo (con costo)
+              </Button>
             </div>
+
+            {!materialNuevo ? (
+              <div className="space-y-2">
+                <Label>Material (opcional, del catálogo)</Label>
+                <Select value={materialId || 'sin-material'} onValueChange={(v) => setMaterialId(v === 'sin-material' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sin-material">Sin material / se define después</SelectItem>
+                    {catalogoMateriales.map(m => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.nombre} — {m.tipo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-400">
+                  El material de la compra real se registra después con la orden de compra.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Nombre del material *</Label>
+                  <Input
+                    value={nuevoMatNombre}
+                    onChange={(e) => setNuevoMatNombre(e.target.value)}
+                    placeholder="Ej: Bronce SAE 63 redondo 3in"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Tipo (opcional)</Label>
+                    <Input
+                      value={nuevoMatTipo}
+                      onChange={(e) => setNuevoMatTipo(e.target.value)}
+                      placeholder="Ej: Bronce"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Costo por pieza ($)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={nuevoMatCosto}
+                      onChange={(e) => setNuevoMatCosto(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Si ya tienes el costo, captúralo aquí. El material nuevo también se guarda en el catálogo para próximas piezas.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -316,7 +423,7 @@ export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onG
           ) : (
             <Button
               onClick={handleGuardar}
-              disabled={guardando || procesos.length === 0}
+              disabled={guardando}
               className="bg-green-600 hover:bg-green-700"
             >
               <Package className="w-4 h-4 mr-1" />
@@ -325,7 +432,9 @@ export function AgregarPiezaWizard({ open, onOpenChange, catalogoMateriales, onG
           )}
         </div>
         {paso === 3 && procesos.length === 0 && (
-          <p className="text-xs text-amber-600 text-center">Agrega al menos un proceso para guardar la pieza</p>
+          <p className="text-xs text-slate-400 text-center">
+            Sin procesos: la hoja viajera saldrá en blanco para llenarla a mano en piso y cargar los datos después.
+          </p>
         )}
       </DialogContent>
     </Dialog>

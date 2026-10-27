@@ -27,6 +27,8 @@ interface ProduccionProyectoViewProps {
   // Captura de piezas (proyectos directos) — wizard con material y procesos
   onActualizarPiezasProyecto?: (id: string, piezas: any[]) => Promise<boolean> | void;
   catalogoMateriales?: CatalogoMaterial[];
+  // Material nuevo capturado en el wizard → se guarda al catálogo
+  onAgregarMaterialACatalogo?: (material: any) => Promise<any> | void;
   // Marcar fabricado se hace DESDE Producción
   onMarcarFabricado?: (id: string) => void;
 }
@@ -53,6 +55,7 @@ export function ProduccionProyectoView({
   onGuardarHorasReales,
   onActualizarPiezasProyecto,
   catalogoMateriales = [],
+  onAgregarMaterialACatalogo,
   onMarcarFabricado,
 }: ProduccionProyectoViewProps) {
   const esDirecto = proyecto.tipoOrigen === 'urgencia' || proyecto.tipoOrigen === 'stock';
@@ -590,6 +593,7 @@ export function ProduccionProyectoView({
         onOpenChange={setWizardPieza}
         catalogoMateriales={catalogoMateriales}
         onGuardar={handleAgregarPieza}
+        onAgregarMaterialACatalogo={onAgregarMaterialACatalogo}
       />
 
       {/* Diálogo: editar procesos de una pieza existente */}
