@@ -1238,6 +1238,7 @@ function App() {
               onGuardarHorasReales={handleGuardarHorasProduccion}
               onActualizarPiezasProyecto={actualizarPiezasProyecto}
               catalogoMateriales={catalogo}
+              onAgregarMaterialACatalogo={agregarAlCatalogo}
               onMarcarFabricado={canUpdateProyectoEstado('fabricado') ? handleMarcarFabricado : undefined}
             />
           </>
