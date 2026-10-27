@@ -17,6 +17,7 @@ import type { ProyectoVenta } from '@/types/ventas';
 import { procesosAplanados, minutosCotizados, buscarReal } from '@/utils/proyectoDatos';
 import { HojaViajeraDocumento } from '@/components/HojaViajeraDocumento';
 import { AgregarPiezaWizard } from '@/components/AgregarPiezaWizard';
+import { EditarProcesosPiezaDialog } from '@/components/EditarProcesosPiezaDialog';
 import type { CatalogoMaterial } from '@/types/cotizacion';
 
 interface ProduccionProyectoViewProps {
@@ -63,6 +64,7 @@ export function ProduccionProyectoView({
   const [extrasEliminados, setExtrasEliminados] = useState<string[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [wizardPieza, setWizardPieza] = useState(false);
+  const [editandoPieza, setEditandoPieza] = useState<any | null>(null);
   const [impresion, setImpresion] = useState<any | null>(null);
 
   // Imprime la hoja viajera de una pieza (orden de producción)
@@ -253,6 +255,18 @@ export function ProduccionProyectoView({
     toast.success(`Pieza "${pieza.nombre}" agregada al proyecto`);
   };
 
+  // Guardar procesos editados de una pieza existente (urgencia/stock):
+  // agregar/quitar procesos y ajustar minutos conforme se fabrica. Los ids
+  // existentes se conservan para no perder las capturas reales
+  const handleGuardarProcesosPieza = async (pieza: any, procesos: any[]) => {
+    if (!onActualizarPiezasProyecto) return;
+    const nuevasPiezas = (proyecto.piezas || []).map((pz: any) =>
+      pz.id === pieza.id ? { ...pz, procesos } : pz
+    );
+    await onActualizarPiezasProyecto(proyecto.id, nuevasPiezas);
+    toast.success(`Procesos de "${pieza.nombre}" actualizados`);
+  };
+
   // Alerta del navegador si hay capturas sin guardar
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -353,6 +367,19 @@ export function ProduccionProyectoView({
                     <Badge variant="outline" className="text-slate-600">
                       {pieza.cantidad} pzas
                     </Badge>
+                    {/* Editar procesos de la pieza (urgencia/stock, en fabricación) */}
+                    {esDirecto && editable && onActualizarPiezasProyecto && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 border-blue-300 text-blue-700 hover:bg-blue-50 no-print"
+                        title="Agregar, quitar o ajustar procesos de esta pieza"
+                        onClick={() => setEditandoPieza(pieza)}
+                      >
+                        <Wrench className="w-3.5 h-3.5 mr-1" />
+                        Procesos
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -563,6 +590,16 @@ export function ProduccionProyectoView({
         onOpenChange={setWizardPieza}
         catalogoMateriales={catalogoMateriales}
         onGuardar={handleAgregarPieza}
+      />
+
+      {/* Diálogo: editar procesos de una pieza existente */}
+      <EditarProcesosPiezaDialog
+        pieza={editandoPieza}
+        open={editandoPieza !== null}
+        onOpenChange={(open) => { if (!open) setEditandoPieza(null); }}
+        onGuardar={async (procesos) => {
+          if (editandoPieza) await handleGuardarProcesosPieza(editandoPieza, procesos);
+        }}
       />
 
       {/* Documento de impresión: hoja viajera de la pieza seleccionada */}
