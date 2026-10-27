@@ -225,7 +225,8 @@ export function ProduccionProyectoView({
         costoPorHora: 0,
         costoManoObra: 0,
         costoTotalCotizado: 0,
-        costoTotalReal: Number(e.costo) || 0,
+        // En Producción solo se captura tiempo; el costo se asigna en Proyectos
+        costoTotalReal: 0,
       }));
 
     // Fusionar con lo ya guardado: no pisar procesos que no se tocaron
@@ -509,11 +510,13 @@ export function ProduccionProyectoView({
                   })}
                 </div>
 
-                {/* Herramientas / dispositivos extra de la pieza */}
+                {/* Herramientas / dispositivos extra de la pieza:
+                    en Producción SOLO se captura el TIEMPO — el costo se
+                    asigna después en la sección de Proyectos */}
                 {editable && (
                   <div className="border border-dashed border-slate-300 rounded-lg p-2 space-y-1.5">
                     <p className="text-xs font-semibold text-slate-500">
-                      Herramientas o dispositivos extra (suman al costo)
+                      Herramientas o dispositivos extra (solo tiempo; el costo se asigna en Proyectos)
                     </p>
                     {extrasDePieza(pieza).map((extra) => (
                       <div key={extra.id} className="flex items-center gap-2 flex-wrap">
@@ -530,14 +533,6 @@ export function ProduccionProyectoView({
                           value={extra.minutos}
                           onChange={(e) => actualizarExtra(pieza, extra.id, 'minutos', e.target.value)}
                           className="h-7 w-20 text-sm text-right"
-                        />
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="$ costo"
-                          value={extra.costo}
-                          onChange={(e) => actualizarExtra(pieza, extra.id, 'costo', e.target.value)}
-                          className="h-7 w-24 text-sm text-right"
                         />
                         <Button
                           variant="ghost"

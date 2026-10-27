@@ -144,16 +144,16 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
         </tbody>
       </table>
 
-      {/* Herramientas / dispositivos extra con su tiempo y costo */}
+      {/* Herramientas / dispositivos extra: en Producción solo TIEMPO;
+          el costo se asigna en la sección de Proyectos */}
       <p className="text-[10px] font-bold text-slate-600 mb-0.5">
-        HERRAMIENTAS O DISPOSITIVOS ESPECIALES (suman al costo)
+        HERRAMIENTAS O DISPOSITIVOS ESPECIALES (solo tiempo)
       </p>
       <table className="w-full text-[11px] border border-slate-300 mb-2">
         <thead>
           <tr className="bg-slate-600 text-white">
             <th className="px-2 py-1 text-left">HERRAMIENTA / DISPOSITIVO</th>
             <th className="px-2 py-1 text-center w-24">MIN UTILIZADOS</th>
-            <th className="px-2 py-1 text-center w-24">COSTO $</th>
           </tr>
         </thead>
         <tbody>
@@ -161,15 +161,11 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
             <tr key={e.id || idx} className="border-b border-slate-200">
               <td className="px-2 py-2 font-medium">{e.nombre}</td>
               <td className="px-2 py-2 text-center">{e.tiempoMinutosReal ?? ''}</td>
-              <td className="px-2 py-2 text-center">
-                {e.costoTotalReal ? `$${Number(e.costoTotalReal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : ''}
-              </td>
             </tr>
           ))}
           {/* Renglones en blanco para captura a mano */}
           {Array.from({ length: Math.max(0, 3 - extras.length) }).map((_, i) => (
             <tr key={`vacio-${i}`} className="border-b border-slate-200">
-              <td className="px-2 py-2" />
               <td className="px-2 py-2" />
               <td className="px-2 py-2" />
             </tr>
