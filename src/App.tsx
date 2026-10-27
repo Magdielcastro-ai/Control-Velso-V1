@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -593,6 +593,34 @@ function App() {
   const irADiagnostico = () => {
     setVistaActual('diagnostico');
   };
+
+  // ═══ REFRESCO ENTRE USUARIOS / AL NAVEGAR ═══
+  // Al cambiar de sección o entrar/salir de menús se releen los datos de
+  // Supabase: lo que otro usuario guardó (piezas, tiempos reales, OCs)
+  // aparece sin recargar la página. Debounce de 3s para no repetir.
+  const ultimoRefreshNavegacion = useRef(0);
+  useEffect(() => {
+    if (!user || !initialized) return;
+    const ahora = Date.now();
+    if (ahora - ultimoRefreshNavegacion.current < 3000) return;
+    ultimoRefreshNavegacion.current = ahora;
+    Promise.allSettled([
+      refrescarProyectos(),
+      refrescarCotizaciones(),
+      refrescarClientes(),
+      refrescarOrdenes(),
+    ]);
+  }, [vistaActual, user, initialized]);
+
+  // Polling ligero cada 60s: proyectos (incluye procesos_reales) y OCs,
+  // para que los cambios de OTROS usuarios lleguen también sin navegar
+  useEffect(() => {
+    if (!user || !initialized) return;
+    const id = setInterval(() => {
+      Promise.allSettled([refrescarProyectos(), refrescarOrdenes()]);
+    }, 60 * 1000);
+    return () => clearInterval(id);
+  }, [user, initialized]);
 
   // NUEVAS NAVEGACIONES VELSO OS v2
   const irAPendientes = () => setVistaActual('pendientes');
