@@ -368,7 +368,11 @@ export const useCotizacionStore = () => {
       tiempoMinutosPorPieza,
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
-      costoManoObraPorHora: tipoManoObraSeleccionada === 'mo_e' ? COSTOS_MANO_OBRA.mo_e : COSTOS_MANO_OBRA.mo_s,
+      // La tasa de MO solo existe si el proceso realmente la incluye;
+      // antes quedaba MO-S (191.19) por defecto y se sumaba a MO-E → 477.97
+      costoManoObraPorHora: incluyeManoObra
+        ? (tipoManoObraSeleccionada === 'mo_e' ? COSTOS_MANO_OBRA.mo_e : COSTOS_MANO_OBRA.mo_s)
+        : 0,
       costoManoObra,
       costoTotal,
       descripcion: descripcion || catalogoItem.descripcion,
@@ -455,11 +459,14 @@ export const useCotizacionStore = () => {
               descripcion: `$${costoPorPiezaBase.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
             };
           }
-          // Proceso de máquina: recalcular tiempo total y costo
+          // Proceso de máquina: recalcular tiempo total y costo.
+          // La MO solo suma si el proceso la incluye (si no, la tasa es 0
+          // aunque quedara guardada por el bug anterior)
           const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
           const tiempoHoras = tiempoMinutos / 60;
           const costoMaquina = tiempoHoras * proceso.costoPorHora;
-          const costoManoObra = tiempoHoras * (proceso.costoManoObraPorHora || 0);
+          const tasaMO = proceso.incluyeManoObra ? (proceso.costoManoObraPorHora || 0) : 0;
+          const costoManoObra = tiempoHoras * tasaMO;
           const costoTotal = costoMaquina + costoManoObra;
           return {
             ...proceso,
