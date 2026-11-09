@@ -443,60 +443,67 @@ export const useCotizacionStore = () => {
     recalcularTotalesRef.current = true;
 
     try {
+      const cotizarConTiempoExtra = !!c.proyecto.tiempoExtra;
+      const factorManoObra = cotizarConTiempoExtra ? 2 : 1;
       const piezasRecalculadas = c.piezas.map((pieza: PiezaCotizacion) => {
-        // Recalcular procesos cuando cambia la cantidad de piezas
+        // Recalcular procesos cuando cambia la cantidad de piezas.
+        // costoManoObra SIEMPRE conserva el valor regular: el factor extra
+        // se aplica solo a costoTotal para poder comparar y evitar duplicar
+        // el sobrecosto después en Producción.
         const procesosRecalculados = pieza.procesos.map((proceso: Proceso) => {
           if (proceso.tipo === 'otro') {
             // Proceso externo: costoTotalIngresado es el costo POR PIEZA base
-            // Aplicar margen de seguridad y multiplicar por cantidad
             const costoPorPiezaBase = proceso.costoTotalIngresado || 0;
             const margenSeguridad = proceso.margenPorcentaje || 30;
             const costoConMargenPorPieza = costoPorPiezaBase * (1 + margenSeguridad / 100);
             const costoTotal = costoConMargenPorPieza * pieza.cantidad;
             return {
               ...proceso,
-              costoTotal: costoTotal,
+              costoTotal,
+              tiempoExtraCotizado: false,
               descripcion: `$${costoPorPiezaBase.toFixed(2)} por pieza + ${margenSeguridad}% margen = $${costoConMargenPorPieza.toFixed(2)} × ${pieza.cantidad} pzas = $${costoTotal.toFixed(2)}`,
             };
           }
-          // Proceso de máquina: recalcular tiempo total y costo.
-          // La MO solo suma si el proceso la incluye (si no, la tasa es 0
-          // aunque quedara guardada por el bug anterior)
           const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
           const tiempoHoras = tiempoMinutos / 60;
           const costoMaquina = tiempoHoras * proceso.costoPorHora;
           const tasaMO = proceso.incluyeManoObra ? (proceso.costoManoObraPorHora || 0) : 0;
           const costoManoObra = tiempoHoras * tasaMO;
-          const costoTotal = costoMaquina + costoManoObra;
+          const costoTotal = costoMaquina + costoManoObra * factorManoObra;
           return {
             ...proceso,
             tiempoMinutos,
+            costoManoObra,
             costoTotal,
+            tiempoExtraCotizado: cotizarConTiempoExtra && costoManoObra > 0,
           };
         });
 
         // Material: costoUnitario es el costo POR PIEZA ingresado por el usuario
-        // costoTotal es costoUnitario * cantidad (calculado en PiezasStep)
-        // El margen del material se aplica como markup: costoUnitario * (1 + margen%)
         const costoMaterialBase = pieza.material ? pieza.material.costoUnitario : 0;
         const margenMaterial = pieza.material ? (pieza.material.margenPorcentaje || 30) : 30;
         const costoMateriales = costoMaterialBase * (1 + margenMaterial / 100);
-        // Procesos: costoTotal es para TODAS las piezas, dividir por cantidad para obtener por pieza
         const costoProcesosTotal = procesosRecalculados.reduce((sum: number, p: Proceso) => sum + p.costoTotal, 0);
         const costoProcesos = costoProcesosTotal / pieza.cantidad;
         const costosAdicionalesPieza = Object.values(pieza.costosAdicionales)
             .filter((item: any) => !item.incluidoGratis)
             .reduce((sum: number, item: any) => sum + (item.costo || 0), 0) / pieza.cantidad;
 
-        const costoDirectoPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
-        // Usar margen específico de la pieza si existe, sino usar el margen global
+        const subtotalPieza = costoMateriales + costoProcesos + costosAdicionalesPieza;
+        const manoObraRegularTotal = procesosRecalculados.reduce(
+          (sum: number, p: Proceso) => sum + (p.tipo === 'otro' ? 0 : (Number(p.costoManoObra) || 0)), 0,
+        );
+        const sobrecostoExtraPorPieza = cotizarConTiempoExtra ? manoObraRegularTotal / pieza.cantidad : 0;
+        const subtotalRegularPieza = subtotalPieza - sobrecostoExtraPorPieza;
+        const subtotalTiempoExtraPieza = subtotalRegularPieza + manoObraRegularTotal / pieza.cantidad;
+
+        // Ambos escenarios conservan exactamente el mismo margen de utilidad.
         const margenAplicar = pieza.margenPieza !== undefined ? pieza.margenPieza : c.margenUtilidad;
         const factorMargen = 1 - (margenAplicar / 100);
-        // El subtotal es la suma directa de los costos con sus márgenes aplicados
-        const subtotalPieza = costoDirectoPieza;
-        // La utilidad se calcula: subtotal / (1 - margen%) = total con utilidad
-        // Utilidad = total - subtotal
-        const totalPieza = factorMargen > 0 ? subtotalPieza / factorMargen : subtotalPieza;
+        const divisor = factorMargen > 0 ? factorMargen : 1;
+        const totalPiezaRegular = subtotalRegularPieza / divisor;
+        const totalPiezaTiempoExtra = subtotalTiempoExtraPieza / divisor;
+        const totalPieza = cotizarConTiempoExtra ? totalPiezaTiempoExtra : totalPiezaRegular;
         const utilidadPieza = totalPieza - subtotalPieza;
         const ivaPieza = totalPieza * (c.ivaPorcentaje / 100);
 
@@ -507,14 +514,14 @@ export const useCotizacionStore = () => {
           utilidadPieza,
           ivaPieza,
           totalPieza,
+          totalPiezaRegular,
+          totalPiezaTiempoExtra,
         };
       });
 
       const costosGenerales = Object.values(c.costosAdicionales)
         .filter((item: any) => !item.incluidoGratis)
         .reduce((sum: number, item: any) => sum + (item.costo || 0), 0);
-      // El subtotal de la cotización es la suma de (totalPieza * cantidad) de todas las piezas + costos generales
-      // totalPieza ya incluye la utilidad
       const subtotal = piezasRecalculadas.reduce((sum, p) => sum + (p.totalPieza * p.cantidad), 0) + costosGenerales;
       const iva = subtotal * (c.ivaPorcentaje / 100);
       const total = subtotal + iva;
@@ -551,8 +558,11 @@ export const useCotizacionStore = () => {
   }, []);
 
   const actualizarProyecto = useCallback((datos: Partial<EspecificacionesProyecto>) => {
-    setCotizacionEditable(prev => ({ ...prev, proyecto: { ...prev.proyecto, ...datos } }));
-  }, []);
+    setCotizacionEditable(prev => recalcularTotales({
+      ...prev,
+      proyecto: { ...prev.proyecto, ...datos },
+    }));
+  }, [recalcularTotales]);
 
   const actualizarCondiciones = useCallback((datos: Partial<CondicionesComerciales>) => {
     setCotizacionEditable(prev => ({ ...prev, condiciones: { ...prev.condiciones, ...datos } }));

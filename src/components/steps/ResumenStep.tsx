@@ -5,11 +5,12 @@ import type { Cotizacion, PiezaCotizacion, Proceso } from '@/types/cotizacion';
 interface ResumenStepProps {
   cotizacion: Cotizacion;
   onActualizarPieza?: (piezaId: string, datos: Partial<PiezaCotizacion>) => void;
+  onActualizarProyecto?: (datos: Partial<Cotizacion['proyecto']>) => void;
 }
 
 // Las ventas solo se concretan desde la sección Proyectos
 // (con cotización en estado "Cotización" + número de OC)
-export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps) {
+export function ResumenStep({ cotizacion, onActualizarPieza, onActualizarProyecto }: ResumenStepProps) {
   const { piezas, costosAdicionales, margenUtilidad, ivaPorcentaje, datosCliente, proyecto, condiciones } = cotizacion;
 
   const costosGenerales = Object.values(costosAdicionales)
@@ -48,6 +49,14 @@ export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps)
   const subtotalConUtilidad = subtotalPiezasSinUtilidad + utilidadTotal + costosGenerales;
   const ivaTotal = subtotalConUtilidad * (ivaPorcentaje / 100);
   const totalGeneral = subtotalConUtilidad + ivaTotal;
+  const subtotalRegular = piezas.reduce(
+    (sum, p) => sum + (Number(p.totalPiezaRegular ?? p.totalPieza) || 0) * p.cantidad, costosGenerales,
+  );
+  const subtotalTiempoExtra = piezas.reduce(
+    (sum, p) => sum + (Number(p.totalPiezaTiempoExtra ?? p.totalPieza) || 0) * p.cantidad, costosGenerales,
+  );
+  const totalRegular = subtotalRegular * (1 + ivaPorcentaje / 100);
+  const totalTiempoExtra = subtotalTiempoExtra * (1 + ivaPorcentaje / 100);
 
   // % de utilidad promedio ponderado de la cotización (cada pieza puede
   // tener su propio margen). Es el % que se usa en Control de Códigos.
@@ -69,6 +78,58 @@ export function ResumenStep({ cotizacion, onActualizarPieza }: ResumenStepProps)
           <p className="text-sm text-slate-500">Contacto: {datosCliente.nombre}</p>
         )}
       </div>
+
+      {/* Modalidad de fabricación: la máquina no cambia; solo MO ×2.
+          El comparativo permite que el cliente decida antes de generar la orden. */}
+      {(onActualizarProyecto || proyecto.tiempoExtra || proyecto.mostrarComparativoTiempoExtra) && (
+        <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">Modalidad de fabricación</h3>
+              <p className="text-xs text-amber-800">El tiempo extra duplica únicamente la mano de obra, no máquina ni materiales.</p>
+            </div>
+            <span className="text-xs font-bold text-amber-900">
+              Seleccionada: {proyecto.tiempoExtra ? 'TIEMPO EXTRA' : 'TIEMPO REGULAR'}
+            </span>
+          </div>
+          {onActualizarProyecto && (
+            <div className="flex gap-5 flex-wrap">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!proyecto.tiempoExtra}
+                  onChange={(e) => onActualizarProyecto({ tiempoExtra: e.target.checked })}
+                  className="w-4 h-4 accent-amber-600"
+                />
+                Cotizar con tiempo extra (MO ×2)
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!proyecto.mostrarComparativoTiempoExtra}
+                  onChange={(e) => onActualizarProyecto({ mostrarComparativoTiempoExtra: e.target.checked })}
+                  className="w-4 h-4 accent-amber-600"
+                />
+                Mostrar ambas opciones al cliente en la cotización
+              </label>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+            <div className="bg-white border border-slate-200 rounded p-2">
+              <p className="text-xs text-slate-500">Todo en tiempo regular</p>
+              <p className="font-bold text-slate-800">{simbolo}{totalRegular.toFixed(2)} <span className="text-[10px] font-normal">IVA incl.</span></p>
+            </div>
+            <div className="bg-white border border-amber-300 rounded p-2">
+              <p className="text-xs text-amber-700">Todo en tiempo extra</p>
+              <p className="font-bold text-amber-900">{simbolo}{totalTiempoExtra.toFixed(2)} <span className="text-[10px] font-normal">IVA incl.</span></p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded p-2">
+              <p className="text-xs text-slate-500">Diferencia por TE</p>
+              <p className="font-bold text-slate-800">+{simbolo}{(totalTiempoExtra - totalRegular).toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Desglose por pieza */}
       <div className="space-y-4">

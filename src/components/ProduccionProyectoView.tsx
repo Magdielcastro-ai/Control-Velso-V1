@@ -33,8 +33,10 @@ interface ProduccionProyectoViewProps {
   onMarcarFabricado?: (id: string) => void;
 }
 
-// Línea de captura: minutos + operador + piezas hechas por esa persona
-type LineaCaptura = { minutos: string; operador: string; piezas: string };
+// Línea de captura: minutos + operador + piezas + si se trabajó como TE.
+// El sobrecosto se calcula por línea porque un mismo proceso puede tener
+// una parte en horario regular y otra en tiempo extra.
+type LineaCaptura = { minutos: string; operador: string; piezas: string; extra: boolean };
 
 interface ExtraCaptura {
   id: string;
@@ -88,18 +90,20 @@ export function ProduccionProyectoView({
     const editado = captura[proc.captureId];
     if (editado !== undefined) return editado.lineas;
     const guardado = registroGuardado(proc);
-    if (!guardado) return [{ minutos: '', operador: '', piezas: '' }];
+    if (!guardado) return [{ minutos: '', operador: '', piezas: '', extra: false }];
     if (Array.isArray(guardado.lineas) && guardado.lineas.length > 0) {
       return guardado.lineas.map((l: any) => ({
         minutos: l.minutos != null ? String(l.minutos) : '',
         operador: l.operador || '',
         piezas: l.piezas != null ? String(l.piezas) : '',
+        extra: !!l.extra,
       }));
     }
     return [{
       minutos: guardado.tiempoMinutosReal != null ? String(guardado.tiempoMinutosReal) : '',
       operador: guardado.operadorNombre || '',
       piezas: '',
+      extra: Number(guardado.minutosExtra) > 0 && Number(guardado.minutosExtra) >= Number(guardado.tiempoMinutosReal),
     }];
   };
 
@@ -107,17 +111,22 @@ export function ProduccionProyectoView({
     setCaptura(prev => ({ ...prev, [proc.captureId]: { lineas } }));
   };
 
-  const actualizarLinea = (proc: any, idx: number, campo: 'minutos' | 'operador' | 'piezas', valor: string) => {
+  const actualizarLinea = (
+    proc: any,
+    idx: number,
+    campo: 'minutos' | 'operador' | 'piezas' | 'extra',
+    valor: string | boolean,
+  ) => {
     setLineas(proc, getLineas(proc).map((l, i) => i === idx ? { ...l, [campo]: valor } : l));
   };
 
   const agregarLinea = (proc: any) => {
-    setLineas(proc, [...getLineas(proc), { minutos: '', operador: '', piezas: '' }]);
+    setLineas(proc, [...getLineas(proc), { minutos: '', operador: '', piezas: '', extra: false }]);
   };
 
   const quitarLinea = (proc: any, idx: number) => {
     const lineas = getLineas(proc).filter((_, i) => i !== idx);
-    setLineas(proc, lineas.length > 0 ? lineas : [{ minutos: '', operador: '', piezas: '' }]);
+    setLineas(proc, lineas.length > 0 ? lineas : [{ minutos: '', operador: '', piezas: '', extra: false }]);
   };
 
   const minutosCapturados = (proc: any): number =>
@@ -182,11 +191,23 @@ export function ProduccionProyectoView({
         const lineas = getLineas(p).filter(l => l.minutos !== '');
         if (lineas.length === 0) return null;
         const minutos = lineas.reduce((s, l) => s + (Number(l.minutos) || 0), 0);
+        const minutosExtra = lineas.filter(l => l.extra).reduce((s, l) => s + (Number(l.minutos) || 0), 0);
         const operadores = [...new Set(lineas.map(l => l.operador.trim()).filter(Boolean))];
         const minCot = minutosCotizados(p);
         const costoCot = Number(p.costoTotal ?? p.costoTotalCotizado) || 0;
-        // Costo real PROPORCIONAL al cotizado: mismos minutos = mismo costo
-        const costoTotalReal = minCot > 0 ? (minutos / minCot) * costoCot : costoCot;
+        const costoManoObraRegular = Number(p.costoManoObra) ||
+          ((Number(p.costoManoObraPorHora) || 0) * (minCot / 60));
+        const factorMOCotizado = p.tiempoExtraCotizado ? 2 : 1;
+        const costoSinMOCotizado = Math.max(0, costoCot - costoManoObraRegular * factorMOCotizado);
+        // Máquina y demás costos se prorratean por minutos. La MO regular se
+        // paga una vez y la extra dos. Si la cotización YA era con TE, el
+        // factor cotizado se descuenta aquí para no cargarlo dos veces.
+        const costoManoObraReal = minCot > 0
+          ? ((minutos + minutosExtra) / minCot) * costoManoObraRegular
+          : costoManoObraRegular;
+        const costoTotalReal = minCot > 0
+          ? (minutos / minCot) * costoSinMOCotizado + costoManoObraReal
+          : costoCot;
         return {
           id: p.captureId,
           procesoId: p.id,
@@ -196,15 +217,18 @@ export function ProduccionProyectoView({
           piezaNombre: p.piezaNombre,
           tiempoMinutosCotizado: minCot,
           tiempoMinutosReal: minutos,
+          minutosExtra,
           operadorNombre: operadores.join(' / '),
           lineas: lineas.map(l => ({
             minutos: Number(l.minutos) || 0,
             operador: l.operador.trim(),
             piezas: Number(l.piezas) || 0,
+            extra: !!l.extra,
           })),
           piezasReal: lineas.reduce((s, l) => s + (Number(l.piezas) || 0), 0),
           costoPorHora: Number(p.costoPorHora) || 0,
-          costoManoObra: Number(p.costoManoObra) || 0,
+          costoManoObra: costoManoObraRegular,
+          costoManoObraReal,
           costoTotalCotizado: costoCot,
           costoTotalReal,
         };
@@ -433,12 +457,16 @@ export function ProduccionProyectoView({
                     const lineas = getLineas(procConLlave);
                     const totalCot = minutosCotizados(proc);
                     const totalReal = minutosCapturados(procConLlave);
+                    const totalExtra = lineas.filter(l => l.extra).reduce((s, l) => s + (Number(l.minutos) || 0), 0);
                     return (
                       <div key={proc.id} className="p-2 bg-slate-50 rounded-lg space-y-1.5">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2 min-w-0">
                             <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span className="text-sm text-slate-700 truncate">{proc.nombre}</span>
+                            {proc.tiempoExtraCotizado && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 text-amber-700 border-amber-300">COTIZADO CON TE</Badge>
+                            )}
                             {regGuardado && (
                               <span className="text-[10px] text-green-600" title="Ya capturado — puedes corregirlo y volver a guardar">✓</span>
                             )}
@@ -451,6 +479,9 @@ export function ProduccionProyectoView({
                               <span className={`ml-2 font-medium ${totalReal > totalCot ? 'text-red-600' : 'text-green-600'}`}>
                                 · {totalReal} min reales
                               </span>
+                            )}
+                            {totalExtra > 0 && (
+                              <span className="ml-1 font-semibold text-amber-700">· {totalExtra} min TE</span>
                             )}
                           </span>
                         </div>
@@ -483,6 +514,20 @@ export function ProduccionProyectoView({
                                   onChange={(e) => actualizarLinea(procConLlave, idx, 'piezas', e.target.value)}
                                   className="h-7 w-16 text-sm text-right"
                                 />
+                                <label
+                                  className={`h-7 inline-flex items-center gap-1 rounded border px-2 text-xs cursor-pointer select-none ${
+                                    linea.extra ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-200 text-slate-500'
+                                  }`}
+                                  title="Tiempo extra: solo la mano de obra de esta línea se paga al doble"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={linea.extra}
+                                    onChange={(e) => actualizarLinea(procConLlave, idx, 'extra', e.target.checked)}
+                                    className="w-3.5 h-3.5 accent-amber-600"
+                                  />
+                                  TE
+                                </label>
                                 {lineas.length > 1 && (
                                   <button
                                     onClick={() => quitarLinea(procConLlave, idx)}
@@ -496,7 +541,7 @@ export function ProduccionProyectoView({
                                   <button
                                     onClick={() => agregarLinea(procConLlave)}
                                     className="text-blue-600 hover:text-blue-700 text-xs px-1"
-                                    title="Agregar línea (otro operador u otra fecha)"
+                                    title="Agregar línea (otro operador, otra fecha u horario extra)"
                                   >
                                     + línea
                                   </button>

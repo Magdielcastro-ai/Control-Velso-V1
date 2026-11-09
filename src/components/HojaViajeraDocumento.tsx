@@ -109,7 +109,7 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
 
       {/* Procesos: SIN tiempos cotizados a petición del usuario
           (los operadores no deben ver el tiempo esperado).
-          Solo ruta de procesos + fecha/hora/reales para captura en piso */}
+          Solo ruta de procesos + fecha/hora/reales/TE para captura en piso */}
       <table className="w-full text-[11px] border border-slate-300 mb-2">
         <thead>
           <tr className="bg-slate-800 text-white">
@@ -119,12 +119,21 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
             <th className="px-2 py-1 text-center w-16">HORA INICIO</th>
             <th className="px-2 py-1 text-center w-16">HORA FIN</th>
             <th className="px-2 py-1 text-center w-16">MIN REALES</th>
-            <th className="px-2 py-1 text-center w-20">OPERADOR</th>
+            <th className="px-2 py-1 text-center w-14">MIN EXTRA</th>
+            <th className="px-2 py-1 text-center w-24">OPERADOR</th>
           </tr>
         </thead>
         <tbody>
           {(pieza.procesos || []).map((proc: any, idx: number) => {
             const r = real(proc);
+            const lineas = Array.isArray(r?.lineas) ? r.lineas : [];
+            const minExtra = r
+              ? Number(r.minutosExtra ?? lineas.filter((l: any) => l.extra)
+                  .reduce((s: number, l: any) => s + (Number(l.minutos) || 0), 0)) || 0
+              : 0;
+            const operadores = lineas.length > 0
+              ? lineas.map((l: any) => `${l.operador || '—'}${l.extra ? ' (TE)' : ''}`).join(' / ')
+              : (r?.operadorNombre || '');
             return (
               <tr key={proc.id || idx} className="border-b border-slate-200">
                 <td className="px-2 py-3">{idx + 1}</td>
@@ -135,9 +144,10 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
                 <td className="px-2 py-3 text-center font-semibold">
                   {r ? r.tiempoMinutosReal : ''}
                 </td>
-                <td className="px-2 py-3 text-center">
-                  {r?.operadorNombre || ''}
+                <td className="px-2 py-3 text-center font-semibold text-amber-700">
+                  {r && minExtra > 0 ? minExtra : ''}
                 </td>
+                <td className="px-2 py-3 text-center">{operadores}</td>
               </tr>
             );
           })}

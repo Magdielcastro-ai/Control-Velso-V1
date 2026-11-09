@@ -1741,7 +1741,11 @@ function App() {
                   />
                 )}
                 {pasoActual === 'resumen' && (
-                  <ResumenStep cotizacion={cotizacion} onActualizarPieza={soloLectura ? undefined : actualizarPieza} />
+                  <ResumenStep
+                    cotizacion={cotizacion}
+                    onActualizarPieza={soloLectura ? undefined : actualizarPieza}
+                    onActualizarProyecto={soloLectura ? undefined : actualizarProyecto}
+                  />
                 )}
               </CardContent>
             </Card>

@@ -57,6 +57,8 @@ export interface EspecificacionesProyecto {
   dibujo?: string;
   notas?: string;
   imagen?: string;  // Imagen del proyecto completo (data URL) — se imprime si las piezas no llevan imagen individual
+  tiempoExtra?: boolean; // Cotizar toda la mano de obra al doble; máquina y materiales no cambian
+  mostrarComparativoTiempoExtra?: boolean; // Imprime precio regular vs. precio con tiempo extra
 }
 
 // FORMAS DE MATERIAL - ACTUALIZADAS CON NUEVAS FORMAS
@@ -247,6 +249,7 @@ export interface Proceso {
   tipoManoObraSeleccionada?: 'mo_s' | 'mo_e';
   costoTotalIngresado?: number;   // Para procesos externos: costo POR PIEZA ingresado por usuario
   margenPorcentaje?: number;      // Margen de seguridad/financiamiento para procesos externos
+  tiempoExtraCotizado?: boolean;  // costoTotal ya incluye MO ×2; costoManoObra conserva el valor regular
 }
 
 export interface CostosAdicionales {
@@ -292,6 +295,8 @@ export interface PiezaCotizacion {
   utilidadPieza: number;
   ivaPieza: number;
   totalPieza: number;
+  totalPiezaRegular?: number;     // Alternativa con MO regular, misma utilidad porcentual
+  totalPiezaTiempoExtra?: number; // Alternativa con MO ×2, misma utilidad porcentual
   // Campos para costos por pieza en la pestaña Costos
   margenPieza?: number;        // Margen de utilidad específico por pieza (sobrescribe el global)
   descripcion?: string;        // Descripción/comentario — se muestra en la cotización imprimible

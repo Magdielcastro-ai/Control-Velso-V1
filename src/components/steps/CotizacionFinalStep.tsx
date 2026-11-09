@@ -23,6 +23,18 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
   // Usar la moneda de la cotización, no la prop (que siempre venía como MXN)
   const moneda = cotizacion.moneda || 'MXN';
   const monedaConfig = getMonedaConfig(moneda);
+  const costosGenerales = Object.values(cotizacion.costosAdicionales)
+    .filter((item: any) => !item.incluidoGratis)
+    .reduce((sum: number, item: any) => sum + (Number(item.costo) || 0), 0);
+  const subtotalRegular = cotizacion.piezas.reduce(
+    (sum, p) => sum + (Number(p.totalPiezaRegular ?? p.totalPieza) || 0) * p.cantidad, costosGenerales,
+  );
+  const subtotalTiempoExtra = cotizacion.piezas.reduce(
+    (sum, p) => sum + (Number(p.totalPiezaTiempoExtra ?? p.totalPieza) || 0) * p.cantidad, costosGenerales,
+  );
+  const factorIVA = 1 + cotizacion.ivaPorcentaje / 100;
+  const totalRegular = subtotalRegular * factorIVA;
+  const totalTiempoExtra = subtotalTiempoExtra * factorIVA;
 
   // Imprime SOLO el documento (una sola hoja): se clona a <body> y todo
   // lo demás se oculta con display:none — la técnica de visibility dejaba
@@ -255,7 +267,9 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
                 <span className="font-medium text-slate-700">{formatearMoneda(cotizacion.iva, moneda)}</span>
               </div>
               <div className="flex justify-between items-center border-t-2 border-blue-600 mt-1 pt-1">
-                <span className="text-xs font-bold text-slate-900 uppercase">Total</span>
+                <span className="text-xs font-bold text-slate-900 uppercase">
+                  Total {cotizacion.proyecto.tiempoExtra ? 'con TE' : 'regular'}
+                </span>
                 <span className="text-lg font-extrabold text-blue-600">{formatearMoneda(cotizacion.total, moneda)}</span>
               </div>
               <p className="text-[9px] text-slate-500 text-right mt-0.5 leading-snug">
@@ -268,6 +282,33 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
               </p>
             </div>
           </div>
+
+          {/* Comparativo opcional para que el cliente elija modalidad.
+              No sustituye el total oficial de esta cotización. */}
+          {cotizacion.proyecto.mostrarComparativoTiempoExtra && (
+            <div className="mb-2 border border-amber-300 rounded px-3 py-1.5 text-[10px] bg-amber-50">
+              <p className="text-[9px] font-semibold text-amber-800 uppercase tracking-wide mb-0.5">
+                Comparativo de modalidad · IVA incluido
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex justify-between gap-2">
+                  <span>Tiempo regular:</span>
+                  <strong>{formatearMoneda(totalRegular, moneda)}</strong>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span>Tiempo extra (MO ×2):</span>
+                  <strong>{formatearMoneda(totalTiempoExtra, moneda)}</strong>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span>Diferencia:</span>
+                  <strong>+{formatearMoneda(totalTiempoExtra - totalRegular, moneda)}</strong>
+                </div>
+              </div>
+              <p className="text-[8px] text-amber-800 mt-0.5">
+                El total oficial de este documento corresponde a {cotizacion.proyecto.tiempoExtra ? 'tiempo extra' : 'tiempo regular'}.
+              </p>
+            </div>
+          )}
 
           {/* ─── CONDICIONES COMERCIALES: rejilla compacta ─── */}
           <div className="border border-slate-200 rounded px-3 py-2 text-[10px]">
