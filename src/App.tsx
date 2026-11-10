@@ -681,6 +681,7 @@ function App() {
           procesos: (pz.procesos || []).map((pr: any) => ({
             ...pr,
             tiempoMinutos: (Number(pr.tiempoMinutosPorPieza ?? pr.tiempoMinutos) || 0) * compradas,
+            costoManoObra: (Number(pr.costoManoObra) || 0) * factor,
             costoTotal: (Number(pr.costoTotal) || 0) * factor,
           })),
           // Material: precio por pieza × compradas

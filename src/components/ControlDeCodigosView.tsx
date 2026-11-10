@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,7 +61,7 @@ export function ControlDeCodigosView({
       };
     }), [proyecto]);
 
-  const procesosCot = useMemo<(ProcesoProyecto & { piezaNombre?: string; captureId?: string; piezaId?: string })[]>(() =>
+  const procesosCot = useMemo<(ProcesoProyecto & { piezaNombre?: string; captureId?: string; piezaId?: string; tiempoExtraCotizado?: boolean })[]>(() =>
     procesosAplanados(proyecto).map((p: any) => ({
       id: p.id || crypto.randomUUID(),
       captureId: p.captureId,   // llave compuesta pieza:proceso (sin esto no se encuentra lo real)
@@ -73,7 +73,60 @@ export function ControlDeCodigosView({
       costoPorHora: Number(p.costoPorHora) || 0,
       costoManoObra: Number(p.costoManoObra) || 0,
       costoTotalCotizado: costoCotizadoProc(p),
+      tiempoExtraCotizado: !!p.tiempoExtraCotizado,
     })), [proyecto]);
+
+  // Desglose de TE por proceso. El costo base incluye máquina y toda la MO
+  // calculada a tarifa regular; el sobrecosto es SOLAMENTE la segunda tarifa
+  // de MO de los minutos extra. El impacto compara ese sobrecosto contra lo
+  // que ya se había cobrado al cliente: negativo baja utilidad, positivo sube.
+  const desgloseTE = useMemo(() => {
+    const porProceso = new Map<string, {
+      hayReal: boolean; minReal: number; minRegular: number; minExtra: number;
+      costoReal: number; costoBase: number; sobrecosto: number; impacto: number;
+      cotizadoTE: boolean;
+    }>();
+    let minutosExtra = 0;
+    let costoBaseReal = 0;
+    let sobrecostoReal = 0;
+    let impactoUtilidad = 0;
+
+    procesosCot.forEach((proceso) => {
+      const real: any = buscarReal(proyecto.procesosReales, proceso);
+      const hayReal = !!(real && real.tiempoMinutosReal != null);
+      const minCot = proceso.tiempoMinutosCotizado;
+      const minReal = hayReal ? Number(real.tiempoMinutosReal) : minCot;
+      const cotizadoTE = !!proceso.tiempoExtraCotizado && proceso.costoManoObra > 0;
+      const lineas = Array.isArray(real?.lineas) ? real.lineas : [];
+      const extraCapturado = Number(real?.minutosExtra ?? lineas
+        .filter((l: any) => l.extra)
+        .reduce((s: number, l: any) => s + (Number(l.minutos) || 0), 0)) || 0;
+      // Sin captura se conserva la modalidad cotizada como hasta ahora.
+      const minExtra = hayReal ? extraCapturado : (cotizadoTE ? minCot : 0);
+      const minRegular = Math.max(0, minReal - minExtra);
+      const costoReal = hayReal
+        ? (Number(real.costoTotalReal) || (Number(real.tiempoMinutosReal) / 60) * proceso.costoPorHora + proceso.costoManoObra)
+        : proceso.costoTotalCotizado;
+      const sobrecostoCotizado = cotizadoTE ? proceso.costoManoObra : 0;
+      const sobrecosto = hayReal
+        ? (minCot > 0 ? (minExtra / minCot) * proceso.costoManoObra : 0)
+        : sobrecostoCotizado;
+      const costoBase = costoReal - sobrecosto;
+      const impacto = sobrecostoCotizado - sobrecosto;
+      const llave = proceso.captureId || proceso.id;
+
+      porProceso.set(llave, {
+        hayReal, minReal, minRegular, minExtra, costoReal, costoBase,
+        sobrecosto, impacto, cotizadoTE,
+      });
+      minutosExtra += minExtra;
+      costoBaseReal += costoBase;
+      sobrecostoReal += sobrecosto;
+      impactoUtilidad += impacto;
+    });
+
+    return { porProceso, minutosExtra, costoBaseReal, sobrecostoReal, impactoUtilidad };
+  }, [proyecto.procesosReales, procesosCot]);
 
   const costosCot = useMemo<CostosAdicionalesProyecto>(() => {
     const ca: any = proyecto.costosAdicionales || {};
@@ -327,15 +380,15 @@ export function ControlDeCodigosView({
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cotización oficial</p>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Total sin IVA</span>
-              <span className="font-semibold">${totales.subtotalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+              <span className="font-semibold">${totales.subtotalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">IVA ({totales.ivaPct}%)</span>
-              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm border-t border-blue-100 pt-1.5">
               <span className="text-slate-700 font-medium">Total cotizado</span>
-              <span className="font-bold text-blue-700">${totales.totalConIVA.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-blue-700">${totales.totalConIVA.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </CardContent>
         </Card>
@@ -346,19 +399,19 @@ export function ControlDeCodigosView({
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Costo directo</p>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Cotizado</span>
-              <span className="font-semibold">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+              <span className="font-semibold">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Real</span>
               <span className={`font-semibold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
-                ${totales.costoTotalReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${totales.costoTotalReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
               <span className="text-slate-700 font-medium">Diferencia</span>
               <span className={`font-bold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
                 {totales.costoTotalReal > totales.costoTotalCotizado ? '+' : ''}
-                ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <p className="text-[10px] text-slate-400">Materiales + procesos + costos adicionales</p>
@@ -371,12 +424,12 @@ export function ControlDeCodigosView({
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Utilidad</p>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Cotizada ({totales.porcentajeUtilidadCotizada.toFixed(1)}%)</span>
-              <span className="font-semibold">${totales.utilidadCotizada.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+              <span className="font-semibold">${totales.utilidadCotizada.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Real ({totales.porcentajeUtilidadReal.toFixed(1)}%)</span>
               <span className={`font-semibold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-amber-600'}`}>
-                ${totales.utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${totales.utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
@@ -401,7 +454,7 @@ export function ControlDeCodigosView({
             </p>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Considerado en cotización</span>
-              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Pagado en OCs del proyecto</span>
@@ -409,7 +462,7 @@ export function ControlDeCodigosView({
                 ${ordenesCompra
                   .filter(oc => oc.proyectoId === proyecto.id)
                   .reduce((s, oc) => s + (Number(oc.iva) || 0), 0)
-                  .toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  .toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
@@ -418,7 +471,7 @@ export function ControlDeCodigosView({
                 ${(ordenesCompra
                   .filter(oc => oc.proyectoId === proyecto.id)
                   .reduce((s, oc) => s + (Number(oc.iva) || 0), 0) - totales.ivaMonto
-                ).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <p className="text-[10px] text-slate-400">El IVA es transferible y se maneja aparte</p>
@@ -442,17 +495,17 @@ export function ControlDeCodigosView({
                 <span className="font-medium">Materiales</span>
                 <span className={`${totales.costoMaterialesReal > totales.costoMaterialesCotizado ? 'text-red-600' : 'text-green-600'}`}>
                   {totales.costoMaterialesReal > totales.costoMaterialesCotizado ? '+' : ''}
-                  ${(totales.costoMaterialesReal - totales.costoMaterialesCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  ${(totales.costoMaterialesReal - totales.costoMaterialesCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-xs text-slate-500">Cotizado</p>
-                  <p className="font-semibold">${totales.costoMaterialesCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold">${totales.costoMaterialesCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="bg-amber-50 p-3 rounded-lg">
                   <p className="text-xs text-slate-500">Real</p>
-                  <p className="font-semibold">${totales.costoMaterialesReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold">${totales.costoMaterialesReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -463,17 +516,17 @@ export function ControlDeCodigosView({
                 <span className="font-medium">Procesos (Mano de Obra)</span>
                 <span className={`${totales.costoProcesosReal > totales.costoProcesosCotizado ? 'text-red-600' : 'text-green-600'}`}>
                   {totales.costoProcesosReal > totales.costoProcesosCotizado ? '+' : ''}
-                  ${(totales.costoProcesosReal - totales.costoProcesosCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  ${(totales.costoProcesosReal - totales.costoProcesosCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-xs text-slate-500">Cotizado</p>
-                  <p className="font-semibold">${totales.costoProcesosCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold">${totales.costoProcesosCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="bg-amber-50 p-3 rounded-lg">
                   <p className="text-xs text-slate-500">Real</p>
-                  <p className="font-semibold">${totales.costoProcesosReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold">${totales.costoProcesosReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -484,17 +537,17 @@ export function ControlDeCodigosView({
                 <span className="font-medium">Costos Adicionales</span>
                 <span className={`${totales.costosAdicionalesReal > totales.costosAdicionalesCotizado ? 'text-red-600' : 'text-green-600'}`}>
                   {totales.costosAdicionalesReal > totales.costosAdicionalesCotizado ? '+' : ''}
-                  ${(totales.costosAdicionalesReal - totales.costosAdicionalesCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  ${(totales.costosAdicionalesReal - totales.costosAdicionalesCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-xs text-slate-500">Cotizado</p>
-                  <p className="font-semibold">${totales.costosAdicionalesCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold">${totales.costosAdicionalesCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="bg-amber-50 p-3 rounded-lg">
                   <p className="text-xs text-slate-500">Real</p>
-                  <p className="font-semibold">${totales.costosAdicionalesReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold">${totales.costosAdicionalesReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -505,17 +558,17 @@ export function ControlDeCodigosView({
                 <span className="font-bold">Costo Total</span>
                 <span className={`font-bold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
                   Diferencia: {totales.costoTotalReal > totales.costoTotalCotizado ? '+' : ''}
-                  ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <div className="bg-blue-100 p-3 rounded-lg">
                   <p className="text-xs text-blue-600">Costo Cotizado</p>
-                  <p className="font-bold text-blue-800">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-bold text-blue-800">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="bg-amber-100 p-3 rounded-lg">
                   <p className="text-xs text-amber-600">Costo Real</p>
-                  <p className="font-bold text-amber-800">${totales.costoTotalReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-bold text-amber-800">${totales.costoTotalReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -570,18 +623,18 @@ export function ControlDeCodigosView({
                       <div>
                         <p className="text-xs text-slate-500">Costo cotizado</p>
                         <p className="font-medium mt-1.5">
-                          ${material.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          ${material.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Costo real (órdenes de compra)</p>
                         <p className={`font-semibold mt-1.5 ${diferente ? (realTotal > material.costoTotalCotizado ? 'text-red-600' : 'text-green-600') : 'text-slate-700'}`}>
-                          ${realTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          ${realTotal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         {diferente && (
                           <p className={`text-xs ${realTotal > material.costoTotalCotizado ? 'text-red-500' : 'text-green-600'}`}>
                             {realTotal > material.costoTotalCotizado ? '+' : ''}
-                            ${(realTotal - material.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            ${(realTotal - material.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         )}
                       </div>
@@ -594,11 +647,11 @@ export function ControlDeCodigosView({
                               <span className="text-slate-500 truncate mx-2">{c.descripcion}</span>
                               {c.cubierto ? (
                                 <span className="text-emerald-700 font-medium shrink-0">
-                                  VELSO · ya pagado · +${Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })} de utilidad
+                                  VELSO · ya pagado · +${Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de utilidad
                                 </span>
                               ) : (
                                 <span className="text-slate-700 shrink-0">
-                                  ${Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  ${Number(c.total).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                               )}
                             </div>
@@ -622,6 +675,35 @@ export function ControlDeCodigosView({
 
         {/* Tab Procesos — resumen por pieza, cotizado vs real (solo lectura) */}
         <TabsContent value="procesos" className="space-y-4">
+          {/* Totales TE: el impacto compara lo realmente trabajado como extra
+              contra el sobrecosto que ya estaba incluido en la cotización. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="border border-slate-200 rounded-lg p-3 bg-white">
+              <p className="text-xs text-slate-500">Minutos extra</p>
+              <p className="text-xl font-bold text-slate-800">{desgloseTE.minutosExtra.toFixed(0)} min</p>
+              <p className="text-[10px] text-slate-400">Sin captura: conserva lo cotizado</p>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-3 bg-white">
+              <p className="text-xs text-slate-500">Costo base real</p>
+              <p className="text-xl font-bold text-slate-800">${desgloseTE.costoBaseReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-[10px] text-slate-400">Máquina + MO a tarifa regular</p>
+            </div>
+            <div className="border border-amber-200 rounded-lg p-3 bg-amber-50">
+              <p className="text-xs text-amber-700">Sobrecosto TE real</p>
+              <p className="text-xl font-bold text-amber-900">+${desgloseTE.sobrecostoReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-[10px] text-amber-700">Segunda tarifa de MO por TE</p>
+            </div>
+            <div className={`border rounded-lg p-3 ${desgloseTE.impactoUtilidad >= 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+              <p className={`text-xs ${desgloseTE.impactoUtilidad >= 0 ? 'text-green-700' : 'text-red-700'}`}>Impacto TE en utilidad</p>
+              <p className={`text-xl font-bold ${desgloseTE.impactoUtilidad >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                {desgloseTE.impactoUtilidad >= 0 ? '+' : '-'}${Math.abs(desgloseTE.impactoUtilidad).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className={`text-[10px] ${desgloseTE.impactoUtilidad >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                Sobrecosto TE cotizado − real
+              </p>
+            </div>
+          </div>
+
           <Card className="border-slate-200">
             <CardHeader>
               <CardTitle className="text-lg">Procesos por Pieza: Cotizado vs Real</CardTitle>
@@ -645,46 +727,70 @@ export function ControlDeCodigosView({
                       <Package className="w-4 h-4 text-slate-500" />
                       <span className="font-semibold text-sm text-slate-800">{piezaNombre}</span>
                     </div>
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-slate-600 text-xs">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium">Proceso</th>
-                          <th className="px-3 py-2 text-right font-medium">Min. cotizados</th>
-                          <th className="px-3 py-2 text-right font-medium">Min. reales</th>
-                          <th className="px-3 py-2 text-right font-medium">Costo cotizado</th>
-                          <th className="px-3 py-2 text-right font-medium">Costo real</th>
-                          <th className="px-3 py-2 text-left font-medium">Operador</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {procesos.map((proceso) => {
-                          const real = buscarReal(proyecto.procesosReales, proceso);
-                          const hayReal = real && real.tiempoMinutosReal != null;
-                          const minReal = hayReal ? Number(real.tiempoMinutosReal) : proceso.tiempoMinutosCotizado;
-                          const costoReal = hayReal
-                            ? (Number(real.costoTotalReal) || (Number(real.tiempoMinutosReal) / 60) * proceso.costoPorHora + proceso.costoManoObra)
-                            : proceso.costoTotalCotizado;
-                          const sePaso = hayReal && minReal > proceso.tiempoMinutosCotizado;
-                          return (
-                            <tr key={proceso.id}>
-                              <td className="px-3 py-2 text-slate-800">{proceso.nombre}</td>
-                              <td className="px-3 py-2 text-right text-slate-600">{proceso.tiempoMinutosCotizado}</td>
-                              <td className={`px-3 py-2 text-right font-medium ${!hayReal ? 'text-slate-400' : sePaso ? 'text-red-600' : 'text-green-600'}`}>
-                                {minReal}
-                                {!hayReal && <span className="text-[10px] block">sin captura (cotizado)</span>}
-                              </td>
-                              <td className="px-3 py-2 text-right text-slate-600">
-                                ${proceso.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className={`px-3 py-2 text-right font-medium ${hayReal && costoReal > proceso.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
-                                ${costoReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-3 py-2 text-slate-600">{hayReal ? ((real as any).operadorNombre || '—') : '—'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-slate-600 text-xs">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium">Proceso</th>
+                            <th className="px-3 py-2 text-right font-medium">Min. cotizados</th>
+                            <th className="px-3 py-2 text-right font-medium">Min. reales</th>
+                            <th className="px-3 py-2 text-right font-medium">Costo cotizado</th>
+                            <th className="px-3 py-2 text-right font-medium">Costo real</th>
+                            <th className="px-3 py-2 text-left font-medium">Operador</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {procesos.map((proceso) => {
+                            const llave = proceso.captureId || proceso.id;
+                            const d = desgloseTE.porProceso.get(llave)!;
+                            const real: any = buscarReal(proyecto.procesosReales, proceso);
+                            const sePaso = d.hayReal && d.minReal > proceso.tiempoMinutosCotizado;
+                            return (
+                              <Fragment key={llave}>
+                                <tr>
+                                  <td className="px-3 py-2 text-slate-800">{proceso.nombre}</td>
+                                  <td className="px-3 py-2 text-right text-slate-600">{proceso.tiempoMinutosCotizado}</td>
+                                  <td className={`px-3 py-2 text-right font-medium ${!d.hayReal ? 'text-slate-400' : sePaso ? 'text-red-600' : 'text-green-600'}`}>
+                                    {d.minReal}
+                                    <span className="text-[10px] block font-normal">
+                                      {!d.hayReal ? 'sin captura (cotizado)' : `${d.minRegular} regular + ${d.minExtra} TE`}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-slate-600">
+                                    ${proceso.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {d.cotizadoTE && (
+                                      <span className="block text-[10px] text-amber-700">incluye ${proceso.costoManoObra.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TE</span>
+                                    )}
+                                  </td>
+                                  <td className={`px-3 py-2 text-right font-medium ${d.hayReal && d.costoReal > proceso.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
+                                    ${d.costoReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {(d.minExtra > 0 || d.cotizadoTE) && (
+                                      <span className="block text-[10px] font-normal text-slate-500">
+                                        ${d.costoBase.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} base + ${d.sobrecosto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TE
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-600">{d.hayReal ? (real?.operadorNombre || '—') : '—'}</td>
+                                </tr>
+                                {(d.minExtra > 0 || d.cotizadoTE) && (
+                                  <tr className="bg-amber-50/70">
+                                    <td colSpan={6} className="px-3 py-2">
+                                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                                        <span className="text-slate-700"><strong>Desglose TE:</strong> {d.minRegular} min regulares + {d.minExtra} min TE</span>
+                                        <span className="text-amber-800">Sobrecosto real: +${d.sobrecosto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className={`font-semibold ${d.impacto >= 0 ? 'text-green-700' : 'text-red-700'}`} title="Sobrecosto TE cotizado menos sobrecosto TE real">
+                                          Impacto en utilidad: {d.impacto >= 0 ? '+' : '-'}${Math.abs(d.impacto).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ))}
                 {procesosCot.length === 0 && (
@@ -715,7 +821,7 @@ export function ControlDeCodigosView({
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <p className="text-xs text-slate-500">Cotizado</p>
-                        <p className="font-medium">${(costosCot as any)[key].toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                        <p className="font-medium">${(costosCot as any)[key].toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-slate-500">Real</p>
