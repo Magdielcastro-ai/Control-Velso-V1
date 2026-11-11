@@ -291,26 +291,26 @@ export function CotizacionFinalStep({ cotizacion, moneda: _monedaProp, onRegresa
               <p className="text-[9px] font-semibold text-amber-800 uppercase tracking-wide mb-0.5">
                 Comparativo de modalidad · IVA incluido
               </p>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="flex justify-between gap-2">
+              <div className="flex flex-wrap gap-x-8 gap-y-1">
+                <div className="flex items-baseline gap-1.5">
                   <span>Tiempo regular:</span>
                   <strong>{formatearMoneda(totalRegular, moneda)}</strong>
                 </div>
-                <div className="flex justify-between gap-2">
+                <div className="flex items-baseline gap-1.5">
                   <span>Tiempo extra:</span>
                   <strong>{formatearMoneda(totalTiempoExtra, moneda)}</strong>
                 </div>
-                <div className="flex justify-between gap-2">
+                <div className="flex items-baseline gap-1.5">
                   <span>Diferencia:</span>
                   <strong>+{formatearMoneda(totalTiempoExtra - totalRegular, moneda)}</strong>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 mt-1 pt-1 border-t border-amber-200">
-                <div className="flex justify-between gap-2">
+              <div className="flex flex-wrap gap-x-8 gap-y-1 mt-1 pt-1 border-t border-amber-200">
+                <div className="flex items-baseline gap-1.5">
                   <span>Entrega regular:</span>
                   <strong>{formatearTiempoEntrega(cotizacion.condiciones.tiempoEntregaDias)}</strong>
                 </div>
-                <div className="flex justify-between gap-2">
+                <div className="flex items-baseline gap-1.5">
                   <span>Entrega con tiempo extra:</span>
                   <strong>{entregaParaModalidad(cotizacion.condiciones, true)}</strong>
                 </div>
