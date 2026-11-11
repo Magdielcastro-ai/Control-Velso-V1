@@ -275,7 +275,8 @@ export interface CostosAdicionalesProyecto {
 
 export interface CondicionesComerciales {
   validezDias: number;
-  tiempoEntregaDias: number;
+  tiempoEntregaDias: number | string; // Acepta días fijos (7) o rangos ("3-4")
+  tiempoEntregaDiasExtra?: number | string; // Entrega opcional distinta para TE ("1-3")
   formaPago: string;
   anticipoPorcentaje: number;
   garantia: string;

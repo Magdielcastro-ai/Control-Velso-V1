@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { ImagenUploader } from '@/components/ImagenUploader';
+import { entregaParaModalidad, formatearTiempoEntrega } from '@/utils/entrega';
 import type { Cotizacion, PiezaCotizacion, Proceso } from '@/types/cotizacion';
 
 interface ResumenStepProps {
@@ -127,6 +128,10 @@ export function ResumenStep({ cotizacion, onActualizarPieza, onActualizarProyect
               <p className="text-xs text-slate-500">Diferencia por TE</p>
               <p className="font-bold text-slate-800">+{simbolo}{(totalTiempoExtra - totalRegular).toFixed(2)}</p>
             </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs border-t border-amber-200 pt-2">
+            <p className="text-slate-600">Entrega regular: <strong>{formatearTiempoEntrega(condiciones.tiempoEntregaDias)}</strong></p>
+            <p className="text-amber-800">Entrega con tiempo extra: <strong>{entregaParaModalidad(condiciones, true)}</strong></p>
           </div>
         </div>
       )}
@@ -341,7 +346,7 @@ export function ResumenStep({ cotizacion, onActualizarPieza, onActualizarProyect
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Tiempo de entrega:</span>
-            <span className="font-medium">{condiciones.tiempoEntregaDias} días hábiles</span>
+            <span className="font-medium">{entregaParaModalidad(condiciones, !!cotizacion.proyecto.tiempoExtra)}</span>
           </div>
           <div className="flex justify-between col-span-2">
             <span className="text-slate-500">Forma de pago:</span>

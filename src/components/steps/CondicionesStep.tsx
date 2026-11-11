@@ -57,16 +57,33 @@ export function CondicionesStep({
             <div className="space-y-2">
               <Label htmlFor="entrega" className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-500" />
-                Tiempo de Entrega (días hábiles)
+                Entrega en tiempo regular (días hábiles)
               </Label>
               <Input
                 id="entrega"
-                type="number"
-                min={1}
+                type="text"
                 value={datos.tiempoEntregaDias}
-                onChange={(e) => onChange({ tiempoEntregaDias: parseInt(e.target.value) || 1 })}
+                onChange={(e) => onChange({ tiempoEntregaDias: e.target.value })}
+                placeholder="Ej: 3-4"
                 className="border-slate-300"
               />
+              <p className="text-xs text-slate-500">Puedes escribir un día fijo o un rango: 7, 1-2, 3-4, etc.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="entregaExtra" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-amber-600" />
+                Entrega con tiempo extra (días hábiles)
+              </Label>
+              <Input
+                id="entregaExtra"
+                type="text"
+                value={datos.tiempoEntregaDiasExtra || ''}
+                onChange={(e) => onChange({ tiempoEntregaDiasExtra: e.target.value })}
+                placeholder="Ej: 1-3 (opcional)"
+                className="border-amber-300"
+              />
+              <p className="text-xs text-slate-500">Si lo dejas vacío, se utiliza la entrega regular.</p>
             </div>
           </CardContent>
         </Card>
