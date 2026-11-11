@@ -203,10 +203,16 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                       <div className="space-y-2">
                         {pieza.procesos.map((proceso) => {
                           const real = realDe(pieza.id, proceso.id);
+                          const piezasReales = real
+                            ? Number(real.piezasReal ?? (real.lineas || []).reduce((s: number, l: any) => s + (Number(l.piezas) || 0), 0)) || pieza.cantidad
+                            : 0;
+                          const minutosPorPiezaReal = real && piezasReales > 0
+                            ? Number(real.tiempoMinutosReal) / piezasReales
+                            : 0;
                           return (
                             <div
                               key={proceso.id}
-                              className="bg-slate-50 rounded-lg p-3 flex items-center justify-between"
+                              className="bg-slate-50 rounded-lg p-3 flex items-center justify-between gap-3"
                             >
                               <div>
                                 <p className="font-medium text-sm">{proceso.nombre}</p>
@@ -215,17 +221,17 @@ export function HojaViajeraView({ proyecto, onVolver }: HojaViajeraViewProps) {
                                 </p>
                                 {real && (
                                   <p className="text-xs text-green-700 mt-0.5">
-                                    Real: {real.tiempoMinutosReal} min
+                                    Real: {minutosPorPiezaReal.toFixed(2)} min/pza · {piezasReales} pzas
                                     {real.operadorNombre ? ` · ${real.operadorNombre}` : ''}
                                   </p>
                                 )}
                               </div>
-                              <div className="text-right">
+                              <div className="text-right shrink-0">
                                 <p className="text-sm font-semibold">
-                                  Total: {proceso.tiempoMinutos} min
+                                  {real ? `Total real: ${real.tiempoMinutosReal} min` : `Total: ${proceso.tiempoMinutos} min`}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                  ({(proceso.tiempoMinutos / 60).toFixed(1)} hrs)
+                                  ({((real ? real.tiempoMinutosReal : proceso.tiempoMinutos) / 60).toFixed(1)} hrs)
                                 </p>
                               </div>
                             </div>

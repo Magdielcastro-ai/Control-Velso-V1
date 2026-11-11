@@ -128,8 +128,17 @@ export function ControlDeCodigosView({
     return { porProceso, minutosExtra, costoBaseReal, sobrecostoReal, impactoUtilidad };
   }, [proyecto.procesosReales, procesosCot]);
 
+  const esProyectoDirecto = proyecto.tipoOrigen === 'urgencia' || proyecto.tipoOrigen === 'stock';
+  const tieneCotizacionDirecta = esProyectoDirecto && !!proyecto.cotizadoSnapshot && Number(proyecto.totalCotizado) > 0;
+  const pendienteDeCotizacion = esProyectoDirecto && !tieneCotizacionDirecta;
+  // En fabricación → cotización, la referencia llega DESPUÉS desde el
+  // snapshot. Los datos reales de producción nunca se sustituyen.
+  const piezasCotizadas = tieneCotizacionDirecta && Array.isArray(proyecto.cotizadoSnapshot?.piezas)
+    ? proyecto.cotizadoSnapshot.piezas
+    : (proyecto.piezas || []);
+
   const costosCot = useMemo<CostosAdicionalesProyecto>(() => {
-    const ca: any = proyecto.costosAdicionales || {};
+    const ca: any = (tieneCotizacionDirecta ? proyecto.cotizadoSnapshot?.costosAdicionales : proyecto.costosAdicionales) || {};
     const num = (v: any) => Number(typeof v === 'object' && v !== null ? v.costo : v) || 0;
     return {
       disenoCAD: num(ca.diseno ?? ca.disenoCAD),
@@ -138,7 +147,7 @@ export function ControlDeCodigosView({
       transporte: num(ca.envio ?? ca.transporte),
       otro: num(ca.otro) + num(ca.pruebaDureza) + num(ca.estudioMaterial),
     };
-  }, [proyecto]);
+  }, [proyecto, tieneCotizacionDirecta]);
 
   // Los materiales reales son de SOLO LECTURA: el costo real llega
   // automáticamente desde las órdenes de compra del proyecto.
@@ -157,36 +166,37 @@ export function ControlDeCodigosView({
 
   // Inicializar costos adicionales reales
   const [costosReales, setCostosReales] = useState<CostosAdicionalesProyecto>(
-    proyecto.costosAdicionalesReales || { ...costosCot }
+    proyecto.costosAdicionalesReales || (esProyectoDirecto
+      ? { disenoCAD: 0, programacionCNC: 0, setup: 0, transporte: 0, otro: 0 }
+      : { ...costosCot })
   );
 
   // Calcular totales
   const totales = useMemo(() => {
     const costoMaterialesCotizado = materialesCot.reduce((sum, m) => sum + m.costoTotalCotizado, 0);
-    const costoMaterialesReal = materialesReales.reduce((sum, m) => sum + (m.costoTotalReal || m.costoTotalCotizado), 0);
+    // En proyectos directos el material real existe SOLO si llegó por una OC.
+    // Un cero real (proveedor VELSO) también se respeta.
+    const costoMaterialesReal = materialesReales.reduce(
+      (sum, m) => sum + Number(m.costoTotalReal ?? (esProyectoDirecto ? 0 : m.costoTotalCotizado)),
+      0,
+    );
 
     const costoProcesosCotizado = procesosCot.reduce((sum, p) => sum + p.costoTotalCotizado, 0);
-    // Real por proceso: si hay captura se usa el real; si no, cuenta lo cotizado.
-    // (Antes solo sumaba lo capturado → diferencias fantasma "a favor")
     const costoProcesosReal = procesosCot.reduce((sum, p) => {
       const real = buscarReal(proyecto.procesosReales, p);
-      return sum + (real?.costoTotalReal != null ? Number(real.costoTotalReal) : p.costoTotalCotizado);
+      if (real?.costoTotalReal != null) return sum + Number(real.costoTotalReal);
+      // En fabricación → cotización no se inventa gasto sin captura real.
+      return sum + (esProyectoDirecto ? 0 : p.costoTotalCotizado);
     }, 0);
-    // Herramientas/dispositivos extra capturados en producción suman al costo real
     const costosAdicionalesCotizado = Object.values(costosCot).reduce((sum, v) => sum + v, 0);
     const costosAdicionalesReal = Object.values(costosReales).reduce((sum, v) => sum + v, 0);
 
-    // COSTO DIRECTO COTIZADO OFICIAL: el que calculó la cotización
-    // (Σ subtotalPieza × cantidad + costos generales) — nunca se recomputa
-    // desde componentes, para coincidir exactamente con el Resumen.
-    const costoDirectoPiezas = (proyecto.piezas || []).reduce(
-      (s, pz: any) => s + (Number(pz.subtotalPieza) || 0) * (Number(pz.cantidad) || 1), 0
+    // Después de cotizar un proyecto directo se usa el snapshot oficial.
+    const costoDirectoPiezas = piezasCotizadas.reduce(
+      (s: number, pz: any) => s + (Number(pz.subtotalPieza) || 0) * (Number(pz.cantidad) || 1), 0,
     );
-    const costoTotalCotizado = costoDirectoPiezas + costosAdicionalesCotizado;
+    const costoTotalCotizado = pendienteDeCotizacion ? 0 : costoDirectoPiezas + costosAdicionalesCotizado;
 
-    // COSTO REAL POR DELTAS: cotizado oficial + (real − cotizado) de cada
-    // concepto capturado. Sin capturas → real = cotizado AL CENTAVO,
-    // siempre, sin importar cómo se armó la cotización por dentro.
     const deltaMateriales = materialesReales.reduce((sum, m, i) => {
       const cot = materialesCot[i]?.costoTotalCotizado ?? m.costoTotalCotizado;
       const real = m.costoTotalReal ?? cot;
@@ -201,34 +211,33 @@ export function ControlDeCodigosView({
       .reduce((s: number, e: any) => s + (Number(e.costoTotalReal) || 0), 0);
     const deltaAdicionales = costosAdicionalesReal - costosAdicionalesCotizado;
 
-    const costoTotalReal = costoTotalCotizado + deltaMateriales + deltaProcesos + costoExtras + deltaAdicionales;
+    // FLUJO INVERSO: Producción + OCs + extras SIEMPRE forman el costo real
+    // de un proyecto directo, incluso después de generar su cotización.
+    const costoTotalReal = esProyectoDirecto
+      ? costoMaterialesReal + costoProcesosReal + costoExtras + costosAdicionalesReal
+      : costoTotalCotizado + deltaMateriales + deltaProcesos + costoExtras + deltaAdicionales;
 
-    // Desglose fiscal de la cotización (valores originales, no modificables)
     const ivaPct = Number(proyecto.ivaPorcentaje) || 16;
     const totalConIVA = proyecto.totalCotizado;
     const subtotalSinIVA = totalConIVA / (1 + ivaPct / 100);
     const ivaMonto = totalConIVA - subtotalSinIVA;
 
-    // Utilidad cotizada OFICIAL: la que calculó la cotización por pieza.
-    // Nunca cambia; la real es la que se mueve con los gastos.
-    const utilidadCotizada = (proyecto.piezas || []).reduce(
-      (s, pz: any) => s + (Number(pz.utilidadPieza) || 0) * (Number(pz.cantidad) || 1), 0
+    const utilidadCotizada = piezasCotizadas.reduce(
+      (s: number, pz: any) => s + (Number(pz.utilidadPieza) || 0) * (Number(pz.cantidad) || 1), 0,
     );
-    // El % cotizado es el margen que quedó guardado en el proyecto
     const porcentajeUtilidadCotizada = Number(proyecto.margenUtilidad) ||
       (subtotalSinIVA > 0 ? (utilidadCotizada / subtotalSinIVA) * 100 : 0);
-    // Utilidad real = cotizada − lo que se movió el costo (deltas).
-    // Si ya se facturó por otro monto, también se ajusta.
-    // Sin capturas → idéntica a la cotizada en pesos Y en %.
     const deltaCosto = costoTotalReal - costoTotalCotizado;
     const baseFacturadaSinIVA = proyecto.totalFacturado
       ? proyecto.totalFacturado / (1 + ivaPct / 100)
       : subtotalSinIVA;
     const ajusteFacturado = proyecto.totalFacturado ? (baseFacturadaSinIVA - subtotalSinIVA) : 0;
-    const utilidadReal = utilidadCotizada + ajusteFacturado - deltaCosto;
-    // Misma base que la cotización oficial (costo + utilidad = subtotal sin IVA)
+    // Antes de cotizar la utilidad está PENDIENTE, no es una pérdida.
+    const utilidadReal = pendienteDeCotizacion ? 0 : utilidadCotizada + ajusteFacturado - deltaCosto;
     const baseParaPorcentaje = costoTotalCotizado + utilidadCotizada;
-    const porcentajeUtilidadReal = baseParaPorcentaje > 0 ? (utilidadReal / baseParaPorcentaje) * 100 : 0;
+    const porcentajeUtilidadReal = !pendienteDeCotizacion && baseParaPorcentaje > 0
+      ? (utilidadReal / baseParaPorcentaje) * 100
+      : 0;
 
     return {
       costoMaterialesCotizado,
@@ -249,8 +258,9 @@ export function ControlDeCodigosView({
       utilidadReal,
       porcentajeUtilidadCotizada,
       porcentajeUtilidadReal,
+      pendienteDeCotizacion,
     };
-  }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, costosReales]);
+  }, [proyecto, materialesCot, procesosCot, costosCot, materialesReales, costosReales, piezasCotizadas, pendienteDeCotizacion, esProyectoDirecto]);
 
   // Actualizar costo adicional real
   const actualizarCostoReal = (campo: keyof CostosAdicionalesProyecto, valor: number) => {
@@ -372,77 +382,109 @@ export function ControlDeCodigosView({
         </Button>
       </div>
 
+      {pendienteDeCotizacion && (
+        <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+          <strong>Fabricación → cotización:</strong> el costo directo real ya incluye los procesos
+          capturados en Producción, las órdenes de compra y los extras. La utilidad se calculará
+          cuando generes la cotización desde este proyecto.
+        </div>
+      )}
+
       {/* Desglose: cotización oficial vs costo directo vs utilidad */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Cotización oficial (valores originales, no modificables) */}
         <Card className="border-blue-200">
           <CardContent className="p-4 space-y-1.5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cotización oficial</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Total sin IVA</span>
-              <span className="font-semibold">${totales.subtotalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">IVA ({totales.ivaPct}%)</span>
-              <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-sm border-t border-blue-100 pt-1.5">
-              <span className="text-slate-700 font-medium">Total cotizado</span>
-              <span className="font-bold text-blue-700">${totales.totalConIVA.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {pendienteDeCotizacion ? (
+              <div className="py-3">
+                <p className="text-lg font-bold text-blue-800">Pendiente de cotizar</p>
+                <p className="text-xs text-slate-500 mt-1">Se genera desde el proyecto después de fabricar.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Total sin IVA</span>
+                  <span className="font-semibold">${totales.subtotalSinIVA.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">IVA ({totales.ivaPct}%)</span>
+                  <span className="font-semibold">${totales.ivaMonto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-blue-100 pt-1.5">
+                  <span className="text-slate-700 font-medium">Total cotizado</span>
+                  <span className="font-bold text-blue-700">${totales.totalConIVA.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
         {/* Costo directo: materiales + procesos + adicionales */}
-        <Card className={totales.costoTotalReal > totales.costoTotalCotizado ? 'border-red-200' : 'border-green-200'}>
+        <Card className={pendienteDeCotizacion ? 'border-blue-200' : (totales.costoTotalReal > totales.costoTotalCotizado ? 'border-red-200' : 'border-green-200')}>
           <CardContent className="p-4 space-y-1.5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Costo directo</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Cotizado</span>
-              <span className="font-semibold">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {!pendienteDeCotizacion && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Cotizado</span>
+                <span className="font-semibold">${totales.costoTotalCotizado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Real</span>
-              <span className={`font-semibold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
+              <span className={`font-semibold ${!pendienteDeCotizacion && totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
                 ${totales.costoTotalReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
-              <span className="text-slate-700 font-medium">Diferencia</span>
-              <span className={`font-bold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
-                {totales.costoTotalReal > totales.costoTotalCotizado ? '+' : ''}
-                ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400">Materiales + procesos + costos adicionales</p>
+            {!pendienteDeCotizacion && (
+              <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
+                <span className="text-slate-700 font-medium">Diferencia</span>
+                <span className={`font-bold ${totales.costoTotalReal > totales.costoTotalCotizado ? 'text-red-600' : 'text-green-600'}`}>
+                  {totales.costoTotalReal > totales.costoTotalCotizado ? '+' : ''}
+                  ${(totales.costoTotalReal - totales.costoTotalCotizado).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+            <p className="text-[10px] text-slate-400">
+              {pendienteDeCotizacion ? 'Producción + órdenes de compra + extras' : 'Materiales + procesos + costos adicionales'}
+            </p>
           </CardContent>
         </Card>
 
         {/* Utilidad: la margen de la cotización vs lo que quedó */}
-        <Card className={totales.utilidadReal >= totales.utilidadCotizada ? 'border-green-200' : 'border-amber-200'}>
+        <Card className={pendienteDeCotizacion ? 'border-slate-200' : (totales.utilidadReal >= totales.utilidadCotizada ? 'border-green-200' : 'border-amber-200')}>
           <CardContent className="p-4 space-y-1.5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Utilidad</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Cotizada ({totales.porcentajeUtilidadCotizada.toFixed(1)}%)</span>
-              <span className="font-semibold">${totales.utilidadCotizada.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Real ({totales.porcentajeUtilidadReal.toFixed(1)}%)</span>
-              <span className={`font-semibold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-amber-600'}`}>
-                ${totales.utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
-              <span className="text-slate-700 font-medium">Efecto del costo real</span>
-              <span className={`font-bold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-red-600'}`}>
-                {totales.utilidadReal >= totales.utilidadCotizada ? '▲ sube' : '▼ baja'}
-                {' '}
-                {Math.abs(totales.porcentajeUtilidadReal - totales.porcentajeUtilidadCotizada).toFixed(1)} pts
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400">
-              Si gastas menos o fabricas más rápido, la utilidad sube; si gastas más, baja
-            </p>
+            {pendienteDeCotizacion ? (
+              <div className="py-3">
+                <p className="text-lg font-bold text-slate-700">Pendiente de cotización</p>
+                <p className="text-xs text-slate-500 mt-1">Primero conoce tu gasto real; el margen se define al cotizar.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Cotizada ({totales.porcentajeUtilidadCotizada.toFixed(1)}%)</span>
+                  <span className="font-semibold">${totales.utilidadCotizada.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Real ({totales.porcentajeUtilidadReal.toFixed(1)}%)</span>
+                  <span className={`font-semibold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-amber-600'}`}>
+                    ${totales.utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-slate-100 pt-1.5">
+                  <span className="text-slate-700 font-medium">Efecto del costo real</span>
+                  <span className={`font-bold ${totales.utilidadReal >= totales.utilidadCotizada ? 'text-green-600' : 'text-red-600'}`}>
+                    {totales.utilidadReal >= totales.utilidadCotizada ? '▲ sube' : '▼ baja'}
+                    {' '}
+                    {Math.abs(totales.porcentajeUtilidadReal - totales.porcentajeUtilidadCotizada).toFixed(1)} pts
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Si gastas menos o fabricas más rápido, la utilidad sube; si gastas más, baja
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -608,7 +650,7 @@ export function ControlDeCodigosView({
                 {materialesReales.map((material) => {
                   const compras = (material as any).comprasOC || [];
                   const hayCompra = compras.length > 0;
-                  const realTotal = material.costoTotalReal ?? material.costoTotalCotizado;
+                  const realTotal = material.costoTotalReal ?? (esProyectoDirecto ? 0 : material.costoTotalCotizado);
                   const diferente = hayCompra && Math.abs(realTotal - material.costoTotalCotizado) > 0.01;
                   return (
                     <div key={material.id} className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-lg ${hayCompra ? 'bg-blue-50/50 border border-blue-200' : 'bg-slate-50'}`}>

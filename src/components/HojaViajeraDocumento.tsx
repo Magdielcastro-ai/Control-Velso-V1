@@ -118,7 +118,7 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
             <th className="px-2 py-1 text-center w-20">FECHA</th>
             <th className="px-2 py-1 text-center w-16">HORA INICIO</th>
             <th className="px-2 py-1 text-center w-16">HORA FIN</th>
-            <th className="px-2 py-1 text-center w-16">MIN REALES</th>
+            <th className="px-2 py-1 text-center w-20">MIN TOTALES</th>
             <th className="px-2 py-1 text-center w-14">MIN EXTRA</th>
             <th className="px-2 py-1 text-center w-24">OPERADOR</th>
           </tr>
@@ -134,6 +134,12 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
             const operadores = lineas.length > 0
               ? lineas.map((l: any) => `${l.operador || '—'}${l.extra ? ' (TE)' : ''}`).join(' / ')
               : (r?.operadorNombre || '');
+            const piezasReales = r
+              ? Number(r.piezasReal ?? lineas.reduce((s: number, l: any) => s + (Number(l.piezas) || 0), 0)) || Number(pieza.cantidad) || 1
+              : 0;
+            const minutosPorPieza = r && piezasReales > 0
+              ? Number(r.tiempoMinutosReal) / piezasReales
+              : 0;
             return (
               <tr key={proc.id || idx} className="border-b border-slate-200">
                 <td className="px-2 py-3">{idx + 1}</td>
@@ -143,6 +149,11 @@ export function HojaViajeraDocumento({ proyecto, pieza }: HojaViajeraDocumentoPr
                 <td className="px-2 py-3" />
                 <td className="px-2 py-3 text-center font-semibold">
                   {r ? r.tiempoMinutosReal : ''}
+                  {r && (
+                    <span className="block text-[9px] font-normal text-slate-600">
+                      {minutosPorPieza.toFixed(2)} min/pza · {piezasReales} pzas
+                    </span>
+                  )}
                 </td>
                 <td className="px-2 py-3 text-center font-semibold text-amber-700">
                   {r && minExtra > 0 ? minExtra : ''}
