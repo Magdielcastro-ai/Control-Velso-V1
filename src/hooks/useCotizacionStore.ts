@@ -466,15 +466,27 @@ export const useCotizacionStore = () => {
           }
           const tiempoMinutos = proceso.tiempoMinutosPorPieza * pieza.cantidad;
           const tiempoHoras = tiempoMinutos / 60;
-          const costoMaquina = tiempoHoras * proceso.costoPorHora;
-          const tasaMO = proceso.incluyeManoObra ? (proceso.costoManoObraPorHora || 0) : 0;
+          const catalogoItem = CATALOGO_PROCESOS_VELSO.find(p => p.id === proceso.tipo);
+          const esManoObraDirecta = catalogoItem?.categoria === 'mano_obra' || proceso.tipo === 'mo_s' || proceso.tipo === 'mo_e';
+          // MO-S y MO-E son procesos 100% mano de obra: su tarifa está en
+          // costoPorHora, NO en costoManoObraPorHora. Las cotizaciones viejas
+          // además traían incluyeManoObra=false y MO=0, causando diferencia $0.
+          const tasaMO = esManoObraDirecta
+            ? (COSTOS_MANO_OBRA[proceso.tipo as 'mo_s' | 'mo_e'] || proceso.costoPorHora || 0)
+            : (proceso.incluyeManoObra ? (proceso.costoManoObraPorHora || 0) : 0);
+          const costoMaquina = esManoObraDirecta ? 0 : tiempoHoras * proceso.costoPorHora;
           const costoManoObra = tiempoHoras * tasaMO;
           const costoTotal = costoMaquina + costoManoObra * factorManoObra;
           return {
             ...proceso,
             tiempoMinutos,
+            costoManoObraPorHora: tasaMO,
             costoManoObra,
             costoTotal,
+            incluyeManoObra: esManoObraDirecta || proceso.incluyeManoObra,
+            tipoManoObraSeleccionada: esManoObraDirecta
+              ? (proceso.tipo as 'mo_s' | 'mo_e')
+              : proceso.tipoManoObraSeleccionada,
             tiempoExtraCotizado: cotizarConTiempoExtra && costoManoObra > 0,
           };
         });

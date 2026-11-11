@@ -1085,14 +1085,20 @@ function ProcesosPieza({
     const tiempoMinutosPorPieza = unidadTiempo === 'horas' ? tiempoProceso * 60 : tiempoProceso;
     const tiempoMinutos = tiempoMinutosPorPieza * pieza.cantidad;
     const tiempoHoras = tiempoMinutos / 60;
+    const esManoObraDirecta = catalogoItem.categoria === 'mano_obra';
     let costoMO = 0;
-    if (catalogoItem.categoria === 'maquina') {
+    if (esManoObraDirecta) {
+      costoMO = tiempoHoras * catalogoItem.costoPorHora;
+    } else if (catalogoItem.categoria === 'maquina') {
       costoMO = tiempoHoras * (tipoMO === 'mo_s' ? 191.19 : 286.78);
     } else if (catalogoItem.requiereManoObra === 'mo_s') {
       costoMO = tiempoHoras * 191.19;
     } else if (catalogoItem.requiereManoObra === 'mo_e') {
       costoMO = tiempoHoras * 286.78;
     }
+    const tasaMO = esManoObraDirecta
+      ? catalogoItem.costoPorHora
+      : (costoMO > 0 ? (tipoMO === 'mo_e' ? 286.78 : 191.19) : 0);
 
     const nuevoProceso: Proceso = {
       id: crypto.randomUUID(),
@@ -1101,12 +1107,14 @@ function ProcesosPieza({
       tiempoMinutosPorPieza,
       tiempoMinutos,
       costoPorHora: catalogoItem.costoPorHora,
-      costoManoObraPorHora: tipoMO === 'mo_e' ? 286.78 : 191.19,
+      costoManoObraPorHora: tasaMO,
       costoManoObra: costoMO,
-      costoTotal: tiempoHoras * catalogoItem.costoPorHora + costoMO,
+      costoTotal: tiempoHoras * (esManoObraDirecta ? 0 : catalogoItem.costoPorHora) + costoMO,
       descripcion: `${tiempoProceso} ${unidadTiempo} por pieza × ${pieza.cantidad} pzas = ${tiempoMinutos} min total`,
       incluyeManoObra: costoMO > 0,
-      tipoManoObraSeleccionada: costoMO > 0 ? tipoMO : undefined,
+      tipoManoObraSeleccionada: esManoObraDirecta
+        ? (catalogoItem.id as 'mo_s' | 'mo_e')
+        : (costoMO > 0 ? tipoMO : undefined),
     };
 
     onActualizar(pieza.id, { procesos: [...pieza.procesos, nuevoProceso] });
